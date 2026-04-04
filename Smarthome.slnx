@@ -1,6 +1,10 @@
 <Solution>
-  <Project Path="API/API.csproj" />
-  <Project Path="Application/Application.csproj" />
-  <Project Path="Domain/Domain.csproj" />
-  <Project Path="Infrastructure/Infrastructure.csproj" />
+  <Folder Name="/Core/">
+    <Project Path="Application/Application.csproj" />
+    <Project Path="Domain/Domain.csproj" />
+  </Folder>
+  <Folder Name="/Infra/">
+    <Project Path="Infrastructure/Infrastructure.csproj" />
+  </Folder>
+  <Project Path="Web/Web.csproj" Id="9e8c03db-dd60-40c2-8c79-f0c0a8324427" />
 </Solution>
