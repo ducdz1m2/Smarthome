@@ -80,9 +80,7 @@ namespace Domain.ValueObjects
         public bool IsLessThan(Money other) =>
             Currency == other.Currency && Amount < other.Amount;
 
-        public bool Equals(Money other) =>
-            Currency == other.Currency && Amount == other.Amount;
-
+       
         // Formatting
         public string ToVndString() =>
             $"{Amount:N0} ₫";
