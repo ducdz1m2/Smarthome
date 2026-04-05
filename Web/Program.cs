@@ -1,3 +1,4 @@
+using MudBlazor.Services;
 using Web.Components;
 
 namespace Web
@@ -11,7 +12,7 @@ namespace Web
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
-
+            builder.Services.AddMudServices();
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.

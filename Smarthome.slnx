@@ -6,5 +6,5 @@
   <Folder Name="/Infra/">
     <Project Path="Infrastructure/Infrastructure.csproj" />
   </Folder>
-  <Project Path="Web/Web.csproj" Id="9e8c03db-dd60-40c2-8c79-f0c0a8324427" />
+  <Project Path="Web/Web.csproj" Id="8fcce73d-2d69-4084-872d-777910c99644" />
 </Solution>
