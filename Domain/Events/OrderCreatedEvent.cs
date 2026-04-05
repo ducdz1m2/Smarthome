@@ -1,6 +1,6 @@
 ﻿namespace Domain.Events
 {
-    public abstract class OrderCreatedEvent : DomainEvent
+    public class OrderCreatedEvent : DomainEvent
     {
         public int OrderId { get; }
         public int UserId { get; }
