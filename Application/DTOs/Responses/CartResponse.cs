@@ -1,6 +1,6 @@
-namespace Application.DTOs
+namespace Application.DTOs.Responses
 {
-    public class CartItemDto
+    public class CartItemResponse
     {
         public int Id { get; set; }
         public int ProductId { get; set; }
@@ -14,24 +14,15 @@ namespace Application.DTOs
         public int StockAvailable { get; set; }
     }
 
-    public class CartDto
+    public class CartResponse
     {
         public int UserId { get; set; }
-        public List<CartItemDto> Items { get; set; } = new();
+        public List<CartItemResponse> Items { get; set; } = new();
         public decimal SubTotal { get; set; }
         public int TotalItems { get; set; }
     }
 
-    public class AddToCartRequest
-    {
-        public int UserId { get; set; }
-        public int ProductId { get; set; }
-        public int Quantity { get; set; } = 1;
-        public int? VariantId { get; set; }
-    }
+    
 
-    public class UpdateCartItemRequest
-    {
-        public int Quantity { get; set; }
-    }
+    
 }

@@ -1,6 +1,6 @@
-namespace Application.DTOs
+namespace Application.DTOs.Responses
 {
-    public class OrderDto
+    public class OrderResponse
     {
         public int Id { get; set; }
         public string OrderNumber { get; set; } = string.Empty;
@@ -21,7 +21,7 @@ namespace Application.DTOs
         public List<OrderShipmentDto> Shipments { get; set; } = new();
     }
 
-    public class OrderItemDto
+    public class OrderItemResponse
     {
         public int Id { get; set; }
         public int ProductId { get; set; }
@@ -33,7 +33,7 @@ namespace Application.DTOs
         public bool RequiresInstallation { get; set; }
     }
 
-    public class OrderShipmentDto
+    public class OrderShipmentResponse
     {
         public int Id { get; set; }
         public string ShipmentNumber { get; set; } = string.Empty;
@@ -44,28 +44,7 @@ namespace Application.DTOs
         public DateTime? DeliveredAt { get; set; }
     }
 
-    public class CreateOrderRequest
-    {
-        public int UserId { get; set; }
-        public string ReceiverName { get; set; } = string.Empty;
-        public string ReceiverPhone { get; set; } = string.Empty;
-        public string ShippingStreet { get; set; } = string.Empty;
-        public string ShippingWard { get; set; } = string.Empty;
-        public string ShippingDistrict { get; set; } = string.Empty;
-        public string ShippingCity { get; set; } = string.Empty;
-        public List<CreateOrderItemRequest> Items { get; set; } = new();
-    }
+    
 
-    public class CreateOrderItemRequest
-    {
-        public int ProductId { get; set; }
-        public int Quantity { get; set; }
-        public int? VariantId { get; set; }
-    }
-
-    public class UpdateOrderStatusRequest
-    {
-        public string Status { get; set; } = string.Empty;
-        public string? Notes { get; set; }
-    }
+    
 }
