@@ -1,4 +1,4 @@
-﻿using Smarthome.Domain.Exceptions;
+﻿using Domain.Exceptions;
 
 namespace Domain.ValueObjects
 {
