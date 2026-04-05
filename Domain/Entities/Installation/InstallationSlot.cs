@@ -12,6 +12,8 @@ namespace Domain.Entities.Installation
         public bool IsBooked { get; private set; } = false;
         public int? BookingId { get; private set; }
 
+        public virtual TechnicianProfile? Technician { get; private set; }
+
         private InstallationSlot() { }
 
         public static InstallationSlot Create(int technicianId, DateTime date, TimeSpan startTime, TimeSpan endTime)

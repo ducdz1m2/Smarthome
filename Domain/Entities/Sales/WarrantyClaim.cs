@@ -13,6 +13,8 @@ namespace Domain.Entities.Sales
         public WarrantyClaimStatus Status { get; private set; } = WarrantyClaimStatus.Pending;
         public int? TechnicianId { get; private set; }
 
+        public virtual Warranty? Warranty { get; private set; }
+
         private WarrantyClaim() { }
 
         public static WarrantyClaim Create(int warrantyId, string issue)

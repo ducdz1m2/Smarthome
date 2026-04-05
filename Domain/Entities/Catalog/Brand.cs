@@ -12,6 +12,8 @@ namespace Domain.Entities.Catalog
         public WebsiteUrl? Website { get; private set; }  
         public bool IsActive { get; private set; } = true;
 
+        public virtual ICollection<Product> Products { get; private set; } = new List<Product>();
+
         public static Brand Create(string name, string? description = null,
             string? logoUrl = null, string? website = null)
         {

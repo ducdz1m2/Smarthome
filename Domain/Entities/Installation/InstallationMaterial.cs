@@ -11,6 +11,8 @@ namespace Domain.Entities.Installation
         public int? QuantityUsed { get; private set; }
         public int? QuantityReturned { get; private set; }
 
+        public virtual InstallationBooking? Booking { get; private set; }
+
         private InstallationMaterial() { }
 
         public static InstallationMaterial Create(int bookingId, int productId, int quantityTaken)
