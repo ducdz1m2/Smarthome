@@ -15,7 +15,6 @@ namespace Infrastructure.Configuration
             builder.Property(u => u.Avatar).HasMaxLength(500);
             builder.Property(u => u.IsActive).HasDefaultValue(true);
             builder.HasIndex(u => u.UserName).IsUnique();
-            builder.HasIndex(u => u.Email).IsUnique();
             builder.OwnsOne(u => u.Email, e => e.Property(em => em.Value).HasMaxLength(100).HasColumnName("Email"));
             builder.OwnsOne(u => u.PhoneNumber, p => p.Property(ph => ph.Value).HasMaxLength(20).HasColumnName("PhoneNumber"));
             builder.Ignore(u => u.DomainEvents);

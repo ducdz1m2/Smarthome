@@ -17,8 +17,8 @@ namespace Application.DTOs.Responses
         public string ShippingMethod { get; set; } = string.Empty;
         public string? CancelReason { get; set; }
         public DateTime CreatedAt { get; set; }
-        public List<OrderItemDto> Items { get; set; } = new();
-        public List<OrderShipmentDto> Shipments { get; set; } = new();
+        public List<OrderItemResponse> Items { get; set; } = new();
+        public List<OrderShipmentResponse> Shipments { get; set; } = new();
     }
 
     public class OrderItemResponse
