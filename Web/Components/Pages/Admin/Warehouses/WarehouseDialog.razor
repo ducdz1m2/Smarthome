@@ -1,0 +1,158 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IWarehouseService WarehouseService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField @bind-Value="_request.Name" Label="Tên kho *" 
+                          Required="true" RequiredError="Tên kho không được trống"
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            @if (!_isEdit)
+            {
+                <MudTextField @bind-Value="_createRequest.Code" Label="Mã kho *" 
+                              Required="true" RequiredError="Mã kho không được trống"
+                              Variant="Variant.Outlined" Class="mb-3"
+                              HelperText="3-20 ký tự, sẽ chuyển thành chữ hoa" />
+            }
+            
+            <MudTextField @bind-Value="_request.AddressStreet" Label="Địa chỉ đường" 
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            <MudGrid>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_request.AddressWard" Label="Phường/Xã" 
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_request.AddressDistrict" Label="Quận/Huyện" 
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_request.AddressCity" Label="Tỉnh/Thành phố" 
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+            
+            <MudTextField @bind-Value="_request.Phone" Label="Điện thoại" 
+                          Variant="Variant.Outlined" Class="mb-3 mt-3" />
+            
+            <MudTextField @bind-Value="_request.ManagerName" Label="Quản lý kho" 
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            @if (_isEdit)
+            {
+                <MudSwitch @bind-Value="_request.IsActive" Label="Đang hoạt động" 
+                           Color="Color.Success" />
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            @(_isEdit ? "Cập nhật" : "Thêm mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? WarehouseId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isEdit => WarehouseId.HasValue;
+    
+    private UpdateWarehouseRequest _request = new()
+    {
+        Name = "",
+        IsActive = true
+    };
+    
+    private CreateWarehouseRequest _createRequest = new()
+    {
+        Name = "",
+        Code = ""
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_isEdit)
+        {
+            try
+            {
+                var warehouse = await WarehouseService.GetByIdAsync(WarehouseId.Value);
+                if (warehouse != null)
+                {
+                    _request = new UpdateWarehouseRequest
+                    {
+                        Name = warehouse.Name,
+                        AddressStreet = warehouse.AddressStreet,
+                        AddressWard = warehouse.AddressWard,
+                        AddressDistrict = warehouse.AddressDistrict,
+                        AddressCity = warehouse.AddressCity,
+                        Phone = warehouse.Phone,
+                        ManagerName = warehouse.ManagerName,
+                        IsActive = warehouse.IsActive
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
+                MudDialog.Cancel();
+            }
+        }
+        else
+        {
+            _createRequest = new CreateWarehouseRequest
+            {
+                Name = "",
+                Code = ""
+            };
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        try
+        {
+            if (_isEdit)
+            {
+                await WarehouseService.UpdateAsync(WarehouseId.Value, _request);
+                Snackbar.Add("Đã cập nhật kho", Severity.Success);
+            }
+            else
+            {
+                var createRequest = new CreateWarehouseRequest
+                {
+                    Name = _request.Name,
+                    Code = _createRequest.Code,
+                    AddressStreet = _request.AddressStreet,
+                    AddressWard = _request.AddressWard,
+                    AddressDistrict = _request.AddressDistrict,
+                    AddressCity = _request.AddressCity,
+                    Phone = _request.Phone
+                };
+                await WarehouseService.CreateAsync(createRequest);
+                Snackbar.Add("Đã thêm kho mới", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

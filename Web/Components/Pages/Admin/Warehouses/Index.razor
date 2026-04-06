@@ -1,0 +1,172 @@
+@page "/admin/warehouses"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@using Web.Components.Shared
+@layout AdminLayout
+@inject IWarehouseService WarehouseService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Kho</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+           OnClick="@(() => OpenWarehouseDialog(null))" Class="mb-4">
+    Thêm kho
+</MudButton>
+
+<MudTable Items="_warehouses" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterWarehouses" SortMode="SortMode.Single" AllowUnsorted="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách kho</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh Width="60px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh Width="120px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.Code)">Mã kho</MudTableSortLabel></MudTh>
+        <MudTh Width="180px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.Name)">Tên kho</MudTableSortLabel></MudTh>
+        <MudTh Width="250px">Địa chỉ</MudTh>
+        <MudTh Width="120px">Điện thoại</MudTh>
+        <MudTh Width="120px">Chủ kho</MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh Width="100px">Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Mã">@context.Code</MudTd>
+        <MudTd DataLabel="Tên">@context.Name</MudTd>
+        <MudTd DataLabel="Địa chỉ">@context.Address</MudTd>
+        <MudTd DataLabel="Điện thoại">@context.Phone</MudTd>
+        <MudTd DataLabel="Chủ kho">@context.ManagerName</MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudSwitch T="bool" Value="@context.IsActive" 
+                       ValueChanged="@(v => OnToggleStatus(context.Id, v))"
+                       Color="Color.Success" UncheckedColor="Color.Error" />
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenWarehouseDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeleteWarehouse(context))" Size="Size.Small" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<WarehouseResponse> _warehouses = new();
+    private bool _loading = true;
+    private string _searchString = "";
+
+    private bool FilterWarehouses(WarehouseResponse warehouse)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return warehouse.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               warehouse.Code.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               (warehouse.Address?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (warehouse.Phone?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWarehouses();
+    }
+
+    private async Task LoadWarehouses()
+    {
+        _loading = true;
+        try
+        {
+            _warehouses = await WarehouseService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenWarehouseDialog(WarehouseResponse? warehouse)
+    {
+        var parameters = new DialogParameters<WarehouseDialog>();
+        if (warehouse != null)
+        {
+            parameters.Add(x => x.WarehouseId, warehouse.Id);
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<WarehouseDialog>(warehouse == null ? "Thêm kho" : "Sửa kho", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadWarehouses();
+        }
+    }
+
+    private async Task ToggleStatus(int id, bool isActive)
+    {
+        try
+        {
+            if (isActive)
+                await WarehouseService.ActivateAsync(id);
+            else
+                await WarehouseService.DeactivateAsync(id);
+            
+            Snackbar.Add($"Đã {(isActive ? "kích hoạt" : "vô hiệu hóa")} kho", Severity.Success);
+            await LoadWarehouses();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            await LoadWarehouses();
+        }
+    }
+
+    private void OnToggleStatus(int id, bool isActive)
+    {
+        _ = ToggleStatus(id, isActive);
+    }
+
+    private async Task DeleteWarehouse(WarehouseResponse warehouse)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa kho \"{warehouse.Name}\"?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await WarehouseService.DeleteAsync(warehouse.Id);
+                Snackbar.Add("Đã xóa kho", Severity.Success);
+                await LoadWarehouses();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}
