@@ -28,4 +28,9 @@
     <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Components\Shared\Catalog\" />
+    <Folder Include="Components\Shared\Forms\" />
+  </ItemGroup>
+
 </Project>

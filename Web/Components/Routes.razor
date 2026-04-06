@@ -1,25 +1,7 @@
-﻿@inject NavigationManager Navigation
-
-<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+﻿<Router AppAssembly="@typeof(Program).Assembly" NotFoundPage="@typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <LayoutView Layout="@GetLayout()">
-            <RouteView RouteData="@routeData" />
-        </LayoutView>
+        @* Quan trọng: DefaultLayout sẽ là layout mặc định cho những trang không khai báo gì *@
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
 </Router>
-
-@code {
-    private Type GetLayout()
-    {
-        var uri = Navigation.Uri;
-        var baseUri = Navigation.BaseUri;
-        var relativeUri = uri.Replace(baseUri, "").TrimStart('/');
-        
-        if (relativeUri.StartsWith("admin", StringComparison.OrdinalIgnoreCase))
-        {
-            return typeof(Layout.AdminLayout);
-        }
-        return typeof(Layout.MainLayout);
-    }
-}
