@@ -1,0 +1,323 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Enums
+@inject IOrderService OrderService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+        }
+        else if (_order == null)
+        {
+            <MudAlert Severity="Severity.Error">Không tìm thấy đơn hàng</MudAlert>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="0" Class="mb-4">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Thông tin đơn hàng</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudField Label="Mã đơn" Variant="Variant.Text">@_order.OrderNumber</MudField>
+                            <MudField Label="Ngày tạo" Variant="Variant.Text">@_order.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudField>
+                            <MudField Label="Trạng thái" Variant="Variant.Text">
+                                <MudChip T="string" Color="@GetStatusColor(_order.Status)" Size="Size.Small">
+                                    @GetStatusDisplayName(_order.Status)
+                                </MudChip>
+                            </MudField>
+                            <MudField Label="Phương thức thanh toán" Variant="Variant.Text">@_order.PaymentMethod</MudField>
+                            <MudField Label="Phương thức giao hàng" Variant="Variant.Text">@_order.ShippingMethod</MudField>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="0" Class="mb-4">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Thông tin khách hàng</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudField Label="Tên người nhận" Variant="Variant.Text">@_order.ReceiverName</MudField>
+                            <MudField Label="Điện thoại" Variant="Variant.Text">@_order.ReceiverPhone</MudField>
+                            <MudField Label="Địa chỉ giao hàng" Variant="Variant.Text">@_order.ShippingAddress</MudField>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                
+                <MudItem xs="12">
+                    <MudCard Elevation="0" Class="mb-4">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Chi tiết sản phẩm</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudTable Items="_order.Items" Dense="true" Hover="true" Striped="true" Bordered="true">
+                                <HeaderContent>
+                                    <MudTh>Sản phẩm</MudTh>
+                                    <MudTh>SKU</MudTh>
+                                    <MudTh>Số lượng</MudTh>
+                                    <MudTh>Đơn giá</MudTh>
+                                    <MudTh>Thành tiền</MudTh>
+                                    <MudTh>Cần lắp đặt</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd>@context.ProductName</MudTd>
+                                    <MudTd>@context.Sku</MudTd>
+                                    <MudTd>@context.Quantity</MudTd>
+                                    <MudTd>@context.UnitPrice.ToString("N0") đ</MudTd>
+                                    <MudTd>@context.TotalPrice.ToString("N0") đ</MudTd>
+                                    <MudTd>
+                                        @if (context.RequiresInstallation)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" />
+                                        }
+                                        else
+                                        {
+                                            <MudText>-</MudText>
+                                        }
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                
+                @if (_order.Shipments?.Any() == true)
+                {
+                    <MudItem xs="12">
+                        <MudCard Elevation="0" Class="mb-4">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Thông tin vận chuyển</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudTable Items="_order.Shipments" Dense="true">
+                                    <HeaderContent>
+                                        <MudTh>Mã vận đơn</MudTh>
+                                        <MudTh>Trạng thái</MudTh>
+                                        <MudTh>Đơn vị vận chuyển</MudTh>
+                                        <MudTh>Mã tracking</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd>@context.ShipmentNumber</MudTd>
+                                        <MudTd>@context.Status</MudTd>
+                                        <MudTd>@context.Carrier</MudTd>
+                                        <MudTd>@context.TrackingNumber</MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+                
+                <MudItem xs="12">
+                    <MudCard Elevation="0">
+                        <MudCardContent>
+                            <MudGrid Justify="Justify.FlexEnd">
+                                <MudItem>
+                                    <MudText Typo="Typo.body2">Tạm tính: <strong>@_order.SubTotal.ToString("N0") đ</strong></MudText>
+                                </MudItem>
+                                @if (_order.DiscountAmount > 0)
+                                {
+                                    <MudItem xs="12">
+                                        <MudText Typo="Typo.body2" Color="Color.Success">Giảm giá: -@_order.DiscountAmount.ToString("N0") đ</MudText>
+                                    </MudItem>
+                                }
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.body2">Phí vận chuyển: @_order.ShippingFee.ToString("N0") đ</MudText>
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.h6" Color="Color.Primary">
+                                        Tổng cộng: @_order.TotalAmount.ToString("N0") đ
+                                    </MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                
+                @if (!string.IsNullOrEmpty(_order.CancelReason))
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Error">
+                            <strong>Lý do hủy:</strong> @_order.CancelReason
+                        </MudAlert>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Đóng</MudButton>
+        
+        @if (_order != null && !IsReadOnly)
+        {
+            @if (_order.Status == "Pending")
+            {
+                <MudButton Color="Color.Primary" OnClick="ConfirmOrder" StartIcon="@Icons.Material.Filled.CheckCircle">
+                    Xác nhận
+                </MudButton>
+            }
+            
+            @if (CanCancel(_order.Status))
+            {
+                <MudButton Color="Color.Error" OnClick="CancelOrder" StartIcon="@Icons.Material.Filled.Cancel">
+                    Hủy đơn
+                </MudButton>
+            }
+            
+            @if (_order.Status is "Installing" or "Testing" or "Delivered")
+            {
+                <MudButton Color="Color.Success" OnClick="CompleteOrder" StartIcon="@Icons.Material.Filled.DoneAll">
+                    Hoàn tất
+                </MudButton>
+            }
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int OrderId { get; set; }
+    
+    [Parameter]
+    public bool IsReadOnly { get; set; } = true;
+
+    private OrderResponse? _order;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrder();
+    }
+
+    private async Task LoadOrder()
+    {
+        _loading = true;
+        try
+        {
+            _order = await OrderService.GetByIdAsync(OrderId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task ConfirmOrder()
+    {
+        try
+        {
+            await OrderService.ConfirmAsync(OrderId);
+            Snackbar.Add("Đã xác nhận đơn hàng", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CancelOrder()
+    {
+        try
+        {
+            await OrderService.CancelAsync(OrderId, "Hủy bởi admin");
+            Snackbar.Add("Đã hủy đơn hàng", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CompleteOrder()
+    {
+        try
+        {
+            await OrderService.CompleteAsync(OrderId);
+            Snackbar.Add("Đã hoàn tất đơn hàng", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static bool CanCancel(string status)
+    {
+        return status != "Completed" && status != "Cancelled" && status != "Refunded";
+    }
+
+    private static string GetStatusDisplayName(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ xác nhận",
+            "Confirmed" => "Đã xác nhận",
+            "AwaitingPickup" => "Chờ lấy hàng",
+            "Shipping" => "Đang giao",
+            "Delivered" => "Đã giao",
+            "AwaitingSchedule" => "Chờ đặt lịch",
+            "Scheduled" => "Đã có lịch",
+            "TechnicianAssigned" => "Đã phân công",
+            "Preparing" => "Chuẩn bị",
+            "Installing" => "Đang lắp",
+            "Testing" => "Kiểm tra",
+            "Completed" => "Hoàn tất",
+            "Cancelled" => "Đã hủy",
+            "Refunded" => "Đã hoàn tiền",
+            "ReturnRequested" => "Yêu cầu trả hàng",
+            _ => status
+        };
+    }
+
+    private static Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => Color.Warning,
+            "Confirmed" => Color.Info,
+            "AwaitingPickup" => Color.Info,
+            "Shipping" => Color.Primary,
+            "Delivered" => Color.Success,
+            "AwaitingSchedule" => Color.Warning,
+            "Scheduled" => Color.Info,
+            "TechnicianAssigned" => Color.Info,
+            "Preparing" => Color.Info,
+            "Installing" => Color.Primary,
+            "Testing" => Color.Primary,
+            "Completed" => Color.Success,
+            "Cancelled" => Color.Error,
+            "Refunded" => Color.Error,
+            "ReturnRequested" => Color.Error,
+            _ => Color.Default
+        };
+    }
+}
