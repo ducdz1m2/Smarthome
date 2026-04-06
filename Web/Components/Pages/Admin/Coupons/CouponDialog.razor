@@ -1,0 +1,189 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Enums
+@inject ICouponService CouponService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField @bind-Value="_request.Code" Label="Mã coupon *" 
+                          Required="true" RequiredError="Mã coupon không được trống"
+                          Variant="Variant.Outlined" Class="mb-3"
+                          HelperText="Ví dụ: SUMMER2024, FLASH50"
+                          Disabled="_isEdit" />
+            
+            <MudSelect T="string" @bind-Value="_request.DiscountType" Label="Loại giảm giá *" 
+                       Variant="Variant.Outlined" Class="mb-3" Disabled="_isEdit">
+                <MudSelectItem Value="@("Percentage")">Phần trăm (%)</MudSelectItem>
+                <MudSelectItem Value="@("FixedAmount")">Số tiền cố định</MudSelectItem>
+            </MudSelect>
+            
+            <MudNumericField T="decimal" @bind-Value="_request.DiscountValue" 
+                             Label="Giá trị giảm *" 
+                             Variant="Variant.Outlined" Class="mb-3" 
+                             Min="0" Required="true"
+                             HelperText="@GetDiscountHelperText()" />
+            
+            <MudDivider Class="my-4" />
+            
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Giới hạn sử dụng</MudText>
+            
+            <MudNumericField T="int?" @bind-Value="_request.UsageLimit" 
+                             Label="Số lần sử dụng tối đa" 
+                             Variant="Variant.Outlined" Class="mb-3" 
+                             Min="1" 
+                             HelperText="Để trống = không giới hạn" />
+            
+            <MudNumericField T="decimal?" @bind-Value="_request.MinOrderAmount" 
+                             Label="Đơn hàng tối thiểu" 
+                             Variant="Variant.Outlined" Class="mb-3" 
+                             Min="0" 
+                             Adornment="Adornment.End" AdornmentText="đ" />
+            
+            <MudNumericField T="decimal?" @bind-Value="_request.MaxDiscountAmount" 
+                             Label="Giảm giá tối đa" 
+                             Variant="Variant.Outlined" Class="mb-3" 
+                             Min="0"
+                             HelperText="Chỉ áp dụng cho giảm %"
+                             Adornment="Adornment.End" AdornmentText="đ" />
+            
+            <MudDivider Class="my-4" />
+            
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Thời hạn</MudText>
+            
+            <MudDatePicker @bind-Date="_expiryDate" 
+                          Label="Ngày hết hạn *" 
+                          Variant="Variant.Outlined" Class="mb-3"
+                          MinDate="DateTime.Today"
+                          Required="true" />
+            
+            @if (_isEdit)
+            {
+                <MudSwitch @bind-Value="_request.IsActive" Label="Đang hoạt động" 
+                           Color="Color.Success" />
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            @(_isEdit ? "Cập nhật" : "Thêm mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? CouponId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isEdit => CouponId.HasValue;
+    private DateTime? _expiryDate = DateTime.Today.AddMonths(1);
+    
+    private UpdateCouponRequest _request = new()
+    {
+        Code = "",
+        DiscountType = "Percentage",
+        DiscountValue = 10,
+        IsActive = true
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_isEdit)
+        {
+            try
+            {
+                var coupon = await CouponService.GetByIdAsync(CouponId.Value);
+                if (coupon != null)
+                {
+                    _request = new UpdateCouponRequest
+                    {
+                        Code = coupon.Code,
+                        DiscountType = coupon.DiscountType,
+                        DiscountValue = coupon.DiscountValue,
+                        UsageLimit = coupon.UsageLimit,
+                        MinOrderAmount = coupon.MinOrderAmount,
+                        MaxDiscountAmount = coupon.MaxDiscountAmount,
+                        ExpiryDate = coupon.ExpiryDate,
+                        IsActive = coupon.IsActive
+                    };
+                    _expiryDate = coupon.ExpiryDate;
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
+                MudDialog.Cancel();
+            }
+        }
+        else
+        {
+            _request = new UpdateCouponRequest
+            {
+                Code = "",
+                DiscountType = "Percentage",
+                DiscountValue = 10,
+                UsageLimit = 100,
+                IsActive = true
+            };
+        }
+    }
+
+    private string GetDiscountHelperText()
+    {
+        return _request.DiscountType == "Percentage" 
+            ? "Nhập số phần trăm (VD: 10 = 10%)" 
+            : "Nhập số tiền (VD: 50000 = 50,000đ)";
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        if (!_expiryDate.HasValue)
+        {
+            Snackbar.Add("Vui lòng chọn ngày hết hạn", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            if (_isEdit)
+            {
+                _request.ExpiryDate = _expiryDate.Value;
+                await CouponService.UpdateAsync(CouponId.Value, _request);
+                Snackbar.Add("Đã cập nhật mã giảm giá", Severity.Success);
+            }
+            else
+            {
+                var createRequest = new CreateCouponRequest
+                {
+                    Code = _request.Code,
+                    DiscountType = _request.DiscountType,
+                    DiscountValue = _request.DiscountValue,
+                    UsageLimit = _request.UsageLimit,
+                    MinOrderAmount = _request.MinOrderAmount,
+                    MaxDiscountAmount = _request.MaxDiscountAmount,
+                    ExpiryDate = _expiryDate.Value
+                };
+                await CouponService.CreateAsync(createRequest);
+                Snackbar.Add("Đã thêm mã giảm giá mới", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,218 @@
+@page "/admin/coupons"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@using Web.Components.Shared
+@layout AdminLayout
+@inject ICouponService CouponService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Mã giảm giá</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+           OnClick="@(() => OpenCouponDialog(null))" Class="mb-4">
+    Thêm mã giảm giá
+</MudButton>
+
+<MudTable Items="_coupons" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterCoupons" SortMode="SortMode.Single" AllowUnsorted="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách mã giảm giá</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh Width="60px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh Width="120px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.Code)">Mã</MudTableSortLabel></MudTh>
+        <MudTh Width="120px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.DiscountType)">Loại</MudTableSortLabel></MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.DiscountValue)">Giá trị</MudTableSortLabel></MudTh>
+        <MudTh Width="120px">Đơn tối thiểu</MudTh>
+        <MudTh Width="100px">Giảm tối đa</MudTh>
+        <MudTh Width="120px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.ExpiryDate)">Hết hạn</MudTableSortLabel></MudTh>
+        <MudTh Width="80px">Đã dùng</MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh Width="80px">Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Mã">
+            <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.Code</MudText>
+        </MudTd>
+        <MudTd DataLabel="Loại">
+            <MudChip T="string" Color="@GetDiscountTypeColor(context.DiscountType)" Size="Size.Small">
+                @GetDiscountTypeDisplay(context.DiscountType)
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Giá trị">
+            @if (context.DiscountType == "Percentage")
+            {
+                <MudText>@(context.DiscountValue)%</MudText>
+            }
+            else
+            {
+                <MudText>@context.DiscountValue.ToString("N0") đ</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Đơn tối thiểu">@(context.MinOrderAmount?.ToString("N0") ?? "-")</MudTd>
+        <MudTd DataLabel="Giảm tối đa">@(context.MaxDiscountAmount?.ToString("N0") ?? "-")</MudTd>
+        <MudTd DataLabel="Hết hạn">
+            <MudText Color="@GetExpiryColor(context.ExpiryDate, context.IsActive)" Typo="Typo.body2">
+                @context.ExpiryDate.ToString("dd/MM/yyyy")
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="Đã dùng">@context.UsageCount / @(context.UsageLimit?.ToString() ?? "∞")</MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudSwitch T="bool" Value="@context.IsActive" 
+                       ValueChanged="@(v => OnToggleStatus(context.Id, v))"
+                       Color="Color.Success" UncheckedColor="Color.Error" />
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeleteCoupon(context))" Size="Size.Small" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<CouponResponse> _coupons = new();
+    private bool _loading = true;
+    private string _searchString = "";
+
+    private bool FilterCoupons(CouponResponse coupon)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return coupon.Code.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCoupons();
+    }
+
+    private async Task LoadCoupons()
+    {
+        _loading = true;
+        try
+        {
+            _coupons = await CouponService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCouponDialog(CouponResponse? coupon)
+    {
+        var parameters = new DialogParameters<CouponDialog>();
+        if (coupon != null)
+        {
+            parameters.Add(x => x.CouponId, coupon.Id);
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CouponDialog>(coupon == null ? "Thêm mã giảm giá" : "Sửa mã giảm giá", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadCoupons();
+        }
+    }
+
+    private async Task ToggleStatus(int id, bool isActive)
+    {
+        try
+        {
+            if (isActive)
+                await CouponService.ActivateAsync(id);
+            else
+                await CouponService.DeactivateAsync(id);
+            
+            Snackbar.Add($"Đã {(isActive ? "kích hoạt" : "vô hiệu hóa")} mã giảm giá", Severity.Success);
+            await LoadCoupons();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            await LoadCoupons();
+        }
+    }
+
+    private void OnToggleStatus(int id, bool isActive)
+    {
+        _ = ToggleStatus(id, isActive);
+    }
+
+    private async Task DeleteCoupon(CouponResponse coupon)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa mã giảm giá \"{coupon.Code}\"?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await CouponService.DeleteAsync(coupon.Id);
+                Snackbar.Add("Đã xóa mã giảm giá", Severity.Success);
+                await LoadCoupons();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private static string GetDiscountTypeDisplay(string type)
+    {
+        return type switch
+        {
+            "Percentage" => "%",
+            "FixedAmount" => "Tiền",
+            _ => type
+        };
+    }
+
+    private static Color GetDiscountTypeColor(string type)
+    {
+        return type switch
+        {
+            "Percentage" => Color.Info,
+            "FixedAmount" => Color.Success,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetExpiryColor(DateTime expiry, bool isActive)
+    {
+        if (!isActive) return Color.Default;
+        if (expiry < DateTime.UtcNow) return Color.Error;
+        if (expiry < DateTime.UtcNow.AddDays(7)) return Color.Warning;
+        return Color.Success;
+    }
+}

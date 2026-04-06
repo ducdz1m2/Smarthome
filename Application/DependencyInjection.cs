@@ -20,6 +20,7 @@ namespace Application
             services.AddScoped<IWarehouseService, WarehouseService>();
             services.AddScoped<IOrderService, OrderService>();
             services.AddScoped<ISupplierService, SupplierService>();
+            services.AddScoped<ICouponService, CouponService>();
 
             return services;
         }

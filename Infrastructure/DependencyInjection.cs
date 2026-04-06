@@ -22,6 +22,7 @@ namespace Infrastructure
             services.AddScoped<IWarehouseRepository, WarehouseRepository>();
             services.AddScoped<IOrderRepository, OrderRepository>();
             services.AddScoped<ISupplierRepository, SupplierRepository>();
+            services.AddScoped<ICouponRepository, CouponRepository>();
 
             return services;
         }
