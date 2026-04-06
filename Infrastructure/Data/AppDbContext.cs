@@ -62,6 +62,7 @@ namespace Infrastructure.Data
 
         // Content
         public DbSet<UserAddress> UserAddresses => Set<UserAddress>();
+        public DbSet<Banner> Banners => Set<Banner>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

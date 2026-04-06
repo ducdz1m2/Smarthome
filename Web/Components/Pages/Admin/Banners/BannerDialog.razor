@@ -1,0 +1,306 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IBannerService BannerService
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_request.Title" Label="Tiêu đề *" 
+                                  Required="true" RequiredError="Tiêu đề không được trống"
+                                  Variant="Variant.Outlined" Class="mb-3" />
+                    
+                    <MudTextField @bind-Value="_request.Subtitle" Label="Tiêu đề phụ" 
+                                  Variant="Variant.Outlined" Class="mb-3" />
+                    
+                    <MudTextField @bind-Value="_request.LinkUrl" Label="Link khi click" 
+                                  Variant="Variant.Outlined" Class="mb-3"
+                                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Link"
+                                  HelperText="Để trống nếu không cần link" />
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Hình ảnh banner</MudText>
+                    
+                    <MudFileUpload T="IBrowserFile" FilesChanged="UploadFile" Accept=".jpg,.jpeg,.png,.gif,.webp" Class="mb-3">
+                        <ActivatorContent>
+                            <MudButton Variant="Variant.Filled" 
+                                       Color="Color.Primary" 
+                                       StartIcon="@Icons.Material.Filled.CloudUpload">
+                                @(_tempImagePath != null ? "Đổi ảnh khác" : "Chọn ảnh")
+                            </MudButton>
+                        </ActivatorContent>
+                    </MudFileUpload>
+                    
+                    @if (_isUploading)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-2" />
+                    }
+                    
+                    @if (!string.IsNullOrWhiteSpace(_previewImageUrl))
+                    {
+                        <MudPaper Elevation="2" Class="pa-2 mb-3">
+                            <MudImage Src="@_previewImageUrl" Alt="Preview" 
+                                      Style="width: 100%; max-height: 200px; object-fit: cover;" 
+                                      Class="rounded-lg" />
+                            <MudText Typo="Typo.caption" Class="mt-1 d-block">
+                                @(_tempImagePath != null ? "Ảnh mới (chưa lưu)" : "Ảnh đã lưu")
+                            </MudText>
+                        </MudPaper>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                            Chưa chọn ảnh
+                        </MudAlert>
+                    }
+                    
+                    <MudDivider Class="my-3" />
+                    
+                    <MudSelect T="string" @bind-Value="_request.Position" Label="Vị trí hiển thị *" 
+                               Variant="Variant.Outlined" Class="mb-3">
+                        <MudSelectItem Value="@("HomeTop")">Trang chủ - Top</MudSelectItem>
+                        <MudSelectItem Value="@("HomeMiddle")">Trang chủ - Giữa</MudSelectItem>
+                        <MudSelectItem Value="@("HomeBottom")">Trang chủ - Dưới</MudSelectItem>
+                        <MudSelectItem Value="@("ProductPage")">Trang sản phẩm</MudSelectItem>
+                        <MudSelectItem Value="@("CartPage")">Trang giỏ hàng</MudSelectItem>
+                    </MudSelect>
+                    
+                    <MudNumericField T="int" @bind-Value="_request.SortOrder" 
+                                     Label="Thứ tự hiển thị" 
+                                     Variant="Variant.Outlined" Class="mb-3" 
+                                     Min="0" />
+                    
+                    <MudDivider Class="my-3" />
+                    
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Thời gian hiển thị (tùy chọn)</MudText>
+                    
+                    <MudDatePicker @bind-Date="_startDate" 
+                                   Label="Ngày bắt đầu" 
+                                   Variant="Variant.Outlined" Class="mb-3"
+                                   Clearable="true" />
+                    
+                    <MudDatePicker @bind-Date="_endDate" 
+                                   Label="Ngày kết thúc" 
+                                   Variant="Variant.Outlined" Class="mb-3"
+                                   Clearable="true"
+                                   MinDate="_startDate" />
+                </MudItem>
+            </MudGrid>
+            
+            @if (_isEdit)
+            {
+                <MudDivider Class="my-4" />
+                <MudSwitch @bind-Value="_request.IsActive" Label="Đang hoạt động" 
+                           Color="Color.Success" />
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid || _isUploading || string.IsNullOrEmpty(_previewImageUrl)">
+            @(_isEdit ? "Cập nhật" : "Thêm mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? BannerId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isEdit => BannerId.HasValue;
+    private bool _isUploading = false;
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+    private string? _tempImagePath = null;
+    private string? _previewImageUrl = null;
+    
+    private UpdateBannerRequest _request = new()
+    {
+        Title = "",
+        ImageUrl = "",
+        Position = "HomeTop",
+        SortOrder = 0,
+        IsActive = true
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_isEdit)
+        {
+            try
+            {
+                var banner = await BannerService.GetByIdAsync(BannerId.Value);
+                if (banner != null)
+                {
+                    _request = new UpdateBannerRequest
+                    {
+                        Title = banner.Title,
+                        Subtitle = banner.Subtitle,
+                        ImageUrl = banner.ImageUrl,
+                        LinkUrl = banner.LinkUrl,
+                        Position = banner.Position,
+                        SortOrder = banner.SortOrder,
+                        StartDate = banner.StartDate,
+                        EndDate = banner.EndDate,
+                        IsActive = banner.IsActive
+                    };
+                    _startDate = banner.StartDate;
+                    _endDate = banner.EndDate;
+                    _previewImageUrl = banner.ImageUrl;
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
+                MudDialog.Cancel();
+            }
+        }
+        else
+        {
+            _request = new UpdateBannerRequest
+            {
+                Title = "",
+                ImageUrl = "",
+                Position = "HomeTop",
+                SortOrder = 0,
+                IsActive = true
+            };
+        }
+    }
+
+    private void Cancel()
+    {
+        if (!string.IsNullOrEmpty(_tempImagePath))
+        {
+            _ = DeleteTempFileAsync(_tempImagePath);
+        }
+        MudDialog.Cancel();
+    }
+
+    private async Task DeleteTempFileAsync(string tempPath)
+    {
+        try
+        {
+            var httpClient = new HttpClient { BaseAddress = new Uri(NavigationManager.BaseUri) };
+            await httpClient.DeleteAsync($"api/upload/temp?path={Uri.EscapeDataString(tempPath)}");
+        }
+        catch { }
+    }
+
+    private async Task UploadFile(IBrowserFile file)
+    {
+        if (file == null) return;
+
+        _isUploading = true;
+        StateHasChanged();
+
+        try
+        {
+            if (!string.IsNullOrEmpty(_tempImagePath))
+            {
+                await DeleteTempFileAsync(_tempImagePath);
+            }
+
+            var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024));
+            content.Add(fileContent, "file", file.Name);
+
+            var httpClient = new HttpClient { BaseAddress = new Uri(NavigationManager.BaseUri) };
+            var response = await httpClient.PostAsync("api/upload/temp", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<UploadResult>();
+                if (result != null)
+                {
+                    _tempImagePath = result.tempPath;
+                    _previewImageUrl = result.url;
+                    _request.ImageUrl = result.url;
+                    Snackbar.Add("Đã upload ảnh thành công", Severity.Success);
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResult>();
+                Snackbar.Add(error?.error ?? "Lỗi upload ảnh", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi upload: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isUploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        if (string.IsNullOrWhiteSpace(_previewImageUrl))
+        {
+            Snackbar.Add("Vui lòng chọn ảnh banner", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            _request.StartDate = _startDate;
+            _request.EndDate = _endDate;
+
+            if (_isEdit)
+            {
+                await BannerService.UpdateAsync(BannerId.Value, _request);
+                Snackbar.Add("Đã cập nhật banner", Severity.Success);
+            }
+            else
+            {
+                var createRequest = new CreateBannerRequest
+                {
+                    Title = _request.Title,
+                    Subtitle = _request.Subtitle,
+                    ImageUrl = _request.ImageUrl ?? "",
+                    LinkUrl = _request.LinkUrl,
+                    Position = _request.Position,
+                    SortOrder = _request.SortOrder,
+                    StartDate = _startDate,
+                    EndDate = _endDate
+                };
+                await BannerService.CreateAsync(createRequest);
+                Snackbar.Add("Đã thêm banner mới", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private class UploadResult
+    {
+        public string tempPath { get; set; } = "";
+        public string url { get; set; } = "";
+        public string fileName { get; set; } = "";
+        public long size { get; set; }
+    }
+
+    private class ErrorResult
+    {
+        public string error { get; set; } = "";
+    }
+}

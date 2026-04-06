@@ -23,6 +23,7 @@ namespace Infrastructure
             services.AddScoped<IOrderRepository, OrderRepository>();
             services.AddScoped<ISupplierRepository, SupplierRepository>();
             services.AddScoped<ICouponRepository, CouponRepository>();
+            services.AddScoped<IBannerRepository, BannerRepository>();
 
             return services;
         }

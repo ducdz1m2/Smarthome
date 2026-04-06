@@ -1,0 +1,226 @@
+@page "/admin/banners"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@using Web.Components.Shared
+@layout AdminLayout
+@inject IBannerService BannerService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Banner</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+           OnClick="@(() => OpenBannerDialog(null))" Class="mb-4">
+    Thêm banner
+</MudButton>
+
+<MudTable Items="_banners" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterBanners" SortMode="SortMode.Single" AllowUnsorted="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách banner</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh Width="60px">ID</MudTh>
+        <MudTh Width="80px">Hình ảnh</MudTh>
+        <MudTh Width="200px"><MudTableSortLabel T="BannerResponse" SortBy="@(b => b.Title)">Tiêu đề</MudTableSortLabel></MudTh>
+        <MudTh Width="120px"><MudTableSortLabel T="BannerResponse" SortBy="@(b => b.Position)">Vị trí</MudTableSortLabel></MudTh>
+        <MudTh Width="80px"><MudTableSortLabel T="BannerResponse" SortBy="@(b => b.SortOrder)">Thứ tự</MudTableSortLabel></MudTh>
+        <MudTh Width="100px">Thời hạn</MudTh>
+        <MudTh Width="80px">Click</MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="BannerResponse" SortBy="@(b => b.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh Width="80px">Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Hình">
+            <MudAvatar Size="Size.Medium" Square="true">
+                <MudImage Src="@context.ImageUrl" Alt="@context.Title" />
+            </MudAvatar>
+        </MudTd>
+        <MudTd DataLabel="Tiêu đề">
+            <MudText Typo="Typo.body2" Style="font-weight: 500;">@context.Title</MudText>
+            @if (!string.IsNullOrEmpty(context.Subtitle))
+            {
+                <MudText Typo="Typo.caption">@context.Subtitle</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Vị trí">
+            <MudChip T="string" Color="Color.Info" Size="Size.Small">@GetPositionDisplay(context.Position)</MudChip>
+        </MudTd>
+        <MudTd DataLabel="Thứ tự">@context.SortOrder</MudTd>
+        <MudTd DataLabel="Thời hạn">
+            @if (context.StartDate.HasValue || context.EndDate.HasValue)
+            {
+                <div>
+                    @if (context.StartDate.HasValue)
+                    {
+                        <MudText Typo="Typo.caption">Từ: @context.StartDate.Value.ToString("dd/MM")</MudText>
+                    }
+                </div>
+                <div>
+                    @if (context.EndDate.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Color="@GetExpiryColor(context)">Đến: @context.EndDate.Value.ToString("dd/MM")</MudText>
+                    }
+                </div>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption">Vĩnh viễn</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Click">@context.ClickCount</MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudSwitch T="bool" Value="@context.IsActive" 
+                       ValueChanged="@(v => OnToggleStatus(context.Id, v))"
+                       Color="Color.Success" UncheckedColor="Color.Error" />
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenBannerDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeleteBanner(context))" Size="Size.Small" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<BannerResponse> _banners = new();
+    private bool _loading = true;
+    private string _searchString = "";
+
+    private bool FilterBanners(BannerResponse banner)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return banner.Title.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               (banner.Subtitle?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+               banner.Position.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBanners();
+    }
+
+    private async Task LoadBanners()
+    {
+        _loading = true;
+        try
+        {
+            _banners = await BannerService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenBannerDialog(BannerResponse? banner)
+    {
+        var parameters = new DialogParameters<BannerDialog>();
+        if (banner != null)
+        {
+            parameters.Add(x => x.BannerId, banner.Id);
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<BannerDialog>(banner == null ? "Thêm banner" : "Sửa banner", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadBanners();
+        }
+    }
+
+    private async Task ToggleStatus(int id, bool isActive)
+    {
+        try
+        {
+            if (isActive)
+                await BannerService.ActivateAsync(id);
+            else
+                await BannerService.DeactivateAsync(id);
+            
+            Snackbar.Add($"Đã {(isActive ? "kích hoạt" : "vô hiệu hóa")} banner", Severity.Success);
+            await LoadBanners();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            await LoadBanners();
+        }
+    }
+
+    private void OnToggleStatus(int id, bool isActive)
+    {
+        _ = ToggleStatus(id, isActive);
+    }
+
+    private async Task DeleteBanner(BannerResponse banner)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa banner \"{banner.Title}\"?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await BannerService.DeleteAsync(banner.Id);
+                Snackbar.Add("Đã xóa banner", Severity.Success);
+                await LoadBanners();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private static string GetPositionDisplay(string position)
+    {
+        return position switch
+        {
+            "HomeTop" => "Trang chủ - Top",
+            "HomeMiddle" => "Trang chủ - Giữa",
+            "HomeBottom" => "Trang chủ - Dưới",
+            "ProductPage" => "Trang sản phẩm",
+            "CartPage" => "Trang giỏ hàng",
+            _ => position
+        };
+    }
+
+    private static Color GetExpiryColor(BannerResponse banner)
+    {
+        if (!banner.IsActive) return Color.Default;
+        if (banner.EndDate.HasValue && banner.EndDate.Value < DateTime.UtcNow) return Color.Error;
+        if (banner.EndDate.HasValue && banner.EndDate.Value < DateTime.UtcNow.AddDays(7)) return Color.Warning;
+        return Color.Success;
+    }
+}
