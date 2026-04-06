@@ -2,10 +2,8 @@ namespace Domain.Entities.Shipping
 {
     using Domain.Entities.Common;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
-    using Smarthome.Domain.ValueObjects;
 
-    public class ShippingZone : BaseEntity
+    public class ShippingZone : BaseEntity 
     {
         public string Name { get; private set; } = string.Empty;
         public string? Description { get; private set; }
@@ -40,11 +38,11 @@ namespace Domain.Entities.Shipping
         public void Activate() => IsActive = true;
         public void Deactivate() => IsActive = false;
 
-        public Money CalculateFee(Weight weight)
+        public decimal CalculateFee(decimal weight)
         {
             var rate = Rates
                 .Where(r => r.IsActive && r.Matches(weight))
-                .OrderBy(r => r.Price.Amount)
+                .OrderBy(r => r.Price)
                 .FirstOrDefault();
 
             if (rate == null)

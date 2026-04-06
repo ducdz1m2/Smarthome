@@ -66,6 +66,10 @@ namespace Infrastructure.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            
+            // Ignore DomainEvent - it's not an entity to be persisted
+            modelBuilder.Ignore<Domain.Events.DomainEvent>();
+            
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
         }
     }

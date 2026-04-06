@@ -14,15 +14,13 @@ namespace Infrastructure.Configuration
             builder.Property(p => p.Name).IsRequired().HasMaxLength(200);
             builder.Property(p => p.Description).HasMaxLength(4000);
             builder.Property(p => p.SpecsJson).HasColumnType("nvarchar(max)");
+            builder.Property(p => p.Sku).IsRequired().HasMaxLength(50);
+            builder.Property(p => p.BasePrice).HasPrecision(18, 2);
            
             builder.Property(p => p.IsActive).HasDefaultValue(true);
             builder.Property(p => p.RequiresInstallation).HasDefaultValue(false);
-            builder.OwnsOne(p => p.Sku, s => 
-                s.Property(sk => sk.Value).HasMaxLength(50).HasColumnName("Sku"));
-                
-            builder.OwnsOne(p => p.BasePrice, b => 
-                b.Property(bp => bp.Amount).HasPrecision(18, 2).HasColumnName("BasePrice"));
-            builder.HasIndex("Sku").IsUnique();
+            
+            builder.HasIndex(p => p.Sku).IsUnique();
             builder.HasIndex(p => p.CategoryId);
             builder.HasIndex(p => p.BrandId);
             builder.HasIndex(p => p.IsActive);

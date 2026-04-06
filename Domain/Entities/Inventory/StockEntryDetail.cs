@@ -1,6 +1,5 @@
 ﻿using Domain.Entities.Common;
 using Domain.Exceptions;
-using Domain.ValueObjects;
 
 namespace Domain.Entities.Inventory
 {
@@ -9,7 +8,7 @@ namespace Domain.Entities.Inventory
         public int StockEntryId { get; private set; }
         public int ProductId { get; private set; }
         public int Quantity { get; private set; }
-        public Money UnitCost { get; private set; } = null!; // Giá nhập mỗi cái
+        public decimal UnitCost { get; private set; }
         public string? Notes { get; private set; }
 
         // Navigation
@@ -17,7 +16,7 @@ namespace Domain.Entities.Inventory
 
         private StockEntryDetail() { } // EF Core
 
-        public static StockEntryDetail Create(int stockEntryId, int productId, int quantity, Money unitCost, string? notes = null)
+        public static StockEntryDetail Create(int stockEntryId, int productId, int quantity, decimal unitCost, string? notes = null)
         {
             if (stockEntryId <= 0)
                 throw new DomainException("StockEntryId không hợp lệ");
@@ -28,7 +27,7 @@ namespace Domain.Entities.Inventory
             if (quantity <= 0)
                 throw new DomainException("Số lượng phải lớn hơn 0");
 
-            if (unitCost.Amount < 0)
+            if (unitCost < 0)
                 throw new DomainException("Đơn giá không thể âm");
 
             return new StockEntryDetail
@@ -41,6 +40,6 @@ namespace Domain.Entities.Inventory
             };
         }
 
-        public Money GetTotalCost() => UnitCost.Multiply(Quantity);
+        public decimal GetTotalCost() => UnitCost * Quantity;
     }
 }

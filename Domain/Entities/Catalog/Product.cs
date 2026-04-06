@@ -6,13 +6,12 @@ namespace Domain.Entities.Catalog
     using Domain.Enums;
     using Domain.Events;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class Product : BaseEntity
     {
         public string Name { get; private set; } = string.Empty;
-        public Sku Sku { get; private set; } = null!;
-        public Money BasePrice { get; private set; } = null!;
+        public string Sku { get; private set; } = null!;
+        public decimal BasePrice { get; private set; }
         public int StockQuantity { get; private set; }
         public int FrozenStockQuantity { get; private set; }
         public string? Description { get; private set; }
@@ -32,7 +31,7 @@ namespace Domain.Entities.Catalog
 
         private Product() { }
 
-        public static Product Create(string name, Sku sku, Money basePrice, int categoryId, int brandId, int? supplierId = null, bool requiresInstallation = false)
+        public static Product Create(string name, string sku, decimal basePrice, int categoryId, int brandId, int? supplierId = null, bool requiresInstallation = false)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ValidationException(nameof(name), "Tên sản phẩm không được trống");
@@ -43,10 +42,13 @@ namespace Domain.Entities.Catalog
             if (brandId <= 0)
                 throw new ValidationException(nameof(brandId), "BrandId không hợp lệ");
 
+            if (basePrice < 0)
+                throw new ValidationException(nameof(basePrice), "Giá không thể âm");
+
             var product = new Product
             {
                 Name = name.Trim(),
-                Sku = sku,
+                Sku = sku.Trim().ToUpper(),
                 BasePrice = basePrice,
                 CategoryId = categoryId,
                 BrandId = brandId,
@@ -61,16 +63,16 @@ namespace Domain.Entities.Catalog
             return product;
         }
 
-        public void Update(string name, Money basePrice, string? description)
+        public void Update(string name, decimal basePrice, string? description)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Tên sản phẩm không được trống", nameof(name));
 
-            if (basePrice.Amount != BasePrice.Amount)
+            if (basePrice != BasePrice)
             {
                 var oldPrice = BasePrice;
                 BasePrice = basePrice;
-                AddDomainEvent(new ProductPriceChangedEvent(Id, oldPrice.Amount, basePrice.Amount));
+                AddDomainEvent(new ProductPriceChangedEvent(Id, oldPrice, basePrice));
             }
 
             Name = name.Trim();
@@ -138,9 +140,9 @@ namespace Domain.Entities.Catalog
 
         public int GetAvailableStock() => StockQuantity - FrozenStockQuantity;
 
-        public ProductVariant AddVariant(string sku, Money price, Dictionary<string, string> attributes)
+        public ProductVariant AddVariant(string sku, decimal price, Dictionary<string, string> attributes)
         {
-            var variant = ProductVariant.Create(this, Sku.Create(sku), price, 0, attributes);
+            var variant = ProductVariant.Create(this, sku.Trim().ToUpper(), price, 0, attributes);
             Variants.Add(variant);
             return variant;
         }
@@ -174,12 +176,12 @@ namespace Domain.Entities.Catalog
             BrandId = newBrandId;
         }
 
-        public Money GetEffectivePrice(DiscountType discountType, decimal discountValue)
+        public decimal GetEffectivePrice(DiscountType discountType, decimal discountValue)
         {
             return discountType switch
             {
-                DiscountType.FixedAmount => BasePrice.Subtract(Money.Vnd(discountValue)),
-                DiscountType.Percentage => BasePrice.ApplyDiscount(discountValue),
+                DiscountType.FixedAmount => Math.Max(0, BasePrice - discountValue),
+                DiscountType.Percentage => BasePrice * (1 - discountValue / 100),
                 _ => BasePrice
             };
         }

@@ -1,6 +1,5 @@
 ﻿using Domain.Entities.Common;
 using Domain.Exceptions;
-using Domain.ValueObjects;
 
 namespace Domain.Entities.Catalog
 {
@@ -9,7 +8,7 @@ namespace Domain.Entities.Catalog
         public string Name { get; private set; } = string.Empty;
         public string? Description { get; private set; }
         public string? LogoUrl { get; private set; }
-        public WebsiteUrl? Website { get; private set; }  
+        public string? Website { get; private set; }
         public bool IsActive { get; private set; } = true;
 
         public virtual ICollection<Product> Products { get; private set; } = new List<Product>();
@@ -25,7 +24,7 @@ namespace Domain.Entities.Catalog
                 Name = name.Trim(),
                 Description = description?.Trim(),
                 LogoUrl = logoUrl?.Trim(),
-                Website = WebsiteUrl.Create(website), 
+                Website = website?.Trim(),
                 IsActive = true
             };
         }
@@ -38,7 +37,7 @@ namespace Domain.Entities.Catalog
             Name = name.Trim();
             Description = description?.Trim();
             LogoUrl = logoUrl?.Trim();
-            Website = WebsiteUrl.Create(website);  
+            Website = website?.Trim();
         }
 
        

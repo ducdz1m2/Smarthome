@@ -2,13 +2,12 @@ namespace Domain.Entities.Identity
 {
     using Domain.Entities.Common;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class AppUser : BaseEntity
     {
         public string UserName { get; private set; } = string.Empty;
-        public Email Email { get; private set; } = null!;
-        public PhoneNumber? PhoneNumber { get; private set; }
+        public string Email { get; private set; } = null!;
+        public string? PhoneNumber { get; private set; }
         public string FullName { get; private set; } = string.Empty;
         public string? Avatar { get; private set; }
         public bool IsActive { get; private set; } = true;
@@ -19,7 +18,7 @@ namespace Domain.Entities.Identity
 
         private AppUser() { }
 
-        public static AppUser Create(string userName, Email email, string fullName, string? phone = null)
+        public static AppUser Create(string userName, string email, string fullName, string? phone = null)
         {
             if (string.IsNullOrWhiteSpace(userName))
                 throw new DomainException("Tên đăng nhập không được trống");
@@ -30,9 +29,9 @@ namespace Domain.Entities.Identity
             return new AppUser
             {
                 UserName = userName.Trim().ToLower(),
-                Email = email,
+                Email = email.Trim().ToLower(),
                 FullName = fullName.Trim(),
-                PhoneNumber = phone != null ? PhoneNumber.Create(phone) : null,
+                PhoneNumber = phone?.Trim(),
                 IsActive = true
             };
         }
@@ -48,7 +47,7 @@ namespace Domain.Entities.Identity
 
         public void UpdatePhone(string? phone)
         {
-            PhoneNumber = phone != null ? PhoneNumber.Create(phone) : null;
+            PhoneNumber = phone?.Trim();
         }
 
         public void MarkLogin()

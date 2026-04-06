@@ -5,30 +5,32 @@ namespace Domain.Entities.Sales
     using Domain.Enums;
     using Domain.Events;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class Order : BaseEntity
     {
         public string OrderNumber { get; private set; } = string.Empty;
-        public Money TotalAmount { get; private set; } = null!;
+        public decimal TotalAmount { get; private set; }
         public OrderStatus Status { get; private set; } = OrderStatus.Pending;
         public int UserId { get; private set; }
         public string ReceiverName { get; private set; } = string.Empty;
-        public PhoneNumber ReceiverPhone { get; private set; } = null!;
-        public Address ShippingAddress { get; private set; } = null!;
+        public string ReceiverPhone { get; private set; } = null!;
+        public string ShippingAddressStreet { get; private set; } = null!;
+        public string? ShippingAddressWard { get; private set; }
+        public string? ShippingAddressDistrict { get; private set; }
+        public string? ShippingAddressCity { get; private set; }
         public PaymentMethod PaymentMethod { get; private set; }
         public ShippingMethod ShippingMethod { get; private set; }
         public string StatusHistoryJson { get; private set; } = "[]";
         public string? CancelReason { get; private set; }
-        public Money ShippingFee { get; private set; } = Money.Vnd(0);
-        public Money DiscountAmount { get; private set; } = Money.Vnd(0);
+        public decimal ShippingFee { get; private set; }
+        public decimal DiscountAmount { get; private set; }
 
         public virtual ICollection<OrderItem> Items { get; private set; } = new List<OrderItem>();
         public virtual ICollection<OrderShipment> Shipments { get; private set; } = new List<OrderShipment>();
 
         private Order() { }
 
-        public static Order Create(int userId, string receiverName, PhoneNumber receiverPhone, Address shippingAddress)
+        public static Order Create(int userId, string receiverName, string receiverPhone, string shippingAddressStreet, string? shippingAddressWard, string? shippingAddressDistrict, string? shippingAddressCity)
         {
             if (string.IsNullOrWhiteSpace(receiverName))
                 throw new ValidationException(nameof(receiverName), "Tên người nhận không được trống");
@@ -38,12 +40,15 @@ namespace Domain.Entities.Sales
                 OrderNumber = GenerateOrderNumber(),
                 UserId = userId,
                 ReceiverName = receiverName.Trim(),
-                ReceiverPhone = receiverPhone,
-                ShippingAddress = shippingAddress,
+                ReceiverPhone = receiverPhone.Trim(),
+                ShippingAddressStreet = shippingAddressStreet.Trim(),
+                ShippingAddressWard = shippingAddressWard?.Trim(),
+                ShippingAddressDistrict = shippingAddressDistrict?.Trim(),
+                ShippingAddressCity = shippingAddressCity?.Trim(),
                 Status = OrderStatus.Pending,
-                TotalAmount = Money.Vnd(0),
-                ShippingFee = Money.Vnd(0),
-                DiscountAmount = Money.Vnd(0),
+                TotalAmount = 0,
+                ShippingFee = 0,
+                DiscountAmount = 0,
                 PaymentMethod = PaymentMethod.COD,
                 ShippingMethod = ShippingMethod.Standard,
                 StatusHistoryJson = "[]"
@@ -53,7 +58,7 @@ namespace Domain.Entities.Sales
             return order;
         }
 
-        public OrderItem AddItem(int productId, int? variantId, int quantity, Money unitPrice, bool requiresInstallation = false)
+        public OrderItem AddItem(int productId, int? variantId, int quantity, decimal unitPrice, bool requiresInstallation = false)
         {
             if (Status != OrderStatus.Pending)
                 throw new InvalidOrderStateException(Status.ToString(), "thêm sản phẩm");
@@ -89,15 +94,15 @@ namespace Domain.Entities.Sales
             AddDomainEvent(new OrderConfirmedEvent(Id, DateTime.UtcNow));
         }
 
-        public void ApplyShippingFee(Money fee)
+        public void ApplyShippingFee(decimal fee)
         {
             ShippingFee = fee;
             RecalculateTotal();
         }
 
-        public void ApplyDiscount(Money discount)
+        public void ApplyDiscount(decimal discount)
         {
-            if (discount.Amount < 0)
+            if (discount < 0)
                 throw new ValidationException(nameof(discount), "Giảm giá không thể âm");
 
             DiscountAmount = discount;
@@ -169,8 +174,9 @@ namespace Domain.Entities.Sales
 
         private void RecalculateTotal()
         {
-            var itemsTotal = Items.Aggregate(Money.Vnd(0), (sum, i) => sum.Add(i.GetSubtotal()));
-            TotalAmount = itemsTotal.Add(ShippingFee).Subtract(DiscountAmount);
+            var itemsTotal = Items.Sum(i => i.GetSubtotal());
+            TotalAmount = itemsTotal + ShippingFee - DiscountAmount;
+            if (TotalAmount < 0) TotalAmount = 0;
         }
 
         private void AddStatusHistory(OrderStatus status, string note)

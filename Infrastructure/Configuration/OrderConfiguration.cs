@@ -13,7 +13,11 @@ namespace Infrastructure.Configuration
             
             builder.Property(o => o.OrderNumber).IsRequired().HasMaxLength(50);
             builder.Property(o => o.ReceiverName).IsRequired().HasMaxLength(100);
-            builder.Property(o => o.ShippingAddress).IsRequired();
+            builder.Property(o => o.ReceiverPhone).IsRequired().HasMaxLength(20);
+            builder.Property(o => o.ShippingAddressStreet).IsRequired().HasMaxLength(200);
+            builder.Property(o => o.ShippingAddressWard).HasMaxLength(50);
+            builder.Property(o => o.ShippingAddressDistrict).HasMaxLength(50);
+            builder.Property(o => o.ShippingAddressCity).HasMaxLength(50);
             builder.Property(o => o.StatusHistoryJson).HasColumnType("nvarchar(max)");
             builder.Property(o => o.CancelReason).HasMaxLength(500);
             builder.Property(o => o.TotalAmount).HasPrecision(18, 2);

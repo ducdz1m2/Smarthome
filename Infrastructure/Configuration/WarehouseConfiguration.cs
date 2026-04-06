@@ -14,24 +14,15 @@ namespace Infrastructure.Configuration
             builder.Property(w => w.Name).IsRequired().HasMaxLength(100);
             builder.Property(w => w.Code).IsRequired().HasMaxLength(20);
             builder.Property(w => w.ManagerName).HasMaxLength(100);
+            builder.Property(w => w.AddressStreet).IsRequired().HasMaxLength(200);
+            builder.Property(w => w.AddressWard).HasMaxLength(50);
+            builder.Property(w => w.AddressDistrict).HasMaxLength(50);
+            builder.Property(w => w.AddressCity).HasMaxLength(50);
+            builder.Property(w => w.Phone).HasMaxLength(20);
             builder.Property(w => w.IsActive).HasDefaultValue(true);
             
             builder.HasIndex(w => w.Code).IsUnique();
             builder.HasIndex(w => w.IsActive);
-            
-            builder.OwnsOne(w => w.Address, address =>
-            {
-                address.Property(a => a.Street).HasMaxLength(200);
-                address.Property(a => a.Ward).HasMaxLength(50);
-                address.Property(a => a.District).HasMaxLength(50);
-                address.Property(a => a.City).HasMaxLength(50);
-            });
-            
-            builder.OwnsOne(w => w.Phone, phone =>
-            {
-                phone.Property(p => p.Value).HasMaxLength(20);
-                phone.Property(p => p.FormattedValue).HasMaxLength(20);
-            });
             
             builder.Ignore(w => w.DomainEvents);
         }

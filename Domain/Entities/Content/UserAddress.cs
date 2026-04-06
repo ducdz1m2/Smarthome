@@ -2,20 +2,22 @@ namespace Domain.Entities.Content
 {
     using Domain.Entities.Common;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class UserAddress : BaseEntity
     {
         public int UserId { get; private set; }
-        public string Label { get; private set; } = string.Empty; // "Nhà riêng", "Công ty"
+        public string Label { get; private set; } = string.Empty;
         public string ReceiverName { get; private set; } = string.Empty;
-        public PhoneNumber ReceiverPhone { get; private set; } = null!;
-        public Address Address { get; private set; } = null!;
+        public string ReceiverPhone { get; private set; } = null!;
+        public string Street { get; private set; } = null!;
+        public string? Ward { get; private set; }
+        public string? District { get; private set; }
+        public string? City { get; private set; }
         public bool IsDefault { get; private set; } = false;
 
         private UserAddress() { }
 
-        public static UserAddress Create(int userId, string label, string receiverName, string receiverPhone, Address address, bool isDefault = false)
+        public static UserAddress Create(int userId, string label, string receiverName, string receiverPhone, string street, string? ward, string? district, string? city, bool isDefault = false)
         {
             if (string.IsNullOrWhiteSpace(label))
                 throw new DomainException("Nhãn địa chỉ không được trống");
@@ -28,13 +30,16 @@ namespace Domain.Entities.Content
                 UserId = userId,
                 Label = label.Trim(),
                 ReceiverName = receiverName.Trim(),
-                ReceiverPhone = PhoneNumber.Create(receiverPhone),
-                Address = address,
+                ReceiverPhone = receiverPhone.Trim(),
+                Street = street.Trim(),
+                Ward = ward?.Trim(),
+                District = district?.Trim(),
+                City = city?.Trim(),
                 IsDefault = isDefault
             };
         }
 
-        public void Update(string label, string receiverName, string receiverPhone, Address address)
+        public void Update(string label, string receiverName, string receiverPhone, string street, string? ward, string? district, string? city)
         {
             if (string.IsNullOrWhiteSpace(label))
                 throw new DomainException("Nhãn địa chỉ không được trống");
@@ -44,8 +49,11 @@ namespace Domain.Entities.Content
 
             Label = label.Trim();
             ReceiverName = receiverName.Trim();
-            ReceiverPhone = PhoneNumber.Create(receiverPhone);
-            Address = address;
+            ReceiverPhone = receiverPhone.Trim();
+            Street = street.Trim();
+            Ward = ward?.Trim();
+            District = district?.Trim();
+            City = city?.Trim();
         }
 
         public void SetAsDefault()

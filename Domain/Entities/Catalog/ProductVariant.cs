@@ -3,13 +3,12 @@ namespace Domain.Entities.Catalog
     using System.Text.Json;
     using Domain.Entities.Common;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class ProductVariant : BaseEntity
     {
         public int ProductId { get; private set; }
-        public Sku Sku { get; private set; } = null!;
-        public Money Price { get; private set; } = null!;
+        public string Sku { get; private set; } = null!;
+        public decimal Price { get; private set; }
         public int StockQuantity { get; private set; }
         public string AttributesJson { get; private set; } = "{}";
         public bool IsActive { get; private set; } = true;
@@ -18,12 +17,12 @@ namespace Domain.Entities.Catalog
 
         private ProductVariant() { }
 
-        public static ProductVariant Create(Product product, Sku sku, Money price, int initialStock, Dictionary<string, string> attributes)
+        public static ProductVariant Create(Product product, string sku, decimal price, int initialStock, Dictionary<string, string> attributes)
         {
             var variant = new ProductVariant
             {
                 ProductId = product.Id,
-                Sku = sku,
+                Sku = sku.Trim().ToUpper(),
                 Price = price,
                 StockQuantity = initialStock,
                 AttributesJson = JsonSerializer.Serialize(attributes),
@@ -33,12 +32,12 @@ namespace Domain.Entities.Catalog
             return variant;
         }
 
-        public static ProductVariant Create(int productId, Sku sku, Money price, int initialStock, Dictionary<string, string> attributes)
+        public static ProductVariant Create(int productId, string sku, decimal price, int initialStock, Dictionary<string, string> attributes)
         {
             var variant = new ProductVariant
             {
                 ProductId = productId,
-                Sku = sku,
+                Sku = sku.Trim().ToUpper(),
                 Price = price,
                 StockQuantity = initialStock,
                 AttributesJson = JsonSerializer.Serialize(attributes),
@@ -48,7 +47,7 @@ namespace Domain.Entities.Catalog
             return variant;
         }
 
-        public void UpdatePrice(Money newPrice)
+        public void UpdatePrice(decimal newPrice)
         {
             Price = newPrice;
         }
@@ -92,9 +91,9 @@ namespace Domain.Entities.Catalog
             IsActive = false;
         }
 
-        public Money GetEffectivePrice(Money? productBasePrice)
+        public decimal GetEffectivePrice(decimal? productBasePrice)
         {
-            return Price.Amount > 0 ? Price : (productBasePrice ?? Money.Vnd(0));
+            return Price > 0 ? Price : (productBasePrice ?? 0);
         }
     }
 }

@@ -4,7 +4,6 @@ namespace Domain.Entities.Inventory
     using Domain.Enums;
     using Domain.Events;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class StockEntry : BaseEntity
     {
@@ -12,7 +11,7 @@ namespace Domain.Entities.Inventory
         public int SupplierId { get; private set; }
         public int WarehouseId { get; private set; }
         public string? Note { get; private set; }
-        public Money TotalCost { get; private set; } = Money.Vnd(0);
+        public decimal TotalCost { get; private set; }
         public bool IsCompleted { get; private set; } = false;
 
         public virtual Supplier Supplier { get; private set; } = null!;
@@ -35,12 +34,12 @@ namespace Domain.Entities.Inventory
                 SupplierId = supplierId,
                 WarehouseId = warehouseId,
                 Note = note?.Trim(),
-                TotalCost = Money.Vnd(0),
+                TotalCost = 0,
                 IsCompleted = false
             };
         }
 
-        public StockEntryDetail AddItem(int productId, int quantity, Money unitCost)
+        public StockEntryDetail AddItem(int productId, int quantity, decimal unitCost)
         {
             if (IsCompleted)
                 throw new BusinessRuleViolationException("StockEntryCompleted", "Không thể thêm sản phẩm vào phiếu đã hoàn thành");
@@ -67,9 +66,9 @@ namespace Domain.Entities.Inventory
             }
         }
 
-        public Money GetTotalCost()
+        public decimal GetTotalCost()
         {
-            return Details.Aggregate(Money.Vnd(0), (sum, d) => sum.Add(d.GetTotalCost()));
+            return Details.Sum(d => d.GetTotalCost());
         }
 
         private void RecalculateTotal()

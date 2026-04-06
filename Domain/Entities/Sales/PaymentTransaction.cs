@@ -3,12 +3,11 @@ namespace Domain.Entities.Sales
     using Domain.Entities.Common;
     using Domain.Enums;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class PaymentTransaction : BaseEntity
     {
         public int OrderId { get; private set; }
-        public Money Amount { get; private set; } = null!;
+        public decimal Amount { get; private set; }
         public PaymentMethod Method { get; private set; }
         public PaymentTransactionStatus Status { get; private set; } = PaymentTransactionStatus.Pending;
         public string? TransactionCode { get; private set; }
@@ -17,9 +16,9 @@ namespace Domain.Entities.Sales
 
         private PaymentTransaction() { }
 
-        public static PaymentTransaction Create(int orderId, Money amount, PaymentMethod method)
+        public static PaymentTransaction Create(int orderId, decimal amount, PaymentMethod method)
         {
-            if (amount.Amount <= 0)
+            if (amount <= 0)
                 throw new DomainException("Số tiền phải lớn hơn 0");
 
             return new PaymentTransaction

@@ -3,7 +3,6 @@ namespace Domain.Entities.Sales
     using Domain.Entities.Common;
     using Domain.Enums;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class ReturnOrder : BaseEntity
     {
@@ -11,7 +10,7 @@ namespace Domain.Entities.Sales
         public ReturnType ReturnType { get; private set; }
         public string Reason { get; private set; } = string.Empty;
         public ReturnOrderStatus Status { get; private set; } = ReturnOrderStatus.Pending;
-        public Money? RefundAmount { get; private set; }
+        public decimal? RefundAmount { get; private set; }
         public DateTime? ApprovedAt { get; private set; }
         public DateTime? ReceivedAt { get; private set; }
         public DateTime? CompletedAt { get; private set; }
@@ -43,7 +42,7 @@ namespace Domain.Entities.Sales
             Items.Add(item);
         }
 
-        public void Approve(Money? refundAmount = null)
+        public void Approve(decimal? refundAmount = null)
         {
             if (Status != ReturnOrderStatus.Pending)
                 throw new BusinessRuleViolationException("ReturnOrderStatus", "Chỉ có thể duyệt yêu cầu đang chờ");

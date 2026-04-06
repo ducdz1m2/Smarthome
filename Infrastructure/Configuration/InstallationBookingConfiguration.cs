@@ -16,6 +16,17 @@ namespace Infrastructure.Configuration
             builder.HasIndex(ib => ib.TechnicianId);
             builder.HasIndex(ib => ib.SlotId).IsUnique();
             builder.HasIndex(ib => ib.ScheduledDate);
+            
+            builder.HasOne(ib => ib.Technician)
+                .WithMany()
+                .HasForeignKey(ib => ib.TechnicianId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            builder.HasOne(ib => ib.Slot)
+                .WithMany()
+                .HasForeignKey(ib => ib.SlotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
             builder.HasMany(ib => ib.Materials).WithOne(im => im.Booking).HasForeignKey(im => im.BookingId).OnDelete(DeleteBehavior.Cascade);
             builder.Ignore(ib => ib.DomainEvents);
         }

@@ -1,6 +1,5 @@
 ﻿using Domain.Entities.Common;
 using Domain.Exceptions;
-using Domain.ValueObjects;
 
 namespace Domain.Entities.Inventory
 {
@@ -8,8 +7,11 @@ namespace Domain.Entities.Inventory
     {
         public string Name { get; private set; } = string.Empty;
         public string Code { get; private set; } = string.Empty;
-        public Address Address { get; private set; } = null!;
-        public PhoneNumber? Phone { get; private set; }
+        public string AddressStreet { get; private set; } = null!;
+        public string? AddressWard { get; private set; }
+        public string? AddressDistrict { get; private set; }
+        public string? AddressCity { get; private set; }
+        public string? Phone { get; private set; }
         public string? ManagerName { get; private set; }
         public bool IsActive { get; private set; } = true;
 
@@ -18,7 +20,7 @@ namespace Domain.Entities.Inventory
 
         private Warehouse() { } // EF Core
 
-        public static Warehouse Create(string name, string code, Address address,
+        public static Warehouse Create(string name, string code, string addressStreet, string? addressWard = null, string? addressDistrict = null, string? addressCity = null,
             string? phone = null, string? managerName = null)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -34,21 +36,27 @@ namespace Domain.Entities.Inventory
             {
                 Name = name.Trim(),
                 Code = code.Trim().ToUpper(),
-                Address = address,
-                Phone = phone != null ? PhoneNumber.Create(phone) : null,
+                AddressStreet = addressStreet.Trim(),
+                AddressWard = addressWard?.Trim(),
+                AddressDistrict = addressDistrict?.Trim(),
+                AddressCity = addressCity?.Trim(),
+                Phone = phone?.Trim(),
                 ManagerName = managerName?.Trim(),
                 IsActive = true
             };
         }
 
-        public void Update(string name, Address address, string? phone, string? managerName)
+        public void Update(string name, string addressStreet, string? addressWard, string? addressDistrict, string? addressCity, string? phone, string? managerName)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new DomainException("Tên kho không được trống");
 
             Name = name.Trim();
-            Address = address;
-            Phone = phone != null ? PhoneNumber.Create(phone) : null;
+            AddressStreet = addressStreet.Trim();
+            AddressWard = addressWard?.Trim();
+            AddressDistrict = addressDistrict?.Trim();
+            AddressCity = addressCity?.Trim();
+            Phone = phone?.Trim();
             ManagerName = managerName?.Trim();
         }
 

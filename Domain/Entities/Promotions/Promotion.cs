@@ -2,16 +2,15 @@ namespace Domain.Entities.Promotions
 {
     using Domain.Entities.Common;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class Promotion : BaseEntity
     {
         public string Name { get; private set; } = string.Empty;
         public string? Description { get; private set; }
-        public Percentage DiscountPercent { get; private set; } = null!;
+        public decimal DiscountPercent { get; private set; }
         public DateTime StartDate { get; private set; }
         public DateTime EndDate { get; private set; }
-        public Money? MinOrderAmount { get; private set; }
+        public decimal? MinOrderAmount { get; private set; }
         public bool IsActive { get; private set; } = true;
         public int Priority { get; private set; } = 0;
 
@@ -19,13 +18,16 @@ namespace Domain.Entities.Promotions
 
         private Promotion() { }
 
-        public static Promotion Create(string name, Percentage discountPercent, DateTime startDate, DateTime endDate)
+        public static Promotion Create(string name, decimal discountPercent, DateTime startDate, DateTime endDate)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new DomainException("Tên chương trình không được trống");
 
             if (endDate <= startDate)
                 throw new DomainException("Ngày kết thúc phải sau ngày bắt đầu");
+
+            if (discountPercent < 0 || discountPercent > 100)
+                throw new DomainException("Phần trăm giảm giá phải từ 0-100");
 
             return new Promotion
             {
@@ -38,7 +40,7 @@ namespace Domain.Entities.Promotions
             };
         }
 
-        public void AddProduct(int productId, Percentage? customDiscount = null)
+        public void AddProduct(int productId, decimal? customDiscount = null)
         {
             var pp = PromotionProduct.Create(Id, productId, customDiscount);
             PromotionProducts.Add(pp);
@@ -55,15 +57,15 @@ namespace Domain.Entities.Promotions
             return !PromotionProducts.Any() || PromotionProducts.Any(pp => pp.ProductId == productId);
         }
 
-        public Money CalculateDiscount(Money originalPrice, int? productId = null)
+        public decimal CalculateDiscount(decimal originalPrice, int? productId = null)
         {
             if (!IsActiveNow())
-                return Money.Vnd(0);
+                return 0;
 
             if (productId.HasValue && !AppliesTo(productId.Value))
-                return Money.Vnd(0);
+                return 0;
 
-            Percentage effectiveDiscount;
+            decimal effectiveDiscount;
 
             if (productId.HasValue)
             {
@@ -75,7 +77,7 @@ namespace Domain.Entities.Promotions
                 effectiveDiscount = DiscountPercent;
             }
 
-            return originalPrice.ApplyDiscount(effectiveDiscount);
+            return originalPrice * effectiveDiscount / 100;
         }
 
         public void UpdatePeriod(DateTime start, DateTime end)

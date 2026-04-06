@@ -12,6 +12,7 @@ namespace Infrastructure.Configuration
             builder.HasKey(p => p.Id);
             builder.Property(p => p.Name).IsRequired().HasMaxLength(200);
             builder.Property(p => p.Description).HasMaxLength(1000);
+            builder.Property(p => p.DiscountPercent).HasPrecision(5, 2);
             builder.Property(p => p.MinOrderAmount).HasPrecision(18, 2);
             builder.Property(p => p.IsActive).HasDefaultValue(true);
             builder.HasIndex(p => p.StartDate);

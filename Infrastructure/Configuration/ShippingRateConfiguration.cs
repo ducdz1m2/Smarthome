@@ -12,10 +12,10 @@ namespace Infrastructure.Configuration
             builder.HasKey(sr => sr.Id);
             builder.Property(sr => sr.Price).HasPrecision(18, 2);
             builder.Property(sr => sr.IsActive).HasDefaultValue(true);
+            builder.Property(sr => sr.WeightFrom).HasPrecision(18, 3);
+            builder.Property(sr => sr.WeightTo).HasPrecision(18, 3);
             builder.HasIndex(sr => sr.ZoneId);
             builder.HasIndex(sr => sr.IsActive);
-            builder.OwnsOne(sr => sr.WeightFrom, wf => wf.Property(w => w.Value).HasColumnName("WeightFrom"));
-            builder.OwnsOne(sr => sr.WeightTo, wt => wt.Property(w => w.Value).HasColumnName("WeightTo"));
             builder.Ignore(sr => sr.DomainEvents);
         }
     }

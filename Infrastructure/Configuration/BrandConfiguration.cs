@@ -13,8 +13,8 @@ namespace Infrastructure.Configuration
             builder.Property(b => b.Name).IsRequired().HasMaxLength(100);
             builder.Property(b => b.Description).HasMaxLength(500);
             builder.Property(b => b.LogoUrl).HasMaxLength(500);
+            builder.Property(b => b.Website).HasMaxLength(200);
             builder.Property(b => b.IsActive).HasDefaultValue(true);
-            builder.OwnsOne(b => b.Website, w => w.Property(wu => wu.Value).HasMaxLength(200));
             builder.HasIndex(b => b.Name).IsUnique();
             builder.HasIndex(b => b.IsActive);
             builder.Ignore(b => b.DomainEvents);

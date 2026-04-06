@@ -14,9 +14,10 @@ namespace Infrastructure.Configuration
             builder.Property(u => u.FullName).IsRequired().HasMaxLength(100);
             builder.Property(u => u.Avatar).HasMaxLength(500);
             builder.Property(u => u.IsActive).HasDefaultValue(true);
+            builder.Property(u => u.Email).IsRequired().HasMaxLength(100);
+            builder.Property(u => u.PhoneNumber).HasMaxLength(20);
             builder.HasIndex(u => u.UserName).IsUnique();
-            builder.OwnsOne(u => u.Email, e => e.Property(em => em.Value).HasMaxLength(100).HasColumnName("Email"));
-            builder.OwnsOne(u => u.PhoneNumber, p => p.Property(ph => ph.Value).HasMaxLength(20).HasColumnName("PhoneNumber"));
+            builder.HasIndex(u => u.Email).IsUnique();
             builder.Ignore(u => u.DomainEvents);
         }
     }

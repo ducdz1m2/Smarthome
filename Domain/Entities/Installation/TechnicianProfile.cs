@@ -2,7 +2,6 @@ namespace Domain.Entities.Installation
 {
     using Domain.Entities.Common;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class TechnicianProfile : BaseEntity
     {

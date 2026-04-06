@@ -3,15 +3,14 @@ namespace Domain.Entities.Promotions
     using Domain.Entities.Common;
     using Domain.Enums;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class Coupon : BaseEntity
     {
         public string Code { get; private set; } = string.Empty;
         public DiscountType DiscountType { get; private set; }
         public decimal DiscountValue { get; private set; }
-        public Money? MinOrderAmount { get; private set; }
-        public Money? MaxDiscountAmount { get; private set; }
+        public decimal? MinOrderAmount { get; private set; }
+        public decimal? MaxDiscountAmount { get; private set; }
         public DateTime ExpiryDate { get; private set; }
         public int MaxUsage { get; private set; }
         public int UsedCount { get; private set; }
@@ -42,35 +41,35 @@ namespace Domain.Entities.Promotions
             };
         }
 
-        public bool IsValid(Money orderAmount)
+        public bool IsValid(decimal orderAmount)
         {
             if (!IsActive) return false;
             if (DateTime.UtcNow > ExpiryDate) return false;
             if (UsedCount >= MaxUsage) return false;
-            if (MinOrderAmount != null && orderAmount.Amount < MinOrderAmount.Amount) return false;
+            if (MinOrderAmount.HasValue && orderAmount < MinOrderAmount.Value) return false;
 
             return true;
         }
 
-        public Money CalculateDiscount(Money orderAmount)
+        public decimal CalculateDiscount(decimal orderAmount)
         {
             if (!IsValid(orderAmount))
                 throw new CouponExpiredException(Code, ExpiryDate);
 
-            Money discount;
+            decimal discount;
 
             if (DiscountType == DiscountType.FixedAmount)
             {
-                discount = Money.Vnd(DiscountValue);
+                discount = DiscountValue;
             }
             else
             {
-                discount = orderAmount.ApplyDiscount(DiscountValue);
+                discount = orderAmount * DiscountValue / 100;
             }
 
-            if (MaxDiscountAmount != null && discount.Amount > MaxDiscountAmount.Amount)
+            if (MaxDiscountAmount.HasValue && discount > MaxDiscountAmount.Value)
             {
-                discount = MaxDiscountAmount;
+                discount = MaxDiscountAmount.Value;
             }
 
             return discount;
@@ -89,7 +88,7 @@ namespace Domain.Entities.Promotions
             IsActive = false;
         }
 
-        public void SetConstraints(Money? minOrder, Money? maxDiscount)
+        public void SetConstraints(decimal? minOrder, decimal? maxDiscount)
         {
             MinOrderAmount = minOrder;
             MaxDiscountAmount = maxDiscount;

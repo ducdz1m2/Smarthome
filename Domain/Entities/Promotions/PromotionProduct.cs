@@ -2,19 +2,18 @@ namespace Domain.Entities.Promotions
 {
     using Domain.Entities.Common;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class PromotionProduct : BaseEntity
     {
         public int PromotionId { get; private set; }
         public int ProductId { get; private set; }
-        public Percentage? CustomDiscountPercent { get; private set; }
+        public decimal? CustomDiscountPercent { get; private set; }
 
         public virtual Promotion Promotion { get; private set; } = null!;
 
         private PromotionProduct() { }
 
-        public static PromotionProduct Create(int promotionId, int productId, Percentage? customDiscount = null)
+        public static PromotionProduct Create(int promotionId, int productId, decimal? customDiscount = null)
         {
             if (promotionId <= 0)
                 throw new DomainException("PromotionId không hợp lệ");
@@ -30,12 +29,12 @@ namespace Domain.Entities.Promotions
             };
         }
 
-        public void UpdateCustomDiscount(Percentage? customDiscount)
+        public void UpdateCustomDiscount(decimal? customDiscount)
         {
             CustomDiscountPercent = customDiscount;
         }
 
-        public Percentage GetEffectiveDiscount(Percentage defaultDiscount)
+        public decimal GetEffectiveDiscount(decimal defaultDiscount)
         {
             return CustomDiscountPercent ?? defaultDiscount;
         }

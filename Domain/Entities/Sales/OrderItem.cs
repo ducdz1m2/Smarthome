@@ -3,7 +3,6 @@ namespace Domain.Entities.Sales
     using Domain.Entities.Common;
     using Domain.Enums;
     using Domain.Exceptions;
-    using Domain.ValueObjects;
 
     public class OrderItem : BaseEntity
     {
@@ -11,7 +10,7 @@ namespace Domain.Entities.Sales
         public int ProductId { get; private set; }
         public int? VariantId { get; private set; }
         public int Quantity { get; private set; }
-        public Money UnitPrice { get; private set; } = null!;
+        public decimal UnitPrice { get; private set; }
         public bool IsShipped { get; private set; } = false;
         public bool IsInstalled { get; private set; } = false;
         public bool IsReserved { get; private set; } = false;
@@ -23,7 +22,7 @@ namespace Domain.Entities.Sales
 
         private OrderItem() { }
 
-        public static OrderItem Create(int orderId, int productId, int? variantId, int quantity, Money unitPrice, bool requiresInstallation = false)
+        public static OrderItem Create(int orderId, int productId, int? variantId, int quantity, decimal unitPrice, bool requiresInstallation = false)
         {
             if (quantity <= 0)
                 throw new DomainException("Số lượng phải lớn hơn 0");
@@ -81,7 +80,7 @@ namespace Domain.Entities.Sales
             IsReserved = false;
         }
 
-        public Money GetSubtotal() => UnitPrice.Multiply(Quantity);
+        public decimal GetSubtotal() => UnitPrice * Quantity;
 
         public bool IsCompleted => IsShipped || IsInstalled;
     }

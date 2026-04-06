@@ -5,7 +5,6 @@ using Application.Interfaces.Services;
 using AutoMapper;
 using Domain.Entities.Catalog;
 using Domain.Exceptions;
-using Domain.ValueObjects;
 
 namespace Application.Services
 {
@@ -22,18 +21,14 @@ namespace Application.Services
 
         public async Task<int> CreateAsync(CreateProductRequest request)
         {
-            var sku = Sku.Create(request.Sku);
-            var price = Money.Create(request.Price);
-
             var product = Product.Create(
                 request.Name,
-                sku,
-                price,
+                request.Sku,
+                request.Price,
                 request.CategoryId,
                 request.BrandId,
                 request.SupplierId,
                 request.RequiresInstallation
-                
             );
 
             await _repo.AddAsync(product);
@@ -94,9 +89,7 @@ namespace Application.Services
             if (product == null)
                 throw new EntityNotFoundException("Product", id);
 
-            var price = Money.Create(request.Price);
-            product.Update(request.Name, price, request.Description);
-            // product.Activate/Deactivate nếu cần
+            product.Update(request.Name, request.Price, request.Description);
 
             await _repo.SaveChangesAsync();
         }
