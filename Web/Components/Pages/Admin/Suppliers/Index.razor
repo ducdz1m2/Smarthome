@@ -1,0 +1,187 @@
+@page "/admin/suppliers"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@using Web.Components.Shared
+@layout AdminLayout
+@inject ISupplierService SupplierService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Nhà cung cấp</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+           OnClick="@(() => OpenSupplierDialog(null))" Class="mb-4">
+    Thêm nhà cung cấp
+</MudButton>
+
+<MudTable Items="_suppliers" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterSuppliers" SortMode="SortMode.Single" AllowUnsorted="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách nhà cung cấp</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh Width="60px"><MudTableSortLabel T="SupplierResponse" SortBy="@(s => s.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh Width="200px"><MudTableSortLabel T="SupplierResponse" SortBy="@(s => s.Name)">Tên NCC</MudTableSortLabel></MudTh>
+        <MudTh Width="150px">Mã số thuế</MudTh>
+        <MudTh Width="200px">Địa chỉ</MudTh>
+        <MudTh Width="120px">Liên hệ</MudTh>
+        <MudTh Width="120px"><MudTableSortLabel T="SupplierResponse" SortBy="@(s => s.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="SupplierResponse" SortBy="@(s => s.StockEntryCount)">Số phiếu nhập</MudTableSortLabel></MudTh>
+        <MudTh Width="100px">Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Tên">@context.Name</MudTd>
+        <MudTd DataLabel="MST">@context.TaxCode</MudTd>
+        <MudTd DataLabel="Địa chỉ">
+            <MudText Typo="Typo.caption" Style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
+                @context.Address
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="Liên hệ">
+            <div>@context.ContactName</div>
+            <MudText Typo="Typo.caption">@context.Phone</MudText>
+        </MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudSwitch T="bool" Value="@context.IsActive" 
+                       ValueChanged="@(v => OnToggleStatus(context.Id, v))"
+                       Color="Color.Success" UncheckedColor="Color.Error" />
+        </MudTd>
+        <MudTd DataLabel="Số phiếu">@context.StockEntryCount</MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenSupplierDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeleteSupplier(context))" Size="Size.Small" 
+                           Disabled="@(context.StockEntryCount > 0)" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<SupplierResponse> _suppliers = new();
+    private bool _loading = true;
+    private string _searchString = "";
+
+    private bool FilterSuppliers(SupplierResponse supplier)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return supplier.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               (supplier.TaxCode?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (supplier.ContactName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (supplier.Phone?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (supplier.Email?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSuppliers();
+    }
+
+    private async Task LoadSuppliers()
+    {
+        _loading = true;
+        try
+        {
+            _suppliers = await SupplierService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenSupplierDialog(SupplierResponse? supplier)
+    {
+        var parameters = new DialogParameters<SupplierDialog>();
+        if (supplier != null)
+        {
+            parameters.Add(x => x.SupplierId, supplier.Id);
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<SupplierDialog>(supplier == null ? "Thêm nhà cung cấp" : "Sửa nhà cung cấp", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadSuppliers();
+        }
+    }
+
+    private async Task ToggleStatus(int id, bool isActive)
+    {
+        try
+        {
+            if (isActive)
+                await SupplierService.ActivateAsync(id);
+            else
+                await SupplierService.DeactivateAsync(id);
+            
+            Snackbar.Add($"Đã {(isActive ? "kích hoạt" : "vô hiệu hóa")} nhà cung cấp", Severity.Success);
+            await LoadSuppliers();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            await LoadSuppliers();
+        }
+    }
+
+    private void OnToggleStatus(int id, bool isActive)
+    {
+        _ = ToggleStatus(id, isActive);
+    }
+
+    private async Task DeleteSupplier(SupplierResponse supplier)
+    {
+        if (supplier.StockEntryCount > 0)
+        {
+            Snackbar.Add("Không thể xóa nhà cung cấp đã có phiếu nhập kho", Severity.Warning);
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa nhà cung cấp \"{supplier.Name}\"?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await SupplierService.DeleteAsync(supplier.Id);
+                Snackbar.Add("Đã xóa nhà cung cấp", Severity.Success);
+                await LoadSuppliers();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

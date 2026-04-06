@@ -1,0 +1,168 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject ISupplierService SupplierService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField @bind-Value="_request.Name" Label="Tên nhà cung cấp *" 
+                          Required="true" RequiredError="Tên không được trống"
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            @if (!_isEdit)
+            {
+                <MudTextField @bind-Value="_createRequest.TaxCode" Label="Mã số thuế" 
+                              Variant="Variant.Outlined" Class="mb-3" />
+                
+                <MudTextField @bind-Value="_createRequest.AddressStreet" Label="Địa chỉ (Số nhà, đường)" 
+                              Variant="Variant.Outlined" Class="mb-3" />
+                
+                <MudGrid>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="_createRequest.AddressWard" Label="Phường/Xã" 
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="_createRequest.AddressDistrict" Label="Quận/Huyện" 
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="_createRequest.AddressCity" Label="Tỉnh/Thành phố" 
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+            }
+            
+            <MudDivider Class="my-4" />
+            
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Thông tin liên hệ</MudText>
+            
+            <MudTextField @bind-Value="_request.ContactName" Label="Người liên hệ" 
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            <MudTextField @bind-Value="_request.Phone" Label="Điện thoại" 
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            <MudTextField @bind-Value="_request.Email" Label="Email" 
+                          Variant="Variant.Outlined" Class="mb-3" 
+                          InputType="InputType.Email" />
+            
+            <MudDivider Class="my-4" />
+            
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Thông tin ngân hàng</MudText>
+            
+            <MudTextField @bind-Value="_request.BankAccount" Label="Số tài khoản" 
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            <MudTextField @bind-Value="_request.BankName" Label="Tên ngân hàng" 
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            @if (_isEdit)
+            {
+                <MudSwitch @bind-Value="_request.IsActive" Label="Đang hoạt động" 
+                           Color="Color.Success" />
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            @(_isEdit ? "Cập nhật" : "Thêm mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? SupplierId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isEdit => SupplierId.HasValue;
+    
+    private UpdateSupplierRequest _request = new()
+    {
+        Name = "",
+        IsActive = true
+    };
+    
+    private CreateSupplierRequest _createRequest = new()
+    {
+        Name = ""
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_isEdit)
+        {
+            try
+            {
+                var supplier = await SupplierService.GetByIdAsync(SupplierId.Value);
+                if (supplier != null)
+                {
+                    _request = new UpdateSupplierRequest
+                    {
+                        Name = supplier.Name,
+                        ContactName = supplier.ContactName,
+                        Phone = supplier.Phone,
+                        Email = supplier.Email,
+                        BankAccount = supplier.BankAccount,
+                        BankName = supplier.BankName,
+                        IsActive = supplier.IsActive
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
+                MudDialog.Cancel();
+            }
+        }
+        else
+        {
+            _createRequest = new CreateSupplierRequest
+            {
+                Name = ""
+            };
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        try
+        {
+            if (_isEdit)
+            {
+                await SupplierService.UpdateAsync(SupplierId.Value, _request);
+                Snackbar.Add("Đã cập nhật nhà cung cấp", Severity.Success);
+            }
+            else
+            {
+                _createRequest.Name = _request.Name;
+                _createRequest.ContactName = _request.ContactName;
+                _createRequest.Phone = _request.Phone;
+                _createRequest.Email = _request.Email;
+                _createRequest.BankAccount = _request.BankAccount;
+                _createRequest.BankName = _request.BankName;
+                
+                await SupplierService.CreateAsync(_createRequest);
+                Snackbar.Add("Đã thêm nhà cung cấp mới", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}
