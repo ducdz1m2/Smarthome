@@ -1,0 +1,127 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IBrandService BrandService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField @bind-Value="_request.Name" Label="Tên thương hiệu *" 
+                          Required="true" RequiredError="Tên thương hiệu không được trống"
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            <MudTextField @bind-Value="_request.Description" Label="Mô tả" 
+                          Variant="Variant.Outlined" Lines="3" Class="mb-3" />
+            
+            <MudTextField @bind-Value="_request.Website" Label="Website" 
+                          Variant="Variant.Outlined" Class="mb-3"
+                          Validation="@(new Func<string?, string?>(ValidateWebsite))" />
+            
+            <MudTextField @bind-Value="_request.LogoUrl" Label="URL Logo" 
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            @if (_isEdit)
+            {
+                <MudSwitch @bind-Value="_request.IsActive" Label="Đang hoạt động" 
+                           Color="Color.Success" />
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            @(_isEdit ? "Cập nhật" : "Thêm mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? BrandId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isEdit => BrandId.HasValue;
+    
+    private UpdateBrandRequest _request = new()
+    {
+        Name = "",
+        IsActive = true
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_isEdit)
+        {
+            try
+            {
+                var brand = await BrandService.GetByIdAsync(BrandId.Value);
+                if (brand != null)
+                {
+                    _request = new UpdateBrandRequest
+                    {
+                        Name = brand.Name,
+                        Description = brand.Description,
+                        Website = brand.Website,
+                        LogoUrl = brand.LogoUrl,
+                        IsActive = brand.IsActive
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
+                MudDialog.Cancel();
+            }
+        }
+    }
+
+    private string? ValidateWebsite(string? website)
+    {
+        if (string.IsNullOrEmpty(website))
+            return null;
+        
+        if (!Uri.TryCreate(website, UriKind.Absolute, out _))
+            return "URL không hợp lệ";
+        
+        return null;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        try
+        {
+            if (_isEdit)
+            {
+                await BrandService.UpdateAsync(BrandId.Value, _request);
+                Snackbar.Add("Đã cập nhật thương hiệu", Severity.Success);
+            }
+            else
+            {
+                var createRequest = new CreateBrandRequest
+                {
+                    Name = _request.Name,
+                    Description = _request.Description,
+                    Website = _request.Website,
+                    LogoUrl = _request.LogoUrl
+                };
+                await BrandService.CreateAsync(createRequest);
+                Snackbar.Add("Đã thêm thương hiệu mới", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

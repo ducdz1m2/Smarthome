@@ -1,4 +1,5 @@
-﻿using Application.Interfaces.Services;
+﻿using Application.Interfaces.Repositories;
+using Application.Interfaces.Services;
 using Application.Mappings;
 using Application.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,9 +16,7 @@ namespace Application
             // Đăng ký các Services
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<ICategoryService, CategoryService>();
-
-            // Sau này có thêm Service mới, bạn chỉ cần thêm vào đây
-            // services.AddScoped<IOrderService, OrderService>();
+            services.AddScoped<IBrandService, BrandService>();
 
             return services;
         }

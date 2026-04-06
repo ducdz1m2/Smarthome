@@ -1,0 +1,181 @@
+@page "/admin/brands"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@using Web.Components.Shared
+@layout AdminLayout
+@inject IBrandService BrandService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Thương hiệu</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+           OnClick="@(() => OpenBrandDialog(null))" Class="mb-4">
+    Thêm thương hiệu
+</MudButton>
+
+<MudTable Items="_brands" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterBrands" SortMode="SortMode.Single" AllowUnsorted="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách thương hiệu</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh Width="60px"><MudTableSortLabel T="BrandResponse" SortBy="@(b => b.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh Width="200px"><MudTableSortLabel T="BrandResponse" SortBy="@(b => b.Name)">Tên thương hiệu</MudTableSortLabel></MudTh>
+        <MudTh Width="250px">Mô tả</MudTh>
+        <MudTh Width="180px">Website</MudTh>
+        <MudTh Width="120px"><MudTableSortLabel T="BrandResponse" SortBy="@(b => b.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="BrandResponse" SortBy="@(b => b.ProductCount)">Số SP</MudTableSortLabel></MudTh>
+        <MudTh Width="100px">Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Tên">@context.Name</MudTd>
+        <MudTd DataLabel="Mô tả">@context.Description</MudTd>
+        <MudTd DataLabel="Website">
+            @if (!string.IsNullOrEmpty(context.Website))
+            {
+                <MudLink Href="@context.Website" Target="_blank">@context.Website</MudLink>
+            }
+        </MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudSwitch T="bool" Value="@context.IsActive" 
+                       ValueChanged="@(v => OnToggleStatus(context.Id, v))"
+                       Color="Color.Success" UncheckedColor="Color.Error" />
+        </MudTd>
+        <MudTd DataLabel="Số SP">@context.ProductCount</MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenBrandDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeleteBrand(context))" Size="Size.Small" 
+                           Disabled="@(context.ProductCount > 0)" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<BrandResponse> _brands = new();
+    private bool _loading = true;
+    private string _searchString = "";
+
+    private bool FilterBrands(BrandResponse brand)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return brand.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               (brand.Description?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (brand.Website?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBrands();
+    }
+
+    private async Task LoadBrands()
+    {
+        _loading = true;
+        try
+        {
+            _brands = await BrandService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenBrandDialog(BrandResponse? brand)
+    {
+        var parameters = new DialogParameters<BrandDialog>();
+        if (brand != null)
+        {
+            parameters.Add(x => x.BrandId, brand.Id);
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<BrandDialog>(brand == null ? "Thêm thương hiệu" : "Sửa thương hiệu", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadBrands();
+        }
+    }
+
+    private async Task ToggleStatus(int id, bool isActive)
+    {
+        try
+        {
+            if (isActive)
+                await BrandService.ActivateAsync(id);
+            else
+                await BrandService.DeactivateAsync(id);
+            
+            Snackbar.Add($"Đã {(isActive ? "kích hoạt" : "vô hiệu hóa")} thương hiệu", Severity.Success);
+            await LoadBrands();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            await LoadBrands();
+        }
+    }
+
+    private void OnToggleStatus(int id, bool isActive)
+    {
+        _ = ToggleStatus(id, isActive);
+    }
+
+    private async Task DeleteBrand(BrandResponse brand)
+    {
+        if (brand.ProductCount > 0)
+        {
+            Snackbar.Add("Không thể xóa thương hiệu đã có sản phẩm", Severity.Warning);
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa thương hiệu \"{brand.Name}\"?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await BrandService.DeleteAsync(brand.Id);
+                Snackbar.Add("Đã xóa thương hiệu", Severity.Success);
+                await LoadBrands();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

@@ -40,6 +40,14 @@ namespace Domain.Entities.Catalog
             Website = website?.Trim();
         }
 
-       
+        public void Activate()
+        {
+            IsActive = true;
+        }
+
+        public void Deactivate()
+        {
+            IsActive = false;
+        }
     }
 }

@@ -18,6 +18,7 @@ namespace Infrastructure
             // Đăng ký các Repositories
             services.AddScoped<IProductRepository, ProductRepository>();
             services.AddScoped<ICategoryRepository, CategoryRepository>();
+            services.AddScoped<IBrandRepository, BrandRepository>();
 
             return services;
         }
