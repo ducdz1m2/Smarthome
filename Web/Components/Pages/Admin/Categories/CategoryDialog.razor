@@ -1,0 +1,159 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject ICategoryService CategoryService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField @bind-Value="_request.Name" Label="Tên danh mục *" 
+                          Required="true" RequiredError="Tên danh mục không được trống"
+                          Variant="Variant.Outlined" Class="mb-3" />
+            
+            <MudTextField @bind-Value="_request.Description" Label="Mô tả" 
+                          Variant="Variant.Outlined" Class="mb-3" 
+                          Lines="2" />
+            
+            <MudSelect T="int?" @bind-Value="_request.ParentId" Label="Danh mục cha" 
+                       Variant="Variant.Outlined" Class="mb-3" Clearable="true">
+                <MudSelectItem T="int?" Value="@null">-- Không có --</MudSelectItem>
+                @foreach (var cat in GetAvailableParents())
+                {
+                    <MudSelectItem T="int?" Value="@cat.Id">@cat.Name</MudSelectItem>
+                }
+            </MudSelect>
+            
+            <MudNumericField T="int" @bind-Value="_request.SortOrder" Label="Thứ tự sắp xếp" 
+                             Variant="Variant.Outlined" Class="mb-3" Min="0" />
+            
+            @if (_isEdit)
+            {
+                <MudSwitch @bind-Value="_request.IsActive" Label="Đang hoạt động" 
+                           Color="Color.Success" />
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            @(_isEdit ? "Cập nhật" : "Thêm mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? CategoryId { get; set; }
+    
+    [Parameter]
+    public List<CategoryResponse> Categories { get; set; } = new();
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isEdit => CategoryId.HasValue;
+    
+    private UpdateCategoryRequest _request = new()
+    {
+        Name = "",
+        SortOrder = 0,
+        IsActive = true
+    };
+    
+    private CreateCategoryRequest _createRequest = new()
+    {
+        Name = "",
+        SortOrder = 0
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_isEdit)
+        {
+            try
+            {
+                var category = await CategoryService.GetByIdAsync(CategoryId.Value);
+                if (category != null)
+                {
+                    _request = new UpdateCategoryRequest
+                    {
+                        Name = category.Name,
+                        Description = category.Description,
+                        ParentId = category.ParentId,
+                        SortOrder = category.SortOrder,
+                        IsActive = category.IsActive
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
+                MudDialog.Cancel();
+            }
+        }
+        else
+        {
+            _createRequest = new CreateCategoryRequest
+            {
+                Name = "",
+                SortOrder = 0
+            };
+        }
+    }
+
+    private List<CategoryResponse> GetAvailableParents()
+    {
+        if (_isEdit && CategoryId.HasValue)
+        {
+            // Lọc trừ chính nó và các con của nó để tránh vòng lặp
+            return Categories.Where(c => c.Id != CategoryId.Value && !IsChildOf(c, CategoryId.Value)).ToList();
+        }
+        return Categories;
+    }
+
+    private bool IsChildOf(CategoryResponse category, int parentId)
+    {
+        if (category.ParentId == parentId)
+            return true;
+        if (category.Children?.Any() == true)
+            return category.Children.Any(c => IsChildOf(c, parentId));
+        return false;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        try
+        {
+            if (_isEdit)
+            {
+                await CategoryService.UpdateAsync(CategoryId.Value, _request);
+                Snackbar.Add("Đã cập nhật danh mục", Severity.Success);
+            }
+            else
+            {
+                var createRequest = new CreateCategoryRequest
+                {
+                    Name = _request.Name,
+                    Description = _request.Description,
+                    ParentId = _request.ParentId,
+                    SortOrder = _request.SortOrder
+                };
+                await CategoryService.CreateAsync(createRequest);
+                Snackbar.Add("Đã thêm danh mục mới", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,219 @@
+@page "/admin/categories"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@using Web.Components.Shared
+@layout AdminLayout
+@inject ICategoryService CategoryService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Danh mục</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+           OnClick="@(() => OpenCategoryDialog(null))" Class="mb-4">
+    Thêm danh mục
+</MudButton>
+
+<MudTable Items="_categories" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterCategories" SortMode="SortMode.Single" AllowUnsorted="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách danh mục</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh Width="60px"><MudTableSortLabel T="CategoryResponse" SortBy="@(c => c.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh Width="250px"><MudTableSortLabel T="CategoryResponse" SortBy="@(c => c.Name)">Tên danh mục</MudTableSortLabel></MudTh>
+        <MudTh Width="150px">Danh mục cha</MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="CategoryResponse" SortBy="@(c => c.SortOrder)">Thứ tự</MudTableSortLabel></MudTh>
+        <MudTh Width="120px"><MudTableSortLabel T="CategoryResponse" SortBy="@(c => c.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="CategoryResponse" SortBy="@(c => c.ProductCount)">Số SP</MudTableSortLabel></MudTh>
+        <MudTh Width="100px">Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Tên">
+            <div style="padding-left: @(GetIndentLevel(context) * 20)px">
+                @if (context.Children?.Any() == true)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small" Class="mr-2" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Label" Size="Size.Small" Class="mr-2" />
+                }
+                @context.Name
+            </div>
+        </MudTd>
+        <MudTd DataLabel="Danh mục cha">@context.ParentName</MudTd>
+        <MudTd DataLabel="Thứ tự">@context.SortOrder</MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudSwitch T="bool" Value="@context.IsActive" 
+                       ValueChanged="@(v => OnToggleStatus(context.Id, v))"
+                       Color="Color.Success" UncheckedColor="Color.Error" />
+        </MudTd>
+        <MudTd DataLabel="Số SP">@context.ProductCount</MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenCategoryDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeleteCategory(context))" Size="Size.Small" 
+                           Disabled="@(context.ProductCount > 0 || context.Children?.Any() == true)" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<CategoryResponse> _categories = new();
+    private List<CategoryResponse> _flatCategories = new();
+    private bool _loading = true;
+    private string _searchString = "";
+
+    private bool FilterCategories(CategoryResponse category)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return category.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               (category.Description?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (category.ParentName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        _loading = true;
+        try
+        {
+            _flatCategories = await CategoryService.GetAllAsync();
+            // Chỉ lấy root categories (không có ParentId) để flatten, tránh trùng lặp
+            var rootCategories = _flatCategories.Where(c => c.ParentId == null).ToList();
+            _categories = FlattenHierarchy(rootCategories);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private List<CategoryResponse> FlattenHierarchy(List<CategoryResponse> categories, int level = 0)
+    {
+        var result = new List<CategoryResponse>();
+        foreach (var cat in categories.OrderBy(c => c.SortOrder))
+        {
+            result.Add(cat);
+            if (cat.Children?.Any() == true)
+            {
+                result.AddRange(FlattenHierarchy(cat.Children, level + 1));
+            }
+        }
+        return result;
+    }
+
+    private int GetIndentLevel(CategoryResponse category)
+    {
+        int level = 0;
+        var parent = _flatCategories.FirstOrDefault(c => c.Id == category.ParentId);
+        while (parent != null)
+        {
+            level++;
+            parent = _flatCategories.FirstOrDefault(c => c.Id == parent.ParentId);
+        }
+        return level;
+    }
+
+    private async Task OpenCategoryDialog(CategoryResponse? category)
+    {
+        var parameters = new DialogParameters<CategoryDialog>();
+        if (category != null)
+        {
+            parameters.Add(x => x.CategoryId, category.Id);
+        }
+        parameters.Add(x => x.Categories, _flatCategories);
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CategoryDialog>(category == null ? "Thêm danh mục" : "Sửa danh mục", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadCategories();
+        }
+    }
+
+    private async Task ToggleStatus(int id, bool isActive)
+    {
+        try
+        {
+            if (isActive)
+                await CategoryService.ActivateAsync(id);
+            else
+                await CategoryService.DeactivateAsync(id);
+            
+            Snackbar.Add($"Đã {(isActive ? "kích hoạt" : "vô hiệu hóa")} danh mục", Severity.Success);
+            await LoadCategories();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            await LoadCategories();
+        }
+    }
+
+    private void OnToggleStatus(int id, bool isActive)
+    {
+        _ = ToggleStatus(id, isActive);
+    }
+
+    private async Task DeleteCategory(CategoryResponse category)
+    {
+        if (category.ProductCount > 0 || category.Children?.Any() == true)
+        {
+            Snackbar.Add("Không thể xóa danh mục đã có sản phẩm hoặc danh mục con", Severity.Warning);
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa danh mục \"{category.Name}\"?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await CategoryService.DeleteAsync(category.Id);
+                Snackbar.Add("Đã xóa danh mục", Severity.Success);
+                await LoadCategories();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}
