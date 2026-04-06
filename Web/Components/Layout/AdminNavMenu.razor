@@ -1,0 +1,38 @@
+<MudNavMenu>
+    <MudNavLink Href="/admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+    
+    <MudNavGroup Title="Catalog" Expanded="true" Icon="@Icons.Material.Filled.Inventory">
+        <MudNavLink Href="/admin/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Categories</MudNavLink>
+        <MudNavLink Href="/admin/brands" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BrandingWatermark">Brands</MudNavLink>
+        <MudNavLink Href="/admin/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices">Products</MudNavLink>
+    </MudNavGroup>
+    
+    <MudNavGroup Title="Sales" Icon="@Icons.Material.Filled.ShoppingCart">
+        <MudNavLink Href="/admin/orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt">Orders</MudNavLink>
+        <MudNavLink Href="/admin/warranties" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Security">Warranties</MudNavLink>
+    </MudNavGroup>
+    
+    <MudNavGroup Title="Inventory" Icon="@Icons.Material.Filled.Warehouse">
+        <MudNavLink Href="/admin/inventory" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory2">Stock</MudNavLink>
+        <MudNavLink Href="/admin/suppliers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Suppliers</MudNavLink>
+    </MudNavGroup>
+    
+    <MudNavGroup Title="Promotions" Icon="@Icons.Material.Filled.LocalOffer">
+        <MudNavLink Href="/admin/coupons" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CardGiftcard">Coupons</MudNavLink>
+        <MudNavLink Href="/admin/promotions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Campaign">Promotions</MudNavLink>
+    </MudNavGroup>
+    
+    <MudNavGroup Title="Installation" Icon="@Icons.Material.Filled.Build">
+        <MudNavLink Href="/admin/installations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.EventNote">Schedule</MudNavLink>
+        <MudNavLink Href="/admin/technician-reviews" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.RateReview">Reviews</MudNavLink>
+    </MudNavGroup>
+    
+    <MudNavGroup Title="Content" Icon="@Icons.Material.Filled.Article">
+        <MudNavLink Href="/admin/banners" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Image">Banners</MudNavLink>
+    </MudNavGroup>
+    
+    <MudNavGroup Title="System" Icon="@Icons.Material.Filled.Settings">
+        <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Users</MudNavLink>
+        <MudNavLink Href="/admin/statistics" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BarChart">Statistics</MudNavLink>
+    </MudNavGroup>
+</MudNavMenu>

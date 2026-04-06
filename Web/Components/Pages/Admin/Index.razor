@@ -1,0 +1,85 @@
+@page "/admin"
+
+<MudText Typo="Typo.h3" Class="mb-4">Admin Dashboard</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent>
+                <MudText Typo="Typo.h6">Products</MudText>
+                <MudText Typo="Typo.h3" Color="Color.Primary">--</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Href="/admin/products" Color="Color.Primary" Variant="Variant.Text">View All</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent>
+                <MudText Typo="Typo.h6">Orders</MudText>
+                <MudText Typo="Typo.h3" Color="Color.Secondary">--</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Href="/admin/orders" Color="Color.Secondary" Variant="Variant.Text">View All</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent>
+                <MudText Typo="Typo.h6">Categories</MudText>
+                <MudText Typo="Typo.h3" Color="Color.Info">--</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Href="/admin/categories" Color="Color.Info" Variant="Variant.Text">Manage</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent>
+                <MudText Typo="Typo.h6">Brands</MudText>
+                <MudText Typo="Typo.h3" Color="Color.Success">--</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Href="/admin/brands" Color="Color.Success" Variant="Variant.Text">Manage</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<MudText Typo="Typo.h5" Class="mt-8 mb-4">Quick Actions</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="4">
+        <MudButton Href="/admin/products/create" 
+                   Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   FullWidth="true"
+                   StartIcon="@Icons.Material.Filled.Add">
+            Add Product
+        </MudButton>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4">
+        <MudButton Href="/admin/categories" 
+                   Variant="Variant.Filled" 
+                   Color="Color.Secondary" 
+                   FullWidth="true"
+                   StartIcon="@Icons.Material.Filled.Category">
+            Manage Categories
+        </MudButton>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4">
+        <MudButton Href="/admin/inventory" 
+                   Variant="Variant.Filled" 
+                   Color="Color.Info" 
+                   FullWidth="true"
+                   StartIcon="@Icons.Material.Filled.Inventory">
+            Check Inventory
+        </MudButton>
+    </MudItem>
+</MudGrid>
