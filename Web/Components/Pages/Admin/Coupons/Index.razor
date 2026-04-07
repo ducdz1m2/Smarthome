@@ -19,7 +19,7 @@
 
 <MudTable Items="_coupons" Dense="true" Hover="true" Loading="_loading" 
           LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
-          Filter="@FilterCoupons" SortMode="SortMode.Single" AllowUnsorted="false">
+          Filter="@FilterCoupons" sortMode="sortMode.Single" AllowUnsorted="false">
     <ToolBarContent>
         <MudText Typo="Typo.h6">Danh sách mã giảm giá</MudText>
         <MudSpacer />
@@ -28,16 +28,16 @@
                       IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
     </ToolBarContent>
     <HeaderContent>
-        <MudTh Width="60px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.Id)">ID</MudTableSortLabel></MudTh>
-        <MudTh Width="120px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.Code)">Mã</MudTableSortLabel></MudTh>
-        <MudTh Width="120px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.DiscountType)">Loại</MudTableSortLabel></MudTh>
-        <MudTh Width="100px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.DiscountValue)">Giá trị</MudTableSortLabel></MudTh>
-        <MudTh Width="120px">Đơn tối thiểu</MudTh>
-        <MudTh Width="100px">Giảm tối đa</MudTh>
-        <MudTh Width="120px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.ExpiryDate)">Hết hạn</MudTableSortLabel></MudTh>
-        <MudTh Width="80px">Đã dùng</MudTh>
-        <MudTh Width="100px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
-        <MudTh Width="80px">Thao tác</MudTh>
+        <MudTh width="60px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh width="120px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.Code)">Mã</MudTableSortLabel></MudTh>
+        <MudTh width="120px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.DiscountType)">Loại</MudTableSortLabel></MudTh>
+        <MudTh width="100px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.DiscountValue)">Giá trị</MudTableSortLabel></MudTh>
+        <MudTh width="120px">Đơn tối thiểu</MudTh>
+        <MudTh width="100px">Giảm tối đa</MudTh>
+        <MudTh width="120px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.ExpiryDate)">Hết hạn</MudTableSortLabel></MudTh>
+        <MudTh width="80px">Đã dùng</MudTh>
+        <MudTh width="100px"><MudTableSortLabel T="CouponResponse" SortBy="@(c => c.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh width="80px">Thao tác</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
@@ -78,7 +78,7 @@
         </MudTd>
     </RowTemplate>
     <PagerContent>
-        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 5, 10, 25, 50 }"
                        InfoFormat="{first_item}-{last_item} / {all_items}" />
     </PagerContent>
 </MudTable>

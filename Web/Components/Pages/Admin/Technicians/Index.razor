@@ -65,7 +65,7 @@
             </MudChipSet>
         </MudTd>
         <MudTd DataLabel="Đánh giá">
-            <MudRating Value="@((int)Math.Round(context.Rating))" ReadOnly="true" Size="Size.Small" />
+            <MudRating value="@((int)Math.Round(context.Rating))" ReadOnly="true" Size="Size.Small" />
             <MudText Typo="Typo.caption">(@context.Rating.ToString("F1"))</MudText>
         </MudTd>
         <MudTd DataLabel="Công việc">
@@ -88,7 +88,7 @@
         </MudTd>
     </RowTemplate>
     <PagerContent>
-        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 10, 25, 50, 100 }"
+        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 10, 25, 50, 100 }"
                        InfoFormat="{first_item}-{last_item} / {all_items}" />
     </PagerContent>
 </MudTable>

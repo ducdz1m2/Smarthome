@@ -19,7 +19,7 @@
 
 <MudTable Items="_warehouses" Dense="true" Hover="true" Loading="_loading" 
           LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
-          Filter="@FilterWarehouses" SortMode="SortMode.Single" AllowUnsorted="false">
+          Filter="@FilterWarehouses" sortMode="sortMode.Single" AllowUnsorted="false">
     <ToolBarContent>
         <MudText Typo="Typo.h6">Danh sách kho</MudText>
         <MudSpacer />
@@ -28,14 +28,14 @@
                       IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
     </ToolBarContent>
     <HeaderContent>
-        <MudTh Width="60px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.Id)">ID</MudTableSortLabel></MudTh>
-        <MudTh Width="120px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.Code)">Mã kho</MudTableSortLabel></MudTh>
-        <MudTh Width="180px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.Name)">Tên kho</MudTableSortLabel></MudTh>
-        <MudTh Width="250px">Địa chỉ</MudTh>
-        <MudTh Width="120px">Điện thoại</MudTh>
-        <MudTh Width="120px">Chủ kho</MudTh>
-        <MudTh Width="100px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
-        <MudTh Width="100px">Thao tác</MudTh>
+        <MudTh width="60px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh width="120px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.Code)">Mã kho</MudTableSortLabel></MudTh>
+        <MudTh width="180px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.Name)">Tên kho</MudTableSortLabel></MudTh>
+        <MudTh width="250px">Địa chỉ</MudTh>
+        <MudTh width="120px">Điện thoại</MudTh>
+        <MudTh width="120px">Chủ kho</MudTh>
+        <MudTh width="100px"><MudTableSortLabel T="WarehouseResponse" SortBy="@(w => w.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh width="100px">Thao tác</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
@@ -57,7 +57,7 @@
         </MudTd>
     </RowTemplate>
     <PagerContent>
-        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 5, 10, 25, 50 }"
                        InfoFormat="{first_item}-{last_item} / {all_items}" />
     </PagerContent>
 </MudTable>

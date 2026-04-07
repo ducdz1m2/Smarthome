@@ -1,0 +1,278 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Entities.Catalog
+@inject IPromotionService PromotionService
+@inject IProductService ProductService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" panelClass="pa-6">
+                <MudTabPanel Text="Thông tin cơ bản" Icon="@Icons.Material.Filled.Info">
+                    <MudTextField @bind-Value="_request.Name" Label="Tên chương trình *" 
+                                  Required="true" RequiredError="Tên chương trình không được trống"
+                                  Variant="Variant.Outlined" Class="mb-3"
+                                  HelperText="Ví dụ: Khuyến mãi hè 2024" />
+                    
+                    <MudTextField @bind-Value="_request.Description" Label="Mô tả" 
+                                  Variant="Variant.Outlined" Class="mb-3" Lines="2"
+                                  HelperText="Mô tả ngắn về chương trình khuyến mãi" />
+                    
+                    <MudNumericField T="decimal" @bind-Value="_request.DiscountPercent" 
+                                     Label="Phần trăm giảm giá *" 
+                                     Variant="Variant.Outlined" Class="mb-3" 
+                                     Min="0" Max="100" Required="true"
+                                     HelperText="Nhập số phần trăm (VD: 10 = 10%)"
+                                     Adornment="Adornment.End" AdornmentText="%" />
+                    
+                    <MudNumericField T="decimal?" @bind-Value="_request.MinOrderAmount" 
+                                     Label="Đơn hàng tối thiểu" 
+                                     Variant="Variant.Outlined" Class="mb-3" 
+                                     Min="0"
+                                     Adornment="Adornment.End" AdornmentText="đ" />
+                    
+                    <MudNumericField T="int" @bind-Value="_request.Priority" 
+                                     Label="Mức độ ưu tiên" 
+                                     Variant="Variant.Outlined" Class="mb-3" 
+                                     Min="0"
+                                     HelperText="Số cao hơn = Ưu tiên cao hơn (mặc định: 0)" />
+                </MudTabPanel>
+                
+                <MudTabPanel Text="Thời gian" Icon="@Icons.Material.Filled.Schedule">
+                    <MudDatePicker @bind-Date="_startDate" 
+                                  Label="Ngày bắt đầu *" 
+                                  Variant="Variant.Outlined" Class="mb-3"
+                                  Required="true" />
+                    
+                    <MudDatePicker @bind-Date="_endDate" 
+                                  Label="Ngày kết thúc *" 
+                                  Variant="Variant.Outlined" Class="mb-3"
+                                  Required="true" />
+                    
+                    @if (_isEdit)
+                    {
+                        <MudSwitch @bind-Value="_request.IsActive" Label="Đang hoạt động" 
+                                   Color="Color.Success" />
+                    }
+                </MudTabPanel>
+                
+                <MudTabPanel Text="Sản phẩm áp dụng" Icon="@Icons.Material.Filled.Devices">
+                    <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
+                        Nếu không chọn sản phẩm nào, chương trình sẽ áp dụng cho tất cả sản phẩm
+                    </MudText>
+                    
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
+                               OnClick="OpenProductSelector" StartIcon="@Icons.Material.Filled.Add"
+                               Class="mb-3">
+                        Chọn sản phẩm
+                    </MudButton>
+                    
+                    @if (_selectedProducts.Any())
+                    {
+                        <MudTable Items="_selectedProducts" Dense="true" Hover="true" Bordered="true">
+                            <HeaderContent>
+                                <MudTh>Tên sản phẩm</MudTh>
+                                <MudTh>Giảm giá tùy chỉnh</MudTh>
+                                <MudTh width="80px">Thao tác</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Name</MudTd>
+                                <MudTd>
+                                    <MudNumericField T="decimal?" @bind-Value="_customDiscounts[context.Id]"
+                                                     Label="Giảm giá %" Variant="Variant.Text" 
+                                                     Min="0" Max="100" Margin="Margin.Dense"
+                                                     HelperText="Để trống = dùng mức giảm mặc định" />
+                                </MudTd>
+                                <MudTd>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                   Color="Color.Error" Size="Size.Small"
+                                                   OnClick="@(() => RemoveProduct(context.Id))" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info">
+                            Áp dụng cho tất cả sản phẩm
+                        </MudAlert>
+                    }
+                </MudTabPanel>
+            </MudTabs>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            @(_isEdit ? "Cập nhật" : "Thêm mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? PromotionId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isEdit => PromotionId.HasValue;
+    private DateTime? _startDate = DateTime.Today;
+    private DateTime? _endDate = DateTime.Today.AddMonths(1);
+    
+    private UpdatePromotionRequest _request = new()
+    {
+        Name = "",
+        DiscountPercent = 10,
+        IsActive = true,
+        ProductIds = new List<int>(),
+        CustomDiscounts = new Dictionary<int, decimal?>()
+    };
+
+    private List<ProductListResponse> _allProducts = new();
+    private List<ProductListResponse> _selectedProducts = new();
+    private Dictionary<int, decimal?> _customDiscounts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load all products for selection
+        _allProducts = await ProductService.GetAllAsync();
+
+        if (_isEdit)
+        {
+            try
+            {
+                var promotion = await PromotionService.GetByIdAsync(PromotionId.Value);
+                if (promotion != null)
+                {
+                    _request = new UpdatePromotionRequest
+                    {
+                        Name = promotion.Name,
+                        Description = promotion.Description,
+                        DiscountPercent = promotion.DiscountPercent,
+                        MinOrderAmount = promotion.MinOrderAmount,
+                        Priority = promotion.Priority,
+                        IsActive = promotion.IsActive,
+                        ProductIds = promotion.Products.Select(p => p.ProductId).ToList(),
+                        CustomDiscounts = promotion.Products.ToDictionary(p => p.ProductId, p => p.CustomDiscountPercent)
+                    };
+                    _startDate = promotion.StartDate;
+                    _endDate = promotion.EndDate;
+                    
+                    // Load selected products
+                    _customDiscounts = new Dictionary<int, decimal?>(_request.CustomDiscounts);
+                    _selectedProducts = _allProducts
+                        .Where(p => _request.ProductIds.Contains(p.Id))
+                        .ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
+                MudDialog.Cancel();
+            }
+        }
+        else
+        {
+            _request = new UpdatePromotionRequest
+            {
+                Name = "",
+                DiscountPercent = 10,
+                Priority = 0,
+                IsActive = true,
+                ProductIds = new List<int>(),
+                CustomDiscounts = new Dictionary<int, decimal?>()
+            };
+        }
+    }
+
+    private void OpenProductSelector()
+    {
+        // Show product selection dialog or expand a section
+        // For simplicity, we'll show all products in a table and let user select
+        var availableProducts = _allProducts
+            .Where(p => !_selectedProducts.Any(sp => sp.Id == p.Id))
+            .ToList();
+            
+        if (!availableProducts.Any())
+        {
+            Snackbar.Add("Không còn sản phẩm nào để chọn", Severity.Warning);
+            return;
+        }
+        
+        // Add first available product as example (in real app, use a selection dialog)
+        var product = availableProducts.First();
+        _selectedProducts.Add(product);
+        _customDiscounts[product.Id] = null;
+        _request.ProductIds.Add(product.Id);
+        _request.CustomDiscounts[product.Id] = null;
+    }
+
+    private void RemoveProduct(int productId)
+    {
+        _selectedProducts.RemoveAll(p => p.Id == productId);
+        _request.ProductIds.Remove(productId);
+        _customDiscounts.Remove(productId);
+        _request.CustomDiscounts.Remove(productId);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        if (!_startDate.HasValue || !_endDate.HasValue)
+        {
+            Snackbar.Add("Vui lòng chọn ngày bắt đầu và kết thúc", Severity.Warning);
+            return;
+        }
+
+        if (_endDate.Value < _startDate.Value)
+        {
+            Snackbar.Add("Ngày kết thúc phải sau ngày bắt đầu", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            // Update request with dates and custom discounts
+            _request.StartDate = _startDate.Value;
+            _request.EndDate = _endDate.Value;
+            _request.CustomDiscounts = _customDiscounts.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+            if (_isEdit)
+            {
+                await PromotionService.UpdateAsync(PromotionId.Value, _request);
+                Snackbar.Add("Đã cập nhật chương trình khuyến mãi", Severity.Success);
+            }
+            else
+            {
+                var createRequest = new CreatePromotionRequest
+                {
+                    Name = _request.Name,
+                    Description = _request.Description,
+                    DiscountPercent = _request.DiscountPercent,
+                    MinOrderAmount = _request.MinOrderAmount,
+                    Priority = _request.Priority,
+                    StartDate = _request.StartDate,
+                    EndDate = _request.EndDate,
+                    ProductIds = _request.ProductIds,
+                    CustomDiscounts = _request.CustomDiscounts
+                };
+                await PromotionService.CreateAsync(createRequest);
+                Snackbar.Add("Đã thêm chương trình khuyến mãi mới", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

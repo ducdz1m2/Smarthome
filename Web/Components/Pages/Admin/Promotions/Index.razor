@@ -1,0 +1,220 @@
+@page "/admin/promotions"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@using Web.Components.Shared
+@layout AdminLayout
+@inject IPromotionService PromotionService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Khuyến mãi</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+           OnClick="@(() => OpenPromotionDialog(null))" Class="mb-4">
+    Thêm chương trình khuyến mãi
+</MudButton>
+
+<MudTable Items="_promotions" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterPromotions" sortMode="sortMode.Single" AllowUnsorted="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách chương trình khuyến mãi</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh width="60px"><MudTableSortLabel T="PromotionResponse" SortBy="@(p => p.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh width="200px"><MudTableSortLabel T="PromotionResponse" SortBy="@(p => p.Name)">Tên</MudTableSortLabel></MudTh>
+        <MudTh width="100px"><MudTableSortLabel T="PromotionResponse" SortBy="@(p => p.DiscountPercent)">Giảm giá</MudTableSortLabel></MudTh>
+        <MudTh width="120px">Đơn tối thiểu</MudTh>
+        <MudTh width="150px"><MudTableSortLabel T="PromotionResponse" SortBy="@(p => p.StartDate)">Bắt đầu</MudTableSortLabel></MudTh>
+        <MudTh width="150px"><MudTableSortLabel T="PromotionResponse" SortBy="@(p => p.EndDate)">Kết thúc</MudTableSortLabel></MudTh>
+        <MudTh width="80px"><MudTableSortLabel T="PromotionResponse" SortBy="@(p => p.Priority)">Ưu tiên</MudTableSortLabel></MudTh>
+        <MudTh width="100px"><MudTableSortLabel T="PromotionResponse" SortBy="@(p => p.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh width="150px">Sản phẩm áp dụng</MudTh>
+        <MudTh width="100px">Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Tên">
+            <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.Name</MudText>
+            @if (!string.IsNullOrEmpty(context.Description))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Description</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Giảm giá">
+            <MudChip T="string" Color="Color.Info" Size="Size.Small">
+                @context.DiscountPercent%
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Đơn tối thiểu">@(context.MinOrderAmount?.ToString("N0") ?? "-")</MudTd>
+        <MudTd DataLabel="Bắt đầu">
+            <MudText Color="@GetDateColor(context.StartDate, true)" Typo="Typo.body2">
+                @context.StartDate.ToString("dd/MM/yyyy")
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="Kết thúc">
+            <MudText Color="@GetDateColor(context.EndDate, false)" Typo="Typo.body2">
+                @context.EndDate.ToString("dd/MM/yyyy")
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="Ưu tiên">@context.Priority</MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudSwitch T="bool" Value="@context.IsActive" 
+                       ValueChanged="@(v => OnToggleStatus(context.Id, v))"
+                       Color="Color.Success" UncheckedColor="Color.Error" />
+        </MudTd>
+        <MudTd DataLabel="Sản phẩm">
+            @if (context.Products.Any())
+            {
+                <MudChip T="string" Color="Color.Primary" Size="Size.Small">
+                    @context.Products.Count sản phẩm
+                </MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Default" Size="Size.Small">
+                    Tất cả
+                </MudChip>
+            }
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenPromotionDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeletePromotion(context))" Size="Size.Small" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<PromotionResponse> _promotions = new();
+    private bool _loading = true;
+    private string _searchString = "";
+
+    private bool FilterPromotions(PromotionResponse promotion)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return promotion.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               (promotion.Description?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPromotions();
+    }
+
+    private async Task LoadPromotions()
+    {
+        _loading = true;
+        try
+        {
+            _promotions = await PromotionService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenPromotionDialog(PromotionResponse? promotion)
+    {
+        var parameters = new DialogParameters<PromotionDialog>();
+        if (promotion != null)
+        {
+            parameters.Add(x => x.PromotionId, promotion.Id);
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<PromotionDialog>(promotion == null ? "Thêm chương trình khuyến mãi" : "Sửa chương trình khuyến mãi", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadPromotions();
+        }
+    }
+
+    private async Task ToggleStatus(int id, bool isActive)
+    {
+        try
+        {
+            if (isActive)
+                await PromotionService.ActivateAsync(id);
+            else
+                await PromotionService.DeactivateAsync(id);
+            
+            Snackbar.Add($"Đã {(isActive ? "kích hoạt" : "vô hiệu hóa")} chương trình khuyến mãi", Severity.Success);
+            await LoadPromotions();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            await LoadPromotions();
+        }
+    }
+
+    private void OnToggleStatus(int id, bool isActive)
+    {
+        _ = ToggleStatus(id, isActive);
+    }
+
+    private async Task DeletePromotion(PromotionResponse promotion)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa chương trình khuyến mãi \"{promotion.Name}\"?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await PromotionService.DeleteAsync(promotion.Id);
+                Snackbar.Add("Đã xóa chương trình khuyến mãi", Severity.Success);
+                await LoadPromotions();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private static Color GetDateColor(DateTime date, bool isStartDate)
+    {
+        var now = DateTime.UtcNow;
+        if (isStartDate)
+        {
+            return date <= now ? Color.Success : Color.Default;
+        }
+        else
+        {
+            if (date < now) return Color.Error;
+            if (date < now.AddDays(7)) return Color.Warning;
+            return Color.Success;
+        }
+    }
+}

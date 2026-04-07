@@ -21,6 +21,7 @@ namespace Application
             services.AddScoped<IOrderService, OrderService>();
             services.AddScoped<ISupplierService, SupplierService>();
             services.AddScoped<ICouponService, CouponService>();
+            services.AddScoped<IPromotionService, PromotionService>();
             services.AddScoped<IBannerService, BannerService>();
             services.AddScoped<IInventoryService, InventoryService>();
 
