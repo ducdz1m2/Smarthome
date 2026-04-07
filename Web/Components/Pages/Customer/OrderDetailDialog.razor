@@ -170,6 +170,32 @@
                     </MudItem>
                 }
 
+                <!-- Status History Timeline -->
+                @if (_statusHistory?.Any() == true)
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Lịch sử trạng thái</MudText>
+                        <MudCard Elevation="0" Outlined="true" Class="mb-4">
+                            <MudCardContent>
+                                <MudTimeline>
+                                    @foreach (var history in _statusHistory)
+                                    {
+                                        <MudTimelineItem Color="@GetStatusColor(history.Status)">
+                                            <MudText Typo="Typo.body2" Style="font-weight: 500;">
+                                                @GetStatusText(history.Status)
+                                            </MudText>
+                                            <MudText Typo="Typo.caption">@history.Note</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @history.At.ToString("dd/MM/yyyy HH:mm")
+                                            </MudText>
+                                        </MudTimelineItem>
+                                    }
+                                </MudTimeline>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+
                 <!-- Cancel Reason -->
                 @if (!string.IsNullOrEmpty(_order.CancelReason))
                 {
@@ -212,6 +238,14 @@
 
     private OrderResponse? _order;
     private bool _isLoading = true;
+    private List<StatusHistoryItem> _statusHistory = new();
+
+    public class StatusHistoryItem
+    {
+        public string Status { get; set; } = "";
+        public string Note { get; set; } = "";
+        public DateTime At { get; set; }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -224,6 +258,7 @@
         try
         {
             _order = await OrderService.GetByIdAsync(OrderId);
+            _statusHistory = GetMockStatusHistory();
         }
         catch (Exception ex)
         {
@@ -233,6 +268,145 @@
         {
             _isLoading = false;
         }
+    }
+
+    private List<StatusHistoryItem> GetMockStatusHistory()
+    {
+        var history = new List<StatusHistoryItem>();
+        if (_order == null) return history;
+
+        var baseTime = _order.CreatedAt;
+        int timeOffset = 0;
+
+        history.Add(new StatusHistoryItem 
+        { 
+            Status = "Pending", 
+            Note = "Đơn hàng được tạo", 
+            At = baseTime.AddMinutes(timeOffset)
+        });
+
+        var currentStatus = _order.Status;
+        if (currentStatus == "Pending") return history;
+
+        timeOffset += 30;
+        history.Add(new StatusHistoryItem 
+        { 
+            Status = "Confirmed", 
+            Note = "Đơn hàng đã được xác nhận", 
+            At = baseTime.AddMinutes(timeOffset)
+        });
+        if (currentStatus == "Confirmed") return history;
+
+        if (currentStatus is "AwaitingPickup" or "Shipping" or "Delivered" or "Completed")
+        {
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "AwaitingPickup", 
+                Note = "Đơn hàng đang được chuẩn bị", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "AwaitingPickup") return history;
+
+            timeOffset += 60;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Shipping", 
+                Note = "Đơn hàng đang được giao", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Shipping") return history;
+
+            timeOffset += 120;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Delivered", 
+                Note = "Đơn hàng đã được giao thành công", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Delivered") return history;
+        }
+
+        if (currentStatus is "AwaitingSchedule" or "Scheduled" or "TechnicianAssigned" or "Preparing" or "Installing" or "Testing" or "Completed")
+        {
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "AwaitingSchedule", 
+                Note = "Chờ đặt lịch lắp đặt", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "AwaitingSchedule") return history;
+
+            timeOffset += 60;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Scheduled", 
+                Note = "Đã đặt lịch lắp đặt", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Scheduled") return history;
+
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "TechnicianAssigned", 
+                Note = "Đã phân công kỹ thuật viên", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "TechnicianAssigned") return history;
+
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Preparing", 
+                Note = "Kỹ thuật viên đang chuẩn bị", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Preparing") return history;
+
+            timeOffset += 60;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Installing", 
+                Note = "Đang lắp đặt sản phẩm", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Installing") return history;
+
+            timeOffset += 60;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Testing", 
+                Note = "Đang kiểm tra sau lắp đặt", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Testing") return history;
+        }
+
+        if (currentStatus == "Completed")
+        {
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Completed", 
+                Note = "Đơn hàng hoàn tất", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+        }
+
+        if (currentStatus == "Cancelled")
+        {
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Cancelled", 
+                Note = "Đơn hàng đã hủy", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+        }
+
+        return history;
     }
 
     private void Close() => MudDialog.Close();

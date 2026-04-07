@@ -122,6 +122,35 @@
                     </MudItem>
                 }
                 
+                @if (_statusHistory?.Any() == true)
+                {
+                    <MudItem xs="12">
+                        <MudCard Elevation="0" Class="mb-4">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Lịch sử trạng thái</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudTimeline>
+                                    @foreach (var history in _statusHistory)
+                                    {
+                                        <MudTimelineItem Color="@GetStatusColor(history.Status)">
+                                            <MudText Typo="Typo.body2" Style="font-weight: 500;">
+                                                @GetStatusDisplayName(history.Status)
+                                            </MudText>
+                                            <MudText Typo="Typo.caption">@history.Note</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @history.At.ToString("dd/MM/yyyy HH:mm")
+                                            </MudText>
+                                        </MudTimelineItem>
+                                    }
+                                </MudTimeline>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+                
                 <MudItem xs="12">
                     <MudCard Elevation="0">
                         <MudCardContent>
@@ -164,6 +193,7 @@
         
         @if (_order != null && !IsReadOnly)
         {
+            @* Luồng đơn hàng thường *@
             @if (_order.Status == "Pending")
             {
                 <MudButton Color="Color.Primary" OnClick="ConfirmOrder" StartIcon="@Icons.Material.Filled.CheckCircle">
@@ -171,6 +201,71 @@
                 </MudButton>
             }
             
+            @if (_order.Status == "Confirmed")
+            {
+                <MudButton Color="Color.Primary" OnClick="ProcessOrder" StartIcon="@Icons.Material.Filled.Inventory">
+                    Chuẩn bị hàng
+                </MudButton>
+            }
+            
+            @if (_order.Status == "AwaitingPickup")
+            {
+                <MudButton Color="Color.Primary" OnClick="ShipOrder" StartIcon="@Icons.Material.Filled.LocalShipping">
+                    Bắt đầu giao
+                </MudButton>
+            }
+            
+            @if (_order.Status == "Shipping")
+            {
+                <MudButton Color="Color.Success" OnClick="DeliverOrder" StartIcon="@Icons.Material.Filled.Done">
+                    Đã giao
+                </MudButton>
+            }
+            
+            @* Luồng đơn hàng cần lắp đặt *@
+            @if (_order.Status == "AwaitingSchedule")
+            {
+                <MudButton Color="Color.Primary" OnClick="ScheduleInstallation" StartIcon="@Icons.Material.Filled.CalendarToday">
+                    Đặt lịch
+                </MudButton>
+            }
+            
+            @if (_order.Status == "Scheduled")
+            {
+                <MudButton Color="Color.Primary" OnClick="AssignTechnician" StartIcon="@Icons.Material.Filled.PersonAdd">
+                    Phân công KT
+                </MudButton>
+            }
+            
+            @if (_order.Status == "TechnicianAssigned")
+            {
+                <MudButton Color="Color.Primary" OnClick="PrepareInstallation" StartIcon="@Icons.Material.Filled.Handyman">
+                    Chuẩn bị
+                </MudButton>
+            }
+            
+            @if (_order.Status == "Preparing")
+            {
+                <MudButton Color="Color.Primary" OnClick="StartInstallation" StartIcon="@Icons.Material.Filled.Build">
+                    Bắt đầu lắp
+                </MudButton>
+            }
+            
+            @if (_order.Status == "Installing")
+            {
+                <MudButton Color="Color.Primary" OnClick="StartTesting" StartIcon="@Icons.Material.Filled.Science">
+                    Kiểm tra
+                </MudButton>
+            }
+            
+            @if (_order.Status is "Testing" or "Delivered")
+            {
+                <MudButton Color="Color.Success" OnClick="CompleteOrder" StartIcon="@Icons.Material.Filled.DoneAll">
+                    Hoàn tất
+                </MudButton>
+            }
+            
+            @* Các hành động khác *@
             @if (CanCancel(_order.Status))
             {
                 <MudButton Color="Color.Error" OnClick="CancelOrder" StartIcon="@Icons.Material.Filled.Cancel">
@@ -178,10 +273,17 @@
                 </MudButton>
             }
             
-            @if (_order.Status is "Installing" or "Testing" or "Delivered")
+            @if (_order.Status == "Delivered")
             {
-                <MudButton Color="Color.Success" OnClick="CompleteOrder" StartIcon="@Icons.Material.Filled.DoneAll">
-                    Hoàn tất
+                <MudButton Color="Color.Warning" OnClick="ReturnOrder" StartIcon="@Icons.Material.Filled.Replay">
+                    Trả hàng
+                </MudButton>
+            }
+            
+            @if (_order.Status == "ReturnRequested" || _order.Status == "Cancelled")
+            {
+                <MudButton Color="Color.Secondary" OnClick="RefundOrder" StartIcon="@Icons.Material.Filled.MoneyOff">
+                    Hoàn tiền
                 </MudButton>
             }
         }
@@ -200,6 +302,14 @@
 
     private OrderResponse? _order;
     private bool _loading = true;
+    private List<StatusHistoryItem> _statusHistory = new();
+
+    public class StatusHistoryItem
+    {
+        public string Status { get; set; } = "";
+        public string Note { get; set; } = "";
+        public DateTime At { get; set; }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -212,6 +322,8 @@
         try
         {
             _order = await OrderService.GetByIdAsync(OrderId);
+            // TODO: Load status history from API when available
+            _statusHistory = GetMockStatusHistory();
         }
         catch (Exception ex)
         {
@@ -221,6 +333,151 @@
         {
             _loading = false;
         }
+    }
+
+    private List<StatusHistoryItem> GetMockStatusHistory()
+    {
+        var history = new List<StatusHistoryItem>();
+        if (_order == null) return history;
+
+        var baseTime = _order.CreatedAt;
+        int timeOffset = 0;
+
+        // Luôn có trạng thái Pending
+        history.Add(new StatusHistoryItem 
+        { 
+            Status = "Pending", 
+            Note = "Đơn hàng được tạo", 
+            At = baseTime.AddMinutes(timeOffset)
+        });
+
+        var currentStatus = _order.Status;
+        if (currentStatus == "Pending") return history;
+
+        // Confirmed
+        timeOffset += 30;
+        history.Add(new StatusHistoryItem 
+        { 
+            Status = "Confirmed", 
+            Note = "Đơn hàng đã được xác nhận", 
+            At = baseTime.AddMinutes(timeOffset)
+        });
+        if (currentStatus == "Confirmed") return history;
+
+        // Luồng thường: AwaitingPickup -> Shipping -> Delivered
+        if (currentStatus is "AwaitingPickup" or "Shipping" or "Delivered" or "Completed")
+        {
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "AwaitingPickup", 
+                Note = "Đơn hàng đang được chuẩn bị", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "AwaitingPickup") return history;
+
+            timeOffset += 60;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Shipping", 
+                Note = "Đơn hàng đang được giao", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Shipping") return history;
+
+            timeOffset += 120;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Delivered", 
+                Note = "Đơn hàng đã được giao thành công", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Delivered") return history;
+        }
+
+        // Luồng lắp đặt: AwaitingSchedule -> Scheduled -> TechnicianAssigned -> Preparing -> Installing -> Testing
+        if (currentStatus is "AwaitingSchedule" or "Scheduled" or "TechnicianAssigned" or "Preparing" or "Installing" or "Testing" or "Completed")
+        {
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "AwaitingSchedule", 
+                Note = "Chờ đặt lịch lắp đặt", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "AwaitingSchedule") return history;
+
+            timeOffset += 60;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Scheduled", 
+                Note = "Đã đặt lịch lắp đặt", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Scheduled") return history;
+
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "TechnicianAssigned", 
+                Note = "Đã phân công kỹ thuật viên", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "TechnicianAssigned") return history;
+
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Preparing", 
+                Note = "Kỹ thuật viên đang chuẩn bị", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Preparing") return history;
+
+            timeOffset += 60;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Installing", 
+                Note = "Đang lắp đặt sản phẩm", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Installing") return history;
+
+            timeOffset += 60;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Testing", 
+                Note = "Đang kiểm tra sau lắp đặt", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+            if (currentStatus == "Testing") return history;
+        }
+
+        // Completed
+        if (currentStatus == "Completed")
+        {
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Completed", 
+                Note = "Đơn hàng hoàn tất", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+        }
+
+        // Cancelled
+        if (currentStatus == "Cancelled")
+        {
+            timeOffset += 30;
+            history.Add(new StatusHistoryItem 
+            { 
+                Status = "Cancelled", 
+                Note = "Đơn hàng đã hủy", 
+                At = baseTime.AddMinutes(timeOffset)
+            });
+        }
+
+        return history;
     }
 
     private void Cancel() => MudDialog.Cancel();
@@ -240,12 +497,117 @@
         }
     }
 
-    private async Task CancelOrder()
+    private async Task ProcessOrder()
     {
         try
         {
-            await OrderService.CancelAsync(OrderId, "Hủy bởi admin");
-            Snackbar.Add("Đã hủy đơn hàng", Severity.Success);
+            await OrderService.ProcessAsync(OrderId);
+            Snackbar.Add("Đơn hàng đang được chuẩn bị", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ShipOrder()
+    {
+        try
+        {
+            await OrderService.ShipAsync(OrderId);
+            Snackbar.Add("Đơn hàng đang được giao", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeliverOrder()
+    {
+        try
+        {
+            await OrderService.DeliverAsync(OrderId);
+            Snackbar.Add("Đã xác nhận đơn hàng đã giao", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ScheduleInstallation()
+    {
+        try
+        {
+            await OrderService.ScheduleInstallationAsync(OrderId);
+            Snackbar.Add("Đã đặt lịch lắp đặt", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task AssignTechnician()
+    {
+        try
+        {
+            await OrderService.AssignTechnicianAsync(OrderId);
+            Snackbar.Add("Đã phân công kỹ thuật viên", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task PrepareInstallation()
+    {
+        try
+        {
+            await OrderService.PrepareAsync(OrderId);
+            Snackbar.Add("Kỹ thuật viên đang chuẩn bị", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartInstallation()
+    {
+        try
+        {
+            await OrderService.StartInstallationAsync(OrderId);
+            Snackbar.Add("Bắt đầu lắp đặt sản phẩm", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartTesting()
+    {
+        try
+        {
+            await OrderService.StartTestingAsync(OrderId);
+            Snackbar.Add("Bắt đầu kiểm tra sau lắp đặt", Severity.Success);
             await LoadOrder();
             MudDialog.Close(DialogResult.Ok(true));
         }
@@ -270,9 +632,54 @@
         }
     }
 
+    private async Task CancelOrder()
+    {
+        try
+        {
+            await OrderService.CancelAsync(OrderId, "Hủy bởi admin");
+            Snackbar.Add("Đã hủy đơn hàng", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ReturnOrder()
+    {
+        try
+        {
+            await OrderService.ReturnAsync(OrderId, "Yêu cầu trả hàng từ admin");
+            Snackbar.Add("Đã tạo yêu cầu trả hàng", Severity.Warning);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RefundOrder()
+    {
+        try
+        {
+            await OrderService.RefundAsync(OrderId, "Hoàn tiền cho đơn hàng");
+            Snackbar.Add("Đã hoàn tiền", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
     private static bool CanCancel(string status)
     {
-        return status != "Completed" && status != "Cancelled" && status != "Refunded";
+        return status != "Completed" && status != "Cancelled" && status != "Refunded" && status != "ReturnRequested";
     }
 
     private static string GetStatusDisplayName(string status)

@@ -14,8 +14,18 @@ namespace Application.Interfaces.Services
         Task<int> CreateAsync(CreateOrderRequest request);
         Task UpdateStatusAsync(int id, UpdateOrderStatusRequest request);
         Task ConfirmAsync(int id);
-        Task CancelAsync(int id, string reason);
+        Task ProcessAsync(int id);
+        Task ShipAsync(int id);
+        Task DeliverAsync(int id);
+        Task ScheduleInstallationAsync(int id);
+        Task AssignTechnicianAsync(int id);
+        Task PrepareAsync(int id);
+        Task StartInstallationAsync(int id);
+        Task StartTestingAsync(int id);
         Task CompleteAsync(int id);
+        Task CancelAsync(int id, string reason);
+        Task ReturnAsync(int id, string reason);
+        Task RefundAsync(int id, string reason);
         Task DeleteAsync(int id);
     }
 }

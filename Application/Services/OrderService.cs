@@ -99,7 +99,6 @@ namespace Application.Services
                 throw new DomainException("Không tìm thấy đơn hàng");
 
             order.Confirm();
-            _orderRepository.Update(order);
             await _orderRepository.SaveChangesAsync();
         }
 
@@ -110,7 +109,6 @@ namespace Application.Services
                 throw new DomainException("Không tìm thấy đơn hàng");
 
             order.Cancel(reason);
-            _orderRepository.Update(order);
             await _orderRepository.SaveChangesAsync();
         }
 
@@ -121,7 +119,106 @@ namespace Application.Services
                 throw new DomainException("Không tìm thấy đơn hàng");
 
             order.Complete();
-            _orderRepository.Update(order);
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task ProcessAsync(int id)
+        {
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.Process();
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task ShipAsync(int id)
+        {
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.Ship();
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task DeliverAsync(int id)
+        {
+            var order = await _orderRepository.GetByIdWithDetailsAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.Deliver();
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task ScheduleInstallationAsync(int id)
+        {
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.ScheduleInstallation();
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task AssignTechnicianAsync(int id)
+        {
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.AssignTechnician();
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task PrepareAsync(int id)
+        {
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.Prepare();
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task StartInstallationAsync(int id)
+        {
+            var order = await _orderRepository.GetByIdWithDetailsAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.StartInstallation();
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task StartTestingAsync(int id)
+        {
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.StartTesting();
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task ReturnAsync(int id, string reason)
+        {
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.Return(reason);
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task RefundAsync(int id, string reason)
+        {
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.Refund(reason);
             await _orderRepository.SaveChangesAsync();
         }
 
@@ -169,8 +266,8 @@ namespace Application.Services
                 {
                     Id = i.Id,
                     ProductId = i.ProductId,
-                    ProductName = $"Product #{i.ProductId}",
-                    Sku = "N/A",
+                    ProductName = i.Product?.Name ?? $"Product #{i.ProductId}",
+                    Sku = i.Product?.Sku ?? "N/A",
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice,
                     TotalPrice = i.GetSubtotal(),

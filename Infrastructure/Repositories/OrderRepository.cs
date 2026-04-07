@@ -24,8 +24,8 @@ namespace Infrastructure.Repositories
         public async Task<Order?> GetByIdWithDetailsAsync(int id)
         {
             return await _context.Orders
-                .AsNoTracking()
                 .Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
                 .Include(o => o.Shipments)
                 .FirstOrDefaultAsync(o => o.Id == id);
         }
@@ -40,8 +40,8 @@ namespace Infrastructure.Repositories
         public async Task<List<Order>> GetAllAsync()
         {
             return await _context.Orders
-                .AsNoTracking()
                 .Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
         }
@@ -49,9 +49,9 @@ namespace Infrastructure.Repositories
         public async Task<List<Order>> GetByStatusAsync(OrderStatus status)
         {
             return await _context.Orders
-                .AsNoTracking()
                 .Where(o => o.Status == status)
                 .Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
         }
@@ -59,9 +59,9 @@ namespace Infrastructure.Repositories
         public async Task<List<Order>> GetByUserIdAsync(int userId)
         {
             return await _context.Orders
-                .AsNoTracking()
                 .Where(o => o.UserId == userId)
                 .Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
         }

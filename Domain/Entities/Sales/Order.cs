@@ -181,14 +181,116 @@ namespace Domain.Entities.Sales
 
         private void AddStatusHistory(OrderStatus status, string note)
         {
-            var history = GetStatusHistory();
-            history.Add(new { Status = status.ToString(), Note = note, At = DateTime.UtcNow });
+            var history = JsonSerializer.Deserialize<List<OrderStatusHistory>>(StatusHistoryJson) ?? new List<OrderStatusHistory>();
+            history.Add(new OrderStatusHistory(status.ToString(), note, DateTime.UtcNow));
             StatusHistoryJson = JsonSerializer.Serialize(history);
         }
 
-        private List<dynamic> GetStatusHistory()
+        public void Process()
         {
-            return JsonSerializer.Deserialize<List<dynamic>>(StatusHistoryJson) ?? new List<dynamic>();
+            if (Status != OrderStatus.Confirmed)
+                throw new InvalidOrderStateException(Status.ToString(), "xử lý");
+
+            Status = OrderStatus.AwaitingPickup;
+            AddStatusHistory(Status, "Đơn hàng đang được chuẩn bị");
+        }
+
+        public void Ship()
+        {
+            if (Status != OrderStatus.AwaitingPickup)
+                throw new InvalidOrderStateException(Status.ToString(), "giao hàng");
+
+            Status = OrderStatus.Shipping;
+            AddStatusHistory(Status, "Đơn hàng đang được giao");
+            AddDomainEvent(new OrderShippedEvent(Id, DateTime.UtcNow));
+        }
+
+        public void Deliver()
+        {
+            if (Status != OrderStatus.Shipping)
+                throw new InvalidOrderStateException(Status.ToString(), "xác nhận đã giao");
+
+            // Đánh dấu các items không cần lắp là đã giao
+            foreach (var item in Items.Where(i => !i.RequiresInstallation))
+            {
+                item.MarkAsShipped();
+            }
+
+            Status = OrderStatus.Delivered;
+            AddStatusHistory(Status, "Đơn hàng đã được giao thành công");
+            AddDomainEvent(new OrderDeliveredEvent(Id, DateTime.UtcNow));
+        }
+
+        public void StartInstallation()
+        {
+            if (Status != OrderStatus.AwaitingSchedule && Status != OrderStatus.Scheduled && Status != OrderStatus.TechnicianAssigned)
+                throw new InvalidOrderStateException(Status.ToString(), "bắt đầu lắp đặt");
+
+            Status = OrderStatus.Installing;
+            AddStatusHistory(Status, "Bắt đầu lắp đặt sản phẩm");
+        }
+
+        public void StartTesting()
+        {
+            if (Status != OrderStatus.Installing)
+                throw new InvalidOrderStateException(Status.ToString(), "kiểm tra");
+
+            Status = OrderStatus.Testing;
+            AddStatusHistory(Status, "Đang kiểm tra sau lắp đặt");
+        }
+
+        public void ScheduleInstallation()
+        {
+            if (Status != OrderStatus.AwaitingSchedule)
+                throw new InvalidOrderStateException(Status.ToString(), "đặt lịch");
+
+            Status = OrderStatus.Scheduled;
+            AddStatusHistory(Status, "Đã đặt lịch lắp đặt");
+            // InstallationScheduledEvent sẽ được gọi khi có booking thực tế
+            // AddDomainEvent(new InstallationScheduledEvent(...));
+        }
+
+        public void AssignTechnician()
+        {
+            if (Status != OrderStatus.Scheduled)
+                throw new InvalidOrderStateException(Status.ToString(), "phân công kỹ thuật viên");
+
+            Status = OrderStatus.TechnicianAssigned;
+            AddStatusHistory(Status, "Đã phân công kỹ thuật viên");
+        }
+
+        public void Prepare()
+        {
+            if (Status != OrderStatus.TechnicianAssigned)
+                throw new InvalidOrderStateException(Status.ToString(), "chuẩn bị");
+
+            Status = OrderStatus.Preparing;
+            AddStatusHistory(Status, "Kỹ thuật viên đang chuẩn bị");
+        }
+
+        public void Return(string reason)
+        {
+            if (Status != OrderStatus.Delivered && Status != OrderStatus.Completed)
+                throw new InvalidOrderStateException(Status.ToString(), "trả hàng");
+
+            Status = OrderStatus.ReturnRequested;
+            CancelReason = reason;
+            AddStatusHistory(Status, $"Yêu cầu trả hàng: {reason}");
+        }
+
+        public void Refund(string reason)
+        {
+            if (Status != OrderStatus.ReturnRequested && Status != OrderStatus.Cancelled)
+                throw new InvalidOrderStateException(Status.ToString(), "hoàn tiền");
+
+            Status = OrderStatus.Refunded;
+            AddStatusHistory(Status, $"Đã hoàn tiền: {reason}");
+        }
+
+        public IReadOnlyList<OrderStatusHistory> GetStatusHistory()
+        {
+            var history = JsonSerializer.Deserialize<List<OrderStatusHistory>>(StatusHistoryJson) ?? new List<OrderStatusHistory>();
+            return history.AsReadOnly();
         }
 
         private static string GenerateOrderNumber()

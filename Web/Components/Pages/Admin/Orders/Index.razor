@@ -70,8 +70,8 @@
         </MudTd>
         <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
         <MudTd>
-            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" 
-                           OnClick="@(() => OpenOrderDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenOrderDialog(context, false))" Size="Size.Small" Title="Duyệt đơn" />
             @if (CanCancel(context.Status))
             {
                 <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" 
@@ -145,14 +145,14 @@
         }
     }
 
-    private async Task OpenOrderDialog(OrderResponse order)
+    private async Task OpenOrderDialog(OrderResponse order, bool isReadOnly = true)
     {
         var parameters = new DialogParameters<OrderDialog>();
         parameters.Add(x => x.OrderId, order.Id);
-        parameters.Add(x => x.IsReadOnly, true);
+        parameters.Add(x => x.IsReadOnly, isReadOnly);
 
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<OrderDialog>("Chi tiết đơn hàng", parameters, options);
+        var dialog = await DialogService.ShowAsync<OrderDialog>(isReadOnly ? "Chi tiết đơn hàng" : "Duyệt đơn hàng", parameters, options);
         var result = await dialog.Result;
 
         if (!result.Canceled && result.Data is true)
@@ -192,7 +192,7 @@
 
     private bool CanCancel(string status)
     {
-        return status != "Completed" && status != "Cancelled" && status != "Refunded";
+        return status != "Completed" && status != "Cancelled" && status != "Refunded" && status != "ReturnRequested";
     }
 
     private static string GetStatusDisplayName(string status)
