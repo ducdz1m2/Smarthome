@@ -44,7 +44,7 @@ namespace Domain.Entities.Inventory
             if (IsCompleted)
                 throw new BusinessRuleViolationException("StockEntryCompleted", "Không thể thêm sản phẩm vào phiếu đã hoàn thành");
 
-            var detail = StockEntryDetail.Create(Id, productId, quantity, unitCost);
+            var detail = StockEntryDetail.Create(productId, quantity, unitCost);
             Details.Add(detail);
             RecalculateTotal();
             return detail;

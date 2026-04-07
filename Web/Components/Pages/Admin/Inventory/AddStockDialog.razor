@@ -1,0 +1,218 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IInventoryService InventoryService
+@inject IWarehouseService WarehouseService
+@inject ISupplierService SupplierService
+@inject IProductService ProductService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.AddShoppingCart" Class="mr-2" />
+            @(ProductId > 0 ? $"Nhập kho - {ProductName}" : "Tạo phiếu nhập kho")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid>
+                @* Chọn Nhà cung cấp *@
+                <MudItem xs="12" md="6">
+                    <MudSelect T="int" @bind-Value="_request.SupplierId" Label="Nhà cung cấp *" 
+                               Required="true" RequiredError="Chọn nhà cung cấp"
+                               Variant="Variant.Outlined" Dense="true">
+                        @foreach (var sup in _suppliers)
+                        {
+                            <MudSelectItem T="int" Value="@sup.Id">@sup.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                
+                @* Chọn Kho *@
+                <MudItem xs="12" md="6">
+                    <MudSelect T="int" @bind-Value="_request.WarehouseId" Label="Kho nhập *" 
+                               Required="true" RequiredError="Chọn kho nhập"
+                               Variant="Variant.Outlined" Dense="true">
+                        @foreach (var wh in _warehouses)
+                        {
+                            <MudSelectItem T="int" Value="@wh.Id">@wh.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                
+                @* Chọn Sản phẩm (nếu chưa có) *@
+                @if (ProductId == 0)
+                {
+                    <MudItem xs="12">
+                        <MudAutocomplete T="ProductListResponse" 
+                                         @bind-Value="_selectedProduct"
+                                         SearchFunc="SearchProducts"
+                                         ToStringFunc="@(p => p?.Name ?? "")"
+                                         Label="Sản phẩm *"
+                                         Variant="Variant.Outlined"
+                                         Dense="true"
+                                         Required="true" />
+                    </MudItem>
+                }
+                else
+                {
+                    <MudItem xs="12">
+                        <MudTextField Value="@ProductName" Label="Sản phẩm" 
+                                      Variant="Variant.Outlined" Disabled="true" />
+                    </MudItem>
+                }
+                
+                @* Số lượng và Đơn giá *@
+                <MudItem xs="12" md="6">
+                    <MudNumericField T="int" @bind-Value="_currentDetail.Quantity" Label="Số lượng *" 
+                                     Required="true" RequiredError="Nhập số lượng"
+                                     Variant="Variant.Outlined" Min="1" Dense="true" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudNumericField T="decimal" @bind-Value="_currentDetail.UnitCost" Label="Đơn giá *" 
+                                     Required="true" RequiredError="Nhập đơn giá"
+                                     Variant="Variant.Outlined" Min="0" 
+                                     Adornment="Adornment.End" AdornmentText="đ"
+                                     Dense="true" />
+                </MudItem>
+                
+                @* Ghi chú *@
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_request.Note" Label="Ghi chú" 
+                                  Variant="Variant.Outlined" Lines="2"
+                                  Placeholder="VD: Nhập từ nhà cung cấp ABC..." />
+                </MudItem>
+            </MudGrid>
+            
+            @* Hiển thị tổng tiền *@
+            <MudPaper Class="pa-3 mt-4" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.body2">Số lượng:</MudText>
+                        <MudText Typo="Typo.h6">@_currentDetail.Quantity</MudText>
+                    </MudItem>
+                    <MudItem xs="6" Class="text-right">
+                        <MudText Typo="Typo.body2">Thành tiền:</MudText>
+                        <MudText Typo="Typo.h6" Color="Color.Primary">
+                            @((_currentDetail.Quantity * _currentDetail.UnitCost).ToString("N0"))đ
+                        </MudText>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            Tạo phiếu nhập kho
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int ProductId { get; set; }
+
+    [Parameter]
+    public string ProductName { get; set; } = "";
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private List<WarehouseResponse> _warehouses = new();
+    private List<SupplierResponse> _suppliers = new();
+    private List<ProductListResponse> _products = new();
+    private ProductListResponse? _selectedProduct;
+
+    private CreateStockEntryRequest _request = new()
+    {
+        SupplierId = 0,
+        WarehouseId = 0,
+        EntryDate = DateTime.Now,
+        Details = new List<CreateStockEntryDetailRequest>()
+    };
+
+    private CreateStockEntryDetailRequest _currentDetail = new()
+    {
+        ProductId = 0,
+        Quantity = 1,
+        UnitCost = 0
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        
+        if (ProductId > 0)
+        {
+            _currentDetail.ProductId = ProductId;
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            _warehouses = await WarehouseService.GetAllAsync();
+            _suppliers = await SupplierService.GetAllAsync();
+            _products = await ProductService.GetAllAsync();
+            
+            if (_warehouses.Any())
+                _request.WarehouseId = _warehouses.First().Id;
+            if (_suppliers.Any())
+                _request.SupplierId = _suppliers.First().Id;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task<IEnumerable<ProductListResponse>> SearchProducts(string value, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return _products.Take(10);
+
+        return _products.Where(p => 
+            p.Name.Contains(value, StringComparison.OrdinalIgnoreCase) || 
+            p.Sku.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(10);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        // Xác định ProductId
+        var productId = ProductId > 0 ? ProductId : _selectedProduct?.Id ?? 0;
+        if (productId == 0)
+        {
+            Snackbar.Add("Vui lòng chọn sản phẩm", Severity.Warning);
+            return;
+        }
+
+        _currentDetail.ProductId = productId;
+        _request.Details.Add(_currentDetail);
+
+        try
+        {
+            var entryId = await InventoryService.CreateStockEntryAsync(_request);
+            
+            // Hoàn thành phiếu ngay để cập nhật tồn kho
+            await InventoryService.CompleteStockEntryAsync(entryId);
+            
+            Snackbar.Add($"Đã tạo và hoàn thành phiếu nhập kho NK-{entryId:D5}", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

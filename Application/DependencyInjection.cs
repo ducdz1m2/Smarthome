@@ -22,6 +22,7 @@ namespace Application
             services.AddScoped<ISupplierService, SupplierService>();
             services.AddScoped<ICouponService, CouponService>();
             services.AddScoped<IBannerService, BannerService>();
+            services.AddScoped<IInventoryService, InventoryService>();
 
             // Installation services
             services.AddScoped<IInstallationService, InstallationService>();

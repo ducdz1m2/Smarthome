@@ -1,0 +1,76 @@
+@using Application.DTOs.Responses
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Warehouse" Class="mr-2" />
+            Chi tiết tồn kho: @ProductName
+        </MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">SKU: @Sku</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (WarehouseStocks.Any())
+        {
+            <MudTable Items="WarehouseStocks" Dense="true" Striped="true" Bordered="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Kho</MudTh>
+                    <MudTh Align="Align.Right">Tổng tồn</MudTh>
+                    <MudTh Align="Align.Right">Đã đặt</MudTh>
+                    <MudTh Align="Align.Right">Có sẵn</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudText Style="font-weight: 500;">@context.WarehouseName</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.WarehouseCode</MudText>
+                    </MudTd>
+                    <MudTd Align="Align.Right">
+                        <MudChip T="int" Color="GetStockColor(context.Quantity)" Size="Size.Small">
+                            @context.Quantity
+                        </MudChip>
+                    </MudTd>
+                    <MudTd Align="Align.Right">@context.ReservedQuantity</MudTd>
+                    <MudTd Align="Align.Right">
+                        <MudChip T="int" Color="GetStockColor(context.AvailableStock)" Size="Size.Small" Variant="Variant.Outlined">
+                            @context.AvailableStock
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+                <FooterContent>
+                    <MudTd><MudText Style="font-weight: bold;">Tổng cộng</MudText></MudTd>
+                    <MudTd Align="Align.Right">
+                        <MudChip T="int" Color="Color.Primary" Size="Size.Small">
+                            @WarehouseStocks.Sum(w => w.Quantity)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd Align="Align.Right">
+                        <MudText Style="font-weight: 500;">@WarehouseStocks.Sum(w => w.ReservedQuantity)</MudText>
+                    </MudTd>
+                    <MudTd Align="Align.Right">
+                        <MudChip T="int" Color="Color.Success" Size="Size.Small" Variant="Variant.Outlined">
+                            @WarehouseStocks.Sum(w => w.AvailableStock)
+                        </MudChip>
+                    </MudTd>
+                </FooterContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Warning">Chưa có tồn kho tại bất kỳ kho nào</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Close">Đóng</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private static Color GetStockColor(int stock)
+    {
+        return stock switch
+        {
+            0 => Color.Error,
+            <= 10 => Color.Warning,
+            _ => Color.Success
+        };
+    }
+}

@@ -13,14 +13,12 @@ namespace Domain.Entities.Inventory
 
         // Navigation
         public virtual StockEntry StockEntry { get; private set; } = null!;
+        public virtual Domain.Entities.Catalog.Product Product { get; private set; } = null!;
 
         private StockEntryDetail() { } // EF Core
 
-        public static StockEntryDetail Create(int stockEntryId, int productId, int quantity, decimal unitCost, string? notes = null)
+        public static StockEntryDetail Create(int productId, int quantity, decimal unitCost, int? stockEntryId = null, string? notes = null)
         {
-            if (stockEntryId <= 0)
-                throw new DomainException("StockEntryId không hợp lệ");
-
             if (productId <= 0)
                 throw new DomainException("ProductId không hợp lệ");
 
@@ -32,7 +30,7 @@ namespace Domain.Entities.Inventory
 
             return new StockEntryDetail
             {
-                StockEntryId = stockEntryId,
+                StockEntryId = stockEntryId ?? 0,
                 ProductId = productId,
                 Quantity = quantity,
                 UnitCost = unitCost,

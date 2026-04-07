@@ -1,0 +1,389 @@
+@page "/admin/inventory/products"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@layout AdminLayout
+@inject IInventoryService InventoryService
+@inject ICategoryService CategoryService
+@inject IWarehouseService WarehouseService
+@inject ISupplierService SupplierService
+@inject IProductService ProductService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudText Typo="Typo.h4" Class="mb-4">Tồn kho theo Sản phẩm</MudText>
+
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+    <MudTabPanel Text="Tồn kho hiện tại" Icon="@Icons.Material.Filled.Inventory2">
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="2">
+                    <MudCardContent>
+                        <MudText Typo="Typo.caption" Color="Color.Primary">TỔNG SẢN PHẨM</MudText>
+                        <MudText Typo="Typo.h4">@_totalProducts</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="2">
+                    <MudCardContent>
+                        <MudText Typo="Typo.caption" Color="Color.Success">TỔNG TỒN KHO</MudText>
+                        <MudText Typo="Typo.h4">@_totalStock</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="2">
+                    <MudCardContent>
+                        <MudText Typo="Typo.caption" Color="Color.Warning">SẮP HẾT HÀNG</MudText>
+                        <MudText Typo="Typo.h4">@_lowStockCount</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="2">
+                    <MudCardContent>
+                        <MudText Typo="Typo.caption" Color="Color.Error">HẾT HÀNG</MudText>
+                        <MudText Typo="Typo.h4">@_outOfStockCount</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudGrid>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="_searchTerm" 
+                                 Label="Tìm kiếm" 
+                                 Variant="Variant.Outlined"
+                                 Adornment="Adornment.Start"
+                                 AdornmentIcon="@Icons.Material.Filled.Search"
+                                 Immediate="true"
+                                 OnKeyUp="OnSearchKeyUp" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudSelect T="int?" @bind-Value="_categoryFilter" Label="Danh mục" Variant="Variant.Outlined" Clearable="true">
+                        @foreach (var cat in _categories)
+                        {
+                            <MudSelectItem T="int?" Value="@cat.Id">@cat.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudSelect T="int?" @bind-Value="_warehouseFilter" Label="Kho" Variant="Variant.Outlined" Clearable="true">
+                        @foreach (var wh in _warehouses)
+                        {
+                            <MudSelectItem T="int?" Value="@wh.Id">@wh.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudCheckBox @bind-Value="_lowStockOnly" Label="Chỉ hiện sắp hết hàng" Color="Color.Warning" />
+                </MudItem>
+            </MudGrid>
+            <MudGrid Class="mt-2">
+                <MudItem xs="12">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFilter" StartIcon="@Icons.Material.Filled.FilterList">
+                        Lọc
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ResetFilter" StartIcon="@Icons.Material.Filled.Clear">
+                        Xóa lọc
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="OpenStockEntryDialog" StartIcon="@Icons.Material.Filled.Add" Class="ml-2">
+                        Nhập kho
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <MudTable Items="_filteredProducts" Dense="true" Hover="true" Loading="_loading" Striped="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>Sản phẩm</MudTh>
+                <MudTh>SKU</MudTh>
+                <MudTh>Danh mục</MudTh>
+                <MudTh>Tổng tồn</MudTh>
+                <MudTh>Đã đặt</MudTh>
+                <MudTh>Có sẵn</MudTh>
+                <MudTh>Chi tiết kho</MudTh>
+                <MudTh>Thao tác</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <MudText Style="font-weight: 500;">@context.ProductName</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.BrandName</MudText>
+                </MudTd>
+                <MudTd>@context.Sku</MudTd>
+                <MudTd>@context.CategoryName</MudTd>
+                <MudTd>
+                    <MudText Color="GetStockColor(context.TotalQuantity)">@context.TotalQuantity</MudText>
+                </MudTd>
+                <MudTd>@context.TotalReserved</MudTd>
+                <MudTd>
+                    <MudChip T="int" Color="GetStockColor(context.AvailableStock)" Size="Size.Small">
+                        @context.AvailableStock
+                    </MudChip>
+                    @if (context.IsLowStock)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" title="Sắp hết hàng" />
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.WarehouseStocks.Any())
+                    {
+                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                            @foreach (var wh in context.WarehouseStocks)
+                            {
+                                <MudChip T="string"
+                                         Size="Size.Small" 
+                                         Color="GetStockColor(wh.AvailableStock)"
+                                         @onclick="() => ShowWarehouseDetails(context)"
+                                         Style="cursor: pointer;">
+                                    @wh.WarehouseCode: @wh.Quantity
+                                </MudChip>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Error">Chưa có tồn kho</MudText>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Info" Size="Size.Small"
+                                  OnClick="@(() => QuickAddStock(context))" title="Nhập thêm" />
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Số dòng:" />
+            </PagerContent>
+            <NoRecordsContent>
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="ma-4">
+                    <MudText Align="Align.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.SearchOff" Class="mb-2" />
+                        <br />Không có dữ liệu tồn kho
+                    </MudText>
+                </MudAlert>
+            </NoRecordsContent>
+        </MudTable>
+    </MudTabPanel>
+    
+    <MudTabPanel Text="Lịch sử nhập kho" Icon="@Icons.Material.Filled.History">
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" md="4">
+                <MudSelect T="int?" @bind-Value="_historyWarehouseFilter" Label="Kho" Variant="Variant.Outlined" Clearable="true">
+                    @foreach (var wh in _warehouses)
+                    {
+                        <MudSelectItem T="int?" Value="@wh.Id">@wh.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="int?" @bind-Value="_historySupplierFilter" Label="Nhà cung cấp" Variant="Variant.Outlined" Clearable="true">
+                    @foreach (var sup in _suppliers)
+                    {
+                        <MudSelectItem T="int?" Value="@sup.Id">@sup.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadStockHistory" StartIcon="@Icons.Material.Filled.Refresh">
+                    Làm mới
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        <MudTable Items="_stockHistory" Dense="true" Hover="true" Loading="_historyLoading" Striped="true" Bordered="true">
+            <HeaderContent>
+                <MudTh>Mã phiếu</MudTh>
+                <MudTh>Ngày nhập</MudTh>
+                <MudTh>Nhà cung cấp</MudTh>
+                <MudTh>Kho</MudTh>
+                <MudTh>Số mặt hàng</MudTh>
+                <MudTh>Tổng tiền</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>NK-@context.Id.ToString("D5")</MudTd>
+                <MudTd>@context.EntryDate.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                <MudTd>@context.SupplierName</MudTd>
+                <MudTd>@context.WarehouseName</MudTd>
+                <MudTd>@context.ItemCount</MudTd>
+                <MudTd>@context.TotalCost.ToString("N0")đ</MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Số dòng:" />
+            </PagerContent>
+            <NoRecordsContent>
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="ma-4">
+                    <MudText Align="Align.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.HistoryToggleOff" Class="mb-2" />
+                        <br />Không có dữ liệu nhập kho
+                    </MudText>
+                </MudAlert>
+            </NoRecordsContent>
+        </MudTable>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private List<ProductInventoryResponse> _products = new();
+    private List<ProductInventoryResponse> _filteredProducts = new();
+    private List<CategoryResponse> _categories = new();
+    private List<WarehouseResponse> _warehouses = new();
+    private List<SupplierResponse> _suppliers = new();
+    private bool _loading = true;
+
+    // Stats
+    private int _totalProducts;
+    private int _totalStock;
+    private int _lowStockCount;
+    private int _outOfStockCount;
+
+    // Filters
+    private string? _searchTerm;
+    private int? _categoryFilter;
+    private int? _warehouseFilter;
+    private bool _lowStockOnly;
+
+    // Stock History
+    private List<StockEntryListItemResponse> _stockHistory = new();
+    private int? _historyWarehouseFilter;
+    private int? _historySupplierFilter;
+    private bool _historyLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        await LoadStockHistory();
+    }
+
+    private async Task LoadStockHistory()
+    {
+        _historyLoading = true;
+        _stockHistory = new(); // Clear ngay
+        try
+        {
+            _stockHistory = await InventoryService.GetStockEntriesAsync(_historyWarehouseFilter, _historySupplierFilter, null);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải lịch sử: {ex.Message}", Severity.Error);
+            _stockHistory = new(); // Đảm bảo không null
+        }
+        finally
+        {
+            _historyLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _filteredProducts = new(); // Clear ngay để không hiển thị data cũ
+        try
+        {
+            var filter = new InventoryFilterRequest
+            {
+                SearchTerm = _searchTerm,
+                CategoryId = _categoryFilter,
+                WarehouseId = _warehouseFilter,
+                LowStockOnly = _lowStockOnly
+            };
+
+            _products = await InventoryService.GetProductInventoryAsync(filter);
+            _filteredProducts = _products.ToList();
+            
+            // Chỉ load dropdown data khi không filter (lần đầu)
+            if (_categories.Count == 0)
+                _categories = await CategoryService.GetAllAsync();
+            if (_warehouses.Count == 0)
+                _warehouses = await WarehouseService.GetAllAsync();
+            if (_suppliers.Count == 0)
+                _suppliers = await SupplierService.GetAllAsync();
+
+            _totalProducts = _products.Count;
+            _totalStock = _products.Sum(p => p.TotalQuantity);
+            _lowStockCount = _products.Count(p => p.AvailableStock > 0 && p.AvailableStock <= 10);
+            _outOfStockCount = _products.Count(p => p.AvailableStock == 0);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            _filteredProducts = new(); // Đảm bảo không null
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged(); // Ép UI cập nhật ngay
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        _ = LoadData();
+    }
+
+    private void ResetFilter()
+    {
+        _searchTerm = null;
+        _categoryFilter = null;
+        _warehouseFilter = null;
+        _lowStockOnly = false;
+        _ = LoadData();
+    }
+
+    private void OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            ApplyFilter();
+        }
+    }
+
+    private static Color GetStockColor(int stock)
+    {
+        return stock switch
+        {
+            0 => Color.Error,
+            <= 10 => Color.Warning,
+            _ => Color.Success
+        };
+    }
+
+    private async Task ShowWarehouseDetails(ProductInventoryResponse product)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ProductName", product.ProductName);
+        parameters.Add("Sku", product.Sku);
+        parameters.Add("WarehouseStocks", product.WarehouseStocks);
+
+        await DialogService.ShowAsync<WarehouseStockDetailsDialog>("Chi tiết tồn kho", parameters);
+    }
+
+    private async Task QuickAddStock(ProductInventoryResponse product)
+    {
+        var parameters = new DialogParameters<AddStockDialog>();
+        parameters.Add(x => x.ProductId, product.ProductId);
+        parameters.Add(x => x.ProductName, product.ProductName);
+
+        var dialog = await DialogService.ShowAsync<AddStockDialog>("Nhập kho", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task OpenStockEntryDialog()
+    {
+        var dialog = await DialogService.ShowAsync<AddStockDialog>("Nhập kho");
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+}

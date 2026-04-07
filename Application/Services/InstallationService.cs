@@ -293,12 +293,12 @@ namespace Application.Services
             var technician = booking.Technician;
             
             // Build full address
-            var addressParts = new List<string>
+            var addressParts = new List<string?>
             {
-                order.ShippingAddressStreet,
-                order.ShippingAddressWard,
-                order.ShippingAddressDistrict,
-                order.ShippingAddressCity
+                order?.ShippingAddressStreet,
+                order?.ShippingAddressWard,
+                order?.ShippingAddressDistrict,
+                order?.ShippingAddressCity
             }.Where(s => !string.IsNullOrWhiteSpace(s));
             
             return new InstallationBookingResponse
