@@ -14,6 +14,7 @@ namespace Application
             services.AddAutoMapper(typeof(MappingProfile).Assembly);
 
             // Đăng ký các Services
+            services.AddScoped<IProductVariantService, ProductVariantService>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<IBrandService, BrandService>();

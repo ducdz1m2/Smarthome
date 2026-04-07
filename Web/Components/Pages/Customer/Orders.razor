@@ -1,0 +1,201 @@
+@page "/orders"
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Enums
+@inject IOrderService OrderService
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Đơn hàng của tôi</MudText>
+
+    @if (_isLoading)
+    {
+        <MudGrid>
+            @for (int i = 0; i < 3; i++)
+            {
+                <MudItem xs="12">
+                    <MudCard Elevation="2" Class="mb-3">
+                        <MudCardContent>
+                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="30%" />
+                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="50%" Class="mt-2" />
+                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="40%" Class="mt-2" />
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else if (!_orders.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.ShoppingBag" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+            <MudText Typo="Typo.h6" Class="mb-2">Chưa có đơn hàng</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                Bạn chưa có đơn hàng nào. Hãy mua sắm ngay!
+            </MudText>
+            <MudButton Href="/products" Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.ShoppingCart">
+                Mua sắm ngay
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var order in _orders.OrderByDescending(o => o.CreatedAt))
+            {
+                <MudItem xs="12">
+                    <MudCard Elevation="2" Class="mb-3 cursor-pointer" @onclick="() => OpenOrderDetail(order)">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <div class="d-flex align-center justify-space-between">
+                                    <div>
+                                        <MudText Typo="Typo.subtitle1" Class="fw-bold">
+                                            Đơn hàng #@order.OrderNumber
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @order.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                        </MudText>
+                                    </div>
+                                    <MudChip T="string" Color="@GetStatusColor(order.Status)" Size="Size.Small">
+                                        @GetStatusText(order.Status)
+                                    </MudChip>
+                                </div>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudGrid>
+                                <MudItem xs="12" md="8">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        @order.Items.Count sản phẩm
+                                    </MudText>
+                                    @foreach (var item in order.Items.Take(2))
+                                    {
+                                        <MudText Typo="Typo.body2" Class="text-truncate">
+                                            @item.ProductName x @item.Quantity
+                                        </MudText>
+                                    }
+                                    @if (order.Items.Count > 2)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            +@(order.Items.Count - 2) sản phẩm khác
+                                        </MudText>
+                                    }
+                                </MudItem>
+                                <MudItem xs="12" md="4" class="text-right">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Tổng tiền</MudText>
+                                    <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">
+                                        @FormatPrice(order.TotalAmount)
+                                    </MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </MudCardContent>
+                        <MudCardActions Class="justify-end">
+                            <MudButton Variant="Variant.Text" Color="Color.Primary"
+                                       EndIcon="@Icons.Material.Filled.ChevronRight"
+                                       OnClick="() => OpenOrderDetail(order)">
+                                Xem chi tiết
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+<style>
+    .cursor-pointer {
+        cursor: pointer;
+    }
+    .text-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .fw-bold {
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    private List<OrderResponse> _orders = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrdersAsync();
+    }
+
+    private async Task LoadOrdersAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            // TODO: Get current user ID from auth service
+            // For now, get all orders (should filter by current user)
+            var allOrders = await OrderService.GetAllAsync();
+            _orders = allOrders;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải đơn hàng: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenOrderDetail(OrderResponse order)
+    {
+        var parameters = new DialogParameters<OrderDetailDialog>();
+        parameters.Add(x => x.OrderId, order.Id);
+
+        var options = new DialogOptions
+            {
+                CloseOnEscapeKey = true,
+                MaxWidth = MaxWidth.Medium,
+                FullWidth = true
+            };
+
+        var dialog = await DialogService.ShowAsync<OrderDetailDialog>("Chi tiết đơn hàng", parameters, options);
+        await dialog.Result;
+    }
+
+    private static Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => Color.Warning,
+            "Confirmed" => Color.Info,
+            "Shipped" => Color.Primary,
+            "Delivered" => Color.Success,
+            "Completed" => Color.Success,
+            "Cancelled" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetStatusText(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ xác nhận",
+            "Confirmed" => "Đã xác nhận",
+            "Shipped" => "Đang giao",
+            "Delivered" => "Đã giao",
+            "Completed" => "Hoàn thành",
+            "Cancelled" => "Đã hủy",
+            _ => status
+        };
+    }
+
+    private string FormatPrice(decimal price)
+    {
+        return $"{price:N0} ₫";
+    }
+}

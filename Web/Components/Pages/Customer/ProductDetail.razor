@@ -163,7 +163,7 @@ else
                             <MudTextField @bind-Value="_quantity" 
                                          Variant="Variant.Outlined" 
                                          Style="width: 80px;"
-                                         TextAlign="TextAlign.Center"
+                                         textalign="TextAlign.Center"
                                          Immediate="true"/>
                             <MudIconButton Icon="@Icons.Material.Filled.Add" 
                                           OnClick="IncreaseQuantity"
@@ -226,7 +226,7 @@ else
         </MudGrid>
 
         <!-- Product Details Tabs -->
-        <MudTabs Class="mt-8" Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        <MudTabs Class="mt-8" Elevation="2" Rounded="true" ApplyEffectsToContainer="true" panelclass="pa-6">
             <MudTabPanel Text="Thông số kỹ thuật" Icon="@Icons.Material.Filled.Settings">
                 @if (_product.Specs.Any())
                 {
@@ -593,9 +593,67 @@ else
             return;
         }
 
-        // TODO: Implement cart functionality
-        Snackbar.Add($"Đã thêm {_quantity} sản phẩm vào giỏ hàng!", Severity.Success);
-        await Task.CompletedTask;
+        try
+        {
+            // Get current cart from localStorage
+            var cartJson = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "cart");
+            var cartItems = string.IsNullOrEmpty(cartJson)
+                ? new List<CartItem>()
+                : System.Text.Json.JsonSerializer.Deserialize<List<CartItem>>(cartJson) ?? new List<CartItem>();
+
+            // Determine price and name
+            var price = _selectedVariant?.Price ?? _product?.BasePrice ?? 0;
+            var productName = _product?.Name ?? "Sản phẩm";
+            var imageUrl = _product?.Images?.FirstOrDefault(i => i.IsMain)?.Url 
+                          ?? _product?.Images?.FirstOrDefault()?.Url 
+                          ?? "";
+
+            // Check if item already exists in cart
+            var existingItem = cartItems.FirstOrDefault(i => 
+                i.ProductId == ProductId && 
+                ((_selectedVariant == null && string.IsNullOrEmpty(i.VariantName)) || 
+                 (_selectedVariant != null && i.VariantName == GetVariantDisplayText(_selectedVariant))));
+
+            if (existingItem != null)
+            {
+                existingItem.Quantity += _quantity;
+            }
+            else
+            {
+                var newItem = new CartItem
+                {
+                    Id = cartItems.Count > 0 ? cartItems.Max(i => i.Id) + 1 : 1,
+                    ProductId = ProductId,
+                    ProductName = productName,
+                    VariantName = _selectedVariant != null ? GetVariantDisplayText(_selectedVariant) : null,
+                    ImageUrl = imageUrl,
+                    UnitPrice = price,
+                    Quantity = _quantity
+                };
+                cartItems.Add(newItem);
+            }
+
+            // Save cart back to localStorage
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "cart",
+                System.Text.Json.JsonSerializer.Serialize(cartItems));
+
+            Snackbar.Add($"Đã thêm {_quantity} sản phẩm vào giỏ hàng!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi thêm vào giỏ hàng: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public class CartItem
+    {
+        public int Id { get; set; }
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = "";
+        public string? VariantName { get; set; }
+        public string? ImageUrl { get; set; }
+        public decimal UnitPrice { get; set; }
+        public int Quantity { get; set; }
     }
 
     private async Task BuyNow()

@@ -1,0 +1,224 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IProductVariantService VariantService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_request.Sku" Label="SKU *" 
+                                  Required="true" RequiredError="SKU không được trống"
+                                  Variant="Variant.Outlined" Class="mb-3"
+                                  Disabled="_isEdit"
+                                  HelperText="Mã phân loại duy nhất" />
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudNumericField T="decimal" @bind-Value="_request.Price" 
+                                     Label="Giá *" 
+                                     Required="true"
+                                     Variant="Variant.Outlined" Class="mb-3"
+                                     Adornment="Adornment.End" AdornmentText="đ"
+                                     Min="0" />
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudNumericField T="int" @bind-Value="_request.StockQuantity" 
+                                     Label="Số lượng tồn kho" 
+                                     Variant="Variant.Outlined" Class="mb-3"
+                                     Min="0" />
+                </MudItem>
+                
+                @if (_isEdit)
+                {
+                    <MudItem xs="12" md="6">
+                        <MudSwitch @bind-Value="_request.IsActive" 
+                                   Label="Đang bán" Color="Color.Success" />
+                    </MudItem>
+                }
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+            
+            <MudText Typo="Typo.subtitle1" Class="fw-bold mb-3">Thuộc tính phân loại</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3 d-block">
+                Ví dụ: Màu sắc, Kích thước, Chất liệu...
+            </MudText>
+
+            @foreach (var attr in _attributes.Select((value, index) => new { value, index }))
+            {
+                <MudGrid Class="mb-2" @key="attr.index">
+                    <MudItem xs="12" md="5">
+                        <MudTextField @bind-Value="_attributes[attr.index].Key" 
+                                      Label="Tên thuộc tính"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="Ví dụ: Màu sắc" />
+                    </MudItem>
+                    <MudItem xs="12" md="5">
+                        <MudTextField @bind-Value="_attributes[attr.index].Value" 
+                                      Label="Giá trị"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="Ví dụ: Đỏ" />
+                    </MudItem>
+                    <MudItem xs="12" md="2" Class="d-flex align-center">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                       Color="Color.Error"
+                                       OnClick="@(() => RemoveAttribute(attr.index))"
+                                       Size="Size.Small" />
+                    </MudItem>
+                </MudGrid>
+            }
+
+            <MudButton Variant="Variant.Outlined" 
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="AddAttribute"
+                       Class="mt-2">
+                Thêm thuộc tính
+            </MudButton>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            @(_isEdit ? "Cập nhật" : "Thêm mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int ProductId { get; set; }
+
+    [Parameter]
+    public int? VariantId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isEdit => VariantId.HasValue;
+    
+    private UpdateProductVariantRequest _request = new()
+    {
+        Sku = "",
+        Price = 0,
+        StockQuantity = 0,
+        Attributes = new(),
+        IsActive = true
+    };
+    
+    private List<AttributeItem> _attributes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_isEdit)
+        {
+            await LoadVariant();
+        }
+        else
+        {
+            // Add default empty attribute for new variant
+            AddAttribute();
+        }
+    }
+
+    private async Task LoadVariant()
+    {
+        try
+        {
+            var variant = await VariantService.GetByIdAsync(VariantId.Value);
+            if (variant != null)
+            {
+                _request = new UpdateProductVariantRequest
+                {
+                    Sku = variant.Sku,
+                    Price = variant.Price,
+                    StockQuantity = variant.StockQuantity,
+                    Attributes = variant.Attributes,
+                    IsActive = variant.IsActive
+                };
+                
+                // Convert attributes to list for editing
+                _attributes = variant.Attributes.Select(a => new AttributeItem 
+                { 
+                    Key = a.Key, 
+                    Value = a.Value 
+                }).ToList();
+                
+                if (!_attributes.Any())
+                {
+                    AddAttribute();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải phân loại: {ex.Message}", Severity.Error);
+            MudDialog.Cancel();
+        }
+    }
+
+    private void AddAttribute()
+    {
+        _attributes.Add(new AttributeItem { Key = "", Value = "" });
+    }
+
+    private void RemoveAttribute(int index)
+    {
+        if (index >= 0 && index < _attributes.Count)
+        {
+            _attributes.RemoveAt(index);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        try
+        {
+            // Convert attributes list to dictionary
+            _request.Attributes = _attributes
+                .Where(a => !string.IsNullOrWhiteSpace(a.Key))
+                .ToDictionary(a => a.Key, a => a.Value);
+
+            if (_isEdit)
+            {
+                await VariantService.UpdateAsync(VariantId.Value, _request);
+                Snackbar.Add("Đã cập nhật phân loại sản phẩm", Severity.Success);
+            }
+            else
+            {
+                var createRequest = new CreateProductVariantRequest
+                {
+                    ProductId = ProductId,
+                    Sku = _request.Sku,
+                    Price = _request.Price,
+                    StockQuantity = _request.StockQuantity,
+                    Attributes = _request.Attributes
+                };
+                await VariantService.CreateAsync(createRequest);
+                Snackbar.Add("Đã thêm phân loại sản phẩm mới", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private class AttributeItem
+    {
+        public string Key { get; set; } = "";
+        public string Value { get; set; } = "";
+    }
+}

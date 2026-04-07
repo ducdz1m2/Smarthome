@@ -124,7 +124,7 @@ else if (_statistics != null)
                     {
                         <MudChart T="double" ChartType="ChartType.Bar" 
                                   ChartSeries="@GetRevenueSeries()" 
-                                  XAxisLabels="@GetMonthLabels()"
+                                  xaxislabels="@GetMonthLabels()"
                                   ChartOptions="@(_chartOptions)"
                                   Width="100%" Height="300px" />
                     }
@@ -146,8 +146,8 @@ else if (_statistics != null)
                     @if (_statistics.Charts?.OrderStatusChart != null && _statistics.Charts.OrderStatusChart.Any())
                     {
                         <MudChart T="double" ChartType="ChartType.Pie" 
-                                  InputData="@GetOrderStatusData()" 
-                                  InputLabels="@GetOrderStatusLabels()"
+                                  inputdata="@GetOrderStatusData()" 
+                                  inputlabels="@GetOrderStatusLabels()"
                                   Width="250px" Height="250px" />
                     }
                     else
@@ -173,7 +173,7 @@ else if (_statistics != null)
                     {
                         <MudChart T="double" ChartType="ChartType.Line" 
                                   ChartSeries="@GetUsersSeries()" 
-                                  XAxisLabels="@GetMonthLabels()"
+                                  xaxislabels="@GetMonthLabels()"
                                   ChartOptions="@(_chartOptions)"
                                   Width="100%" Height="250px" />
                     }
@@ -195,8 +195,8 @@ else if (_statistics != null)
                     @if (_statistics.Charts?.PaymentMethodChart != null && _statistics.Charts.PaymentMethodChart.Any())
                     {
                         <MudChart T="double" ChartType="ChartType.Donut" 
-                                  InputData="@GetPaymentData()" 
-                                  InputLabels="@GetPaymentLabels()"
+                                  inputdata="@GetPaymentData()" 
+                                  inputlabels="@GetPaymentLabels()"
                                   Width="250px" Height="250px" />
                     }
                     else
@@ -219,8 +219,8 @@ else if (_statistics != null)
             @if (_statistics.Charts?.CategoryDistribution != null && _statistics.Charts.CategoryDistribution.Any())
             {
                 <MudChart T="double" ChartType="ChartType.Pie" 
-                          InputData="@GetCategoryData()" 
-                          InputLabels="@GetCategoryLabels()"
+                          inputdata="@GetCategoryData()" 
+                          inputlabels="@GetCategoryLabels()"
                           Width="300px" Height="300px" />
             }
             else

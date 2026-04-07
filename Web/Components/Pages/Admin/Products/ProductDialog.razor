@@ -3,16 +3,18 @@
 @using Application.Interfaces.Services
 @using System.Net.Http.Json
 @inject IProductService ProductService
+@inject IProductVariantService VariantService
 @inject ICategoryService CategoryService
 @inject IBrandService BrandService
 @inject ISupplierService SupplierService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 
 <MudDialog>
     <DialogContent>
         <MudForm @ref="_form" @bind-IsValid="_isValid">
-            <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+            <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" panelclass="pa-6">
                 <MudTabPanel Text="Thông tin cơ bản" Icon="@Icons.Material.Filled.Info">
                     <MudGrid>
                         <MudItem xs="12" md="6">
@@ -137,6 +139,81 @@
                         <MudSwitch @bind-Value="_request.IsActive" Label="Đang bán" 
                                    Color="Color.Success" />
                     </MudTabPanel>
+                    
+                    <MudTabPanel Text="Phân loại" Icon="@Icons.Material.Filled.Style">
+                        <div class="d-flex justify-space-between align-center mb-4">
+                            <MudText Typo="Typo.subtitle1">Danh sách phân loại sản phẩm</MudText>
+                            <MudButton Variant="Variant.Filled" 
+                                       Color="Color.Primary" 
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       OnClick="OpenAddVariantDialog"
+                                       Size="Size.Small">
+                                Thêm phân loại
+                            </MudButton>
+                        </div>
+                        
+                        @if (_variants.Any())
+                        {
+                            <MudTable Items="_variants" Dense="true" Hover="true" Striped="true">
+                                <HeaderContent>
+                                    <MudTh>SKU</MudTh>
+                                    <MudTh>Thuộc tính</MudTh>
+                                    <MudTh>Giá</MudTh>
+                                    <MudTh>Tồn kho</MudTh>
+                                    <MudTh>Trạng thái</MudTh>
+                                    <MudTh>Thao tác</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="SKU">@context.Sku</MudTd>
+                                    <MudTd DataLabel="Thuộc tính">
+                                        @if (context.Attributes.Any())
+                                        {
+                                            <div class="d-flex flex-wrap gap-1">
+                                                @foreach (var attr in context.Attributes)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                                                        @attr.Key: @attr.Value
+                                                    </MudChip>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Không có thuộc tính</MudText>
+                                        }
+                                    </MudTd>
+                                    <MudTd DataLabel="Giá">@context.Price.ToString("N0")đ</MudTd>
+                                    <MudTd DataLabel="Tồn kho">
+                                        <MudChip T="int" Size="Size.Small" Color="@GetStockColor(context.StockQuantity)">
+                                            @context.StockQuantity
+                                        </MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="Trạng thái">
+                                        <MudSwitch T="bool" Value="@context.IsActive"
+                                                   ValueChanged="@(v => ToggleVariantStatus(context.Id, v))"
+                                                   Color="Color.Success" 
+                                                   UncheckedColor="Color.Error" />
+                                    </MudTd>
+                                    <MudTd>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                                       Color="Color.Primary" 
+                                                       OnClick="@(() => OpenEditVariantDialog(context))" 
+                                                       Size="Size.Small" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                       Color="Color.Error" 
+                                                       OnClick="@(() => DeleteVariant(context))" 
+                                                       Size="Size.Small" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info">
+                                Chưa có phân loại nào. Nhấn "Thêm phân loại" để tạo các phiên bản khác nhau của sản phẩm (ví dụ: Màu sắc, Kích thước).
+                            </MudAlert>
+                        }
+                    </MudTabPanel>
                 }
             </MudTabs>
         </MudForm>
@@ -165,6 +242,7 @@
     private List<BrandResponse> _brands = new();
     private List<SupplierResponse> _suppliers = new();
     private List<string> _imageUrls = new();
+    private List<ProductVariantListResponse> _variants = new();
     
     private string _sku = "";
     
@@ -258,6 +336,9 @@
                 };
                 _sku = product.Sku;
                 _imageUrls = product.Images.Select(i => i.Url).ToList();
+                
+                // Load variants for this product
+                await LoadVariants();
             }
         }
         catch (Exception ex)
@@ -405,5 +486,113 @@
     private class UploadResult
     {
         public string url { get; set; } = "";
+    }
+
+    // Variant management methods
+    private async Task LoadVariants()
+    {
+        if (_isEdit && ProductId.HasValue)
+        {
+            try
+            {
+                _variants = await VariantService.GetByProductIdAsync(ProductId.Value);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading variants: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task OpenAddVariantDialog()
+    {
+        if (!ProductId.HasValue) return;
+
+        var parameters = new DialogParameters<ProductVariantDialog>();
+        parameters.Add(x => x.ProductId, ProductId.Value);
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ProductVariantDialog>("Thêm phân loại sản phẩm", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadVariants();
+        }
+    }
+
+    private async Task OpenEditVariantDialog(ProductVariantListResponse variant)
+    {
+        if (!ProductId.HasValue) return;
+
+        var parameters = new DialogParameters<ProductVariantDialog>();
+        parameters.Add(x => x.ProductId, ProductId.Value);
+        parameters.Add(x => x.VariantId, variant.Id);
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ProductVariantDialog>("Sửa phân loại sản phẩm", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadVariants();
+        }
+    }
+
+    private async Task DeleteVariant(ProductVariantListResponse variant)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa phân loại \"{variant.Sku}\"?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await VariantService.DeleteAsync(variant.Id);
+                Snackbar.Add("Đã xóa phân loại sản phẩm", Severity.Success);
+                await LoadVariants();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ToggleVariantStatus(int variantId, bool isActive)
+    {
+        try
+        {
+            if (isActive)
+                await VariantService.ActivateAsync(variantId);
+            else
+                await VariantService.DeactivateAsync(variantId);
+            
+            Snackbar.Add($"Đã {(isActive ? "kích hoạt" : "vô hiệu hóa")} phân loại", Severity.Success);
+            await LoadVariants();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            await LoadVariants();
+        }
+    }
+
+    private static Color GetStockColor(int stock)
+    {
+        return stock switch
+        {
+            0 => Color.Error,
+            <= 10 => Color.Warning,
+            _ => Color.Success
+        };
     }
 }

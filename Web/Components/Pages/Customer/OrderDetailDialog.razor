@@ -1,0 +1,327 @@
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IOrderService OrderService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_isLoading)
+        {
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" Animation="Animation.Wave" />
+        }
+        else if (_order == null)
+        {
+            <MudAlert Severity="Severity.Error">Không tìm thấy đơn hàng</MudAlert>
+        }
+        else
+        {
+            <MudGrid>
+                <!-- Order Header -->
+                <MudItem xs="12">
+                    <div class="d-flex align-center justify-space-between mb-4">
+                        <div>
+                            <MudText Typo="Typo.h6" Class="fw-bold">Đơn hàng #@_order.OrderNumber</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Đặt ngày @_order.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                            </MudText>
+                        </div>
+                        <MudChip T="string" Color="@GetStatusColor(_order.Status)" Size="Size.Medium">
+                            @GetStatusText(_order.Status)
+                        </MudChip>
+                    </div>
+                </MudItem>
+
+                <!-- Order Items -->
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Sản phẩm</MudText>
+                    <MudCard Elevation="0" Outlined="true" Class="mb-4">
+                        @foreach (var item in _order.Items)
+                        {
+                            <MudCardContent Class="py-2">
+                                <div class="d-flex align-center justify-space-between">
+                                    <div class="d-flex align-center gap-3">
+                                        <MudAvatar Size="Size.Medium" Color="Color.Primary" Variant="Variant.Outlined">
+                                            <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Small" />
+                                        </MudAvatar>
+                                        <div>
+                                            <MudText Typo="Typo.body1" Class="fw-bold">@item.ProductName</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">SKU: @item.Sku</MudText>
+                                            @if (item.RequiresInstallation)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="mt-1">
+                                                    Cần lắp đặt
+                                                </MudChip>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <MudText Typo="Typo.body2">x @item.Quantity</MudText>
+                                        <MudText Typo="Typo.body1" Class="fw-bold" Color="Color.Primary">
+                                            @FormatPrice(item.TotalPrice)
+                                        </MudText>
+                                    </div>
+                                </div>
+                            </MudCardContent>
+                            @if (item != _order.Items.Last())
+                            {
+                                <MudDivider />
+                            }
+                        }
+                    </MudCard>
+                </MudItem>
+
+                <!-- Order Summary -->
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Thông tin giao hàng</MudText>
+                    <MudCard Elevation="0" Outlined="true" Class="mb-4">
+                        <MudCardContent>
+                            <div class="d-flex align-center gap-2 mb-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Color="Color.Secondary" />
+                                <MudText Typo="Typo.body2">@_order.ReceiverName</MudText>
+                            </div>
+                            @if (!string.IsNullOrEmpty(_order.ReceiverPhone))
+                            {
+                                <div class="d-flex align-center gap-2 mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Color="Color.Secondary" />
+                                    <MudText Typo="Typo.body2">@_order.ReceiverPhone</MudText>
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(_order.ShippingAddress))
+                            {
+                                <div class="d-flex align-start gap-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Color="Color.Secondary" />
+                                    <MudText Typo="Typo.body2">@_order.ShippingAddress</MudText>
+                                </div>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Thanh toán</MudText>
+                    <MudCard Elevation="0" Outlined="true" Class="mb-4">
+                        <MudCardContent>
+                            <div class="d-flex justify-space-between mb-2">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Tạm tính</MudText>
+                                <MudText Typo="Typo.body2">@FormatPrice(_order.SubTotal)</MudText>
+                            </div>
+                            @if (_order.DiscountAmount > 0)
+                            {
+                                <div class="d-flex justify-space-between mb-2">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Giảm giá</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Success">-@FormatPrice(_order.DiscountAmount)</MudText>
+                                </div>
+                            }
+                            <div class="d-flex justify-space-between mb-2">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Phí vận chuyển</MudText>
+                                <MudText Typo="Typo.body2">@FormatPrice(_order.ShippingFee)</MudText>
+                            </div>
+                            <MudDivider Class="my-2" />
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.subtitle1" Class="fw-bold">Tổng cộng</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">
+                                    @FormatPrice(_order.TotalAmount)
+                                </MudText>
+                            </div>
+                            <div class="d-flex justify-space-between mt-2">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Phương thức thanh toán</MudText>
+                                <MudText Typo="Typo.caption">@GetPaymentMethodText(_order.PaymentMethod)</MudText>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+
+                <!-- Shipments -->
+                @if (_order.Shipments.Any())
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Thông tin vận chuyển</MudText>
+                        @foreach (var shipment in _order.Shipments)
+                        {
+                            <MudCard Elevation="0" Outlined="true" Class="mb-2">
+                                <MudCardContent>
+                                    <div class="d-flex align-center justify-space-between">
+                                        <div>
+                                            <MudText Typo="Typo.body2" Class="fw-bold">Vận đơn: @shipment.ShipmentNumber</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @if (!string.IsNullOrEmpty(shipment.Carrier))
+                                                {
+                                                    <span>Đơn vị: @shipment.Carrier</span>
+                                                }
+                                                @if (!string.IsNullOrEmpty(shipment.TrackingNumber))
+                                                {
+                                                    <span> | Mã vận: @shipment.TrackingNumber</span>
+                                                }
+                                            </MudText>
+                                        </div>
+                                        <MudChip T="string" Size="Size.Small" Color="@GetShipmentStatusColor(shipment.Status)">
+                                            @GetShipmentStatusText(shipment.Status)
+                                        </MudChip>
+                                    </div>
+                                    @if (shipment.ShippedAt.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                            Giao ngày: @shipment.ShippedAt.Value.ToString("dd/MM/yyyy")
+                                        </MudText>
+                                    }
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    </MudItem>
+                }
+
+                <!-- Cancel Reason -->
+                @if (!string.IsNullOrEmpty(_order.CancelReason))
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Warning">
+                            <MudText Typo="Typo.body2" Class="fw-bold">Lý do hủy:</MudText>
+                            <MudText Typo="Typo.body2">@_order.CancelReason</MudText>
+                        </MudAlert>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Đóng</MudButton>
+        @if (_order != null && _order.Status == "Pending")
+        {
+            <MudButton Color="Color.Error" OnClick="CancelOrder" StartIcon="@Icons.Material.Filled.Cancel">
+                Hủy đơn hàng
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .fw-bold {
+        font-weight: 600;
+    }
+    .text-right {
+        text-align: right;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int OrderId { get; set; }
+
+    private OrderResponse? _order;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrderAsync();
+    }
+
+    private async Task LoadOrderAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _order = await OrderService.GetByIdAsync(OrderId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải đơn hàng: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+
+    private async Task CancelOrder()
+    {
+        if (_order == null) return;
+
+        // TODO: Show confirmation dialog and get cancel reason
+        try
+        {
+            await OrderService.CancelAsync(OrderId, "Khách hàng hủy đơn");
+            Snackbar.Add("Đã hủy đơn hàng", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => Color.Warning,
+            "Confirmed" => Color.Info,
+            "Shipped" => Color.Primary,
+            "Delivered" => Color.Success,
+            "Completed" => Color.Success,
+            "Cancelled" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetStatusText(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ xác nhận",
+            "Confirmed" => "Đã xác nhận",
+            "Shipped" => "Đang giao",
+            "Delivered" => "Đã giao",
+            "Completed" => "Hoàn thành",
+            "Cancelled" => "Đã hủy",
+            _ => status
+        };
+    }
+
+    private static Color GetShipmentStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => Color.Warning,
+            "PickedUp" => Color.Info,
+            "InTransit" => Color.Primary,
+            "Delivered" => Color.Success,
+            "Failed" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetShipmentStatusText(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ lấy hàng",
+            "PickedUp" => "Đã lấy hàng",
+            "InTransit" => "Đang vận chuyển",
+            "Delivered" => "Đã giao",
+            "Failed" => "Giao thất bại",
+            _ => status
+        };
+    }
+
+    private static string GetPaymentMethodText(string paymentMethod)
+    {
+        return paymentMethod switch
+        {
+            "CashOnDelivery" => "Thanh toán khi nhận hàng (COD)",
+            "BankTransfer" => "Chuyển khoản ngân hàng",
+            "CreditCard" => "Thẻ tín dụng",
+            "EWallet" => "Ví điện tử",
+            _ => paymentMethod
+        };
+    }
+
+    private string FormatPrice(decimal price)
+    {
+        return $"{price:N0} ₫";
+    }
+}
