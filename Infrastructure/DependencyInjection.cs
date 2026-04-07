@@ -33,6 +33,10 @@ namespace Infrastructure
             services.AddScoped<ITechnicianProfileRepository, TechnicianProfileRepository>();
             services.AddScoped<IInstallationSlotRepository, InstallationSlotRepository>();
 
+            // Warranty repositories
+            services.AddScoped<IWarrantyRepository, WarrantyRepository>();
+            services.AddScoped<IWarrantyClaimRepository, WarrantyClaimRepository>();
+
             return services;
         }
     }

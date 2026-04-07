@@ -30,6 +30,9 @@ namespace Application
             services.AddScoped<ITechnicianProfileService, TechnicianProfileService>();
             services.AddScoped<IInstallationSlotService, InstallationSlotService>();
 
+            // Warranty services
+            services.AddScoped<IWarrantyService, WarrantyService>();
+
             return services;
         }
     }

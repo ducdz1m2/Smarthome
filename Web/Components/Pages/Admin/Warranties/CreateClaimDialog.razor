@@ -1,0 +1,51 @@
+@using Application.DTOs.Requests
+@using Application.Interfaces.Services
+@inject IWarrantyService WarrantyService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField @bind-Value="_issue" Label="Mô tả lỗi *" 
+                          Required="true" RequiredError="Vui lòng mô tả lỗi"
+                          Variant="Variant.Outlined" Lines="4"
+                          HelperText="Mô tả chi tiết vấn đề bạn gặp phải với sản phẩm" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            Tạo yêu cầu
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int WarrantyId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private string _issue = "";
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        try
+        {
+            await WarrantyService.CreateClaimAsync(WarrantyId, _issue);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}
