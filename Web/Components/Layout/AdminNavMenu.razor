@@ -4,42 +4,41 @@
 @inject ISnackbar Snackbar
 
 <MudNavMenu>
-    <MudNavLink Href="/admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+    <MudNavLink Href="/admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Tổng quan</MudNavLink>
     
-    <MudNavGroup Title="Catalog" Expanded="true" Icon="@Icons.Material.Filled.Inventory">
-        <MudNavLink Href="/admin/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Categories</MudNavLink>
-        <MudNavLink Href="/admin/brands" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BrandingWatermark">Brands</MudNavLink>
-        <MudNavLink Href="/admin/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices">Products</MudNavLink>
+    <MudNavGroup Title="Danh mục" Expanded="true" Icon="@Icons.Material.Filled.Inventory">
+        <MudNavLink Href="/admin/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Loại sản phẩm</MudNavLink>
+        <MudNavLink Href="/admin/brands" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BrandingWatermark">Thương hiệu</MudNavLink>
+        <MudNavLink Href="/admin/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices">Sản phẩm</MudNavLink>
     </MudNavGroup>
     
-    <MudNavGroup Title="Sales" Icon="@Icons.Material.Filled.ShoppingCart">
-        <MudNavLink Href="/admin/orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt">Orders</MudNavLink>
-        <MudNavLink Href="/admin/warranties" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Security">Warranties</MudNavLink>
+    <MudNavGroup Title="Bán hàng" Icon="@Icons.Material.Filled.ShoppingCart">
+        <MudNavLink Href="/admin/orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt">Đơn hàng</MudNavLink>
+        <MudNavLink Href="/admin/warranties" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Security">Bảo hành</MudNavLink>
     </MudNavGroup>
     
-    <MudNavGroup Title="Inventory" Icon="@Icons.Material.Filled.Warehouse" Expanded="true">
+    <MudNavGroup Title="Kho hàng" Icon="@Icons.Material.Filled.Warehouse" Expanded="true">
         <MudNavLink Href="/admin/warehouses" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Warehouse">Quản lý kho</MudNavLink>
         <MudNavLink Href="/admin/suppliers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Nhà cung cấp</MudNavLink>
         <MudNavLink Href="/admin/inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices">Sản phẩm trong kho</MudNavLink>
     </MudNavGroup>
     
-    <MudNavGroup Title="Promotions" Icon="@Icons.Material.Filled.LocalOffer">
-        <MudNavLink Href="/admin/coupons" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CardGiftcard">Coupons</MudNavLink>
-        <MudNavLink Href="/admin/promotions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Campaign">Promotions</MudNavLink>
+    <MudNavGroup Title="Khuyến mãi" Icon="@Icons.Material.Filled.LocalOffer">
+        <MudNavLink Href="/admin/coupons" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CardGiftcard">Mã giảm giá</MudNavLink>
+        <MudNavLink Href="/admin/promotions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Campaign">Chương trình KM</MudNavLink>
     </MudNavGroup>
     
-    <MudNavGroup Title="Installation" Icon="@Icons.Material.Filled.Build">
+    <MudNavGroup Title="Lắp đặt" Icon="@Icons.Material.Filled.Build">
         <MudNavLink Href="/admin/installations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.EventNote">Lịch lắp đặt</MudNavLink>
         <MudNavLink Href="/admin/technicians" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Engineering">Kỹ thuật viên</MudNavLink>
     </MudNavGroup>
     
-    <MudNavGroup Title="Content" Icon="@Icons.Material.Filled.Article">
-        <MudNavLink Href="/admin/banners" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Image">Banners</MudNavLink>
+    <MudNavGroup Title="Nội dung" Icon="@Icons.Material.Filled.Article">
+        <MudNavLink Href="/admin/banners" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Image">Banner</MudNavLink>
     </MudNavGroup>
     
-    <MudNavGroup Title="System" Icon="@Icons.Material.Filled.Settings">
-        <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Users</MudNavLink>
-        <MudNavLink Href="/admin/statistics" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BarChart">Statistics</MudNavLink>
+    <MudNavGroup Title="Hệ thống" Icon="@Icons.Material.Filled.Settings">
+        <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Người dùng</MudNavLink>
     </MudNavGroup>
     
     <MudDivider Class="my-2" />

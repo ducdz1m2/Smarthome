@@ -39,6 +39,9 @@ namespace Application
             // User services
             services.AddScoped<IUserService, UserService>();
 
+            // Statistics services
+            services.AddScoped<IStatisticsService, StatisticsService>();
+
             return services;
         }
     }

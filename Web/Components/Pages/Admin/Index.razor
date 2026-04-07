@@ -1,24 +1,672 @@
 @page "/admin"
-@using Shared.Common
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@layout AdminLayout
+@inject IStatisticsService StatisticsService
 @inject ISnackbar Snackbar
-@inject IDialogService DialogService
 
+<MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
 
-<MudButton Variant="Variant.Filled" Color="Color.Primary" @onclick="@(() => Snackbar.Add("Simple Snackbar"))">
-    Open snackbar
-</MudButton>
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
+}
+else if (_statistics != null)
+{
+    <!-- Overview Cards -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="pa-4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Class="mr-4" />
+                        <div>
+                            <MudText Typo="Typo.body2">Tổng đơn hàng</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: bold;">@_statistics.Overview.TotalOrders.ToString("N0")</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="pa-4" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Class="mr-4" />
+                        <div>
+                            <MudText Typo="Typo.body2">Tổng doanh thu</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: bold;">@_statistics.Overview.TotalRevenue.ToString("N0")đ</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="pa-4" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Devices" Size="Size.Large" Class="mr-4" />
+                        <div>
+                            <MudText Typo="Typo.body2">Tổng sản phẩm</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: bold;">@_statistics.Overview.TotalProducts.ToString("N0")</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="pa-4" Style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white;">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Class="mr-4" />
+                        <div>
+                            <MudText Typo="Typo.body2">Tổng người dùng</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: bold;">@_statistics.Overview.TotalUsers.ToString("N0")</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
 
-<MudButton @onclick="OpenDialogAsync" Variant="Variant.Filled" Color="Color.Primary">
-    Open simple dialog
-</MudButton>
+    <!-- Secondary Stats -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="2">
+            <MudPaper Elevation="1" Class="pa-4 text-center">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Đơn hôm nay</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Primary" Style="font-weight: bold;">@_statistics.Overview.TodayOrders</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="2">
+            <MudPaper Elevation="1" Class="pa-4 text-center">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Doanh thu hôm nay</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Success" Style="font-weight: bold;">@_statistics.Overview.TodayRevenue.ToString("N0")đ</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="2">
+            <MudPaper Elevation="1" Class="pa-4 text-center">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Đơn chờ xử lý</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Warning" Style="font-weight: bold;">@_statistics.Overview.PendingOrders</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="2">
+            <MudPaper Elevation="1" Class="pa-4 text-center">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Sắp hết hàng</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Error" Style="font-weight: bold;">@_statistics.Overview.LowStockProducts</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="2">
+            <MudPaper Elevation="1" Class="pa-4 text-center">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Danh mục</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight: bold;">@_statistics.Overview.TotalCategories</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="2">
+            <MudPaper Elevation="1" Class="pa-4 text-center">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Thương hiệu</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight: bold;">@_statistics.Overview.TotalBrands</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
 
+    <!-- Charts Row 1 -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" lg="8">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Doanh thu & Đơn hàng 6 tháng gần đây</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_statistics.Charts?.RevenueChart != null && _statistics.Charts.RevenueChart.Any())
+                    {
+                        <MudChart T="double" ChartType="ChartType.Bar" 
+                                  ChartSeries="@GetRevenueSeries()" 
+                                  XAxisLabels="@GetMonthLabels()"
+                                  ChartOptions="@(_chartOptions)"
+                                  Width="100%" Height="300px" />
+                    }
+                    else
+                    {
+                        <MudText Align="Align.Center" Color="Color.Secondary">Chưa có dữ liệu</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" lg="4">
+            <MudCard Elevation="2" Style="height: 100%;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Trạng thái đơn hàng</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Class="d-flex justify-center">
+                    @if (_statistics.Charts?.OrderStatusChart != null && _statistics.Charts.OrderStatusChart.Any())
+                    {
+                        <MudChart T="double" ChartType="ChartType.Pie" 
+                                  InputData="@GetOrderStatusData()" 
+                                  InputLabels="@GetOrderStatusLabels()"
+                                  Width="250px" Height="250px" />
+                    }
+                    else
+                    {
+                        <MudText Align="Align.Center" Color="Color.Secondary">Chưa có dữ liệu</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Charts Row 2 -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Người dùng mới</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_statistics.Charts?.UsersChart != null && _statistics.Charts.UsersChart.Any())
+                    {
+                        <MudChart T="double" ChartType="ChartType.Line" 
+                                  ChartSeries="@GetUsersSeries()" 
+                                  XAxisLabels="@GetMonthLabels()"
+                                  ChartOptions="@(_chartOptions)"
+                                  Width="100%" Height="250px" />
+                    }
+                    else
+                    {
+                        <MudText Align="Align.Center" Color="Color.Secondary">Chưa có dữ liệu</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Phương thức thanh toán</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Class="d-flex justify-center">
+                    @if (_statistics.Charts?.PaymentMethodChart != null && _statistics.Charts.PaymentMethodChart.Any())
+                    {
+                        <MudChart T="double" ChartType="ChartType.Donut" 
+                                  InputData="@GetPaymentData()" 
+                                  InputLabels="@GetPaymentLabels()"
+                                  Width="250px" Height="250px" />
+                    }
+                    else
+                    {
+                        <MudText Align="Align.Center" Color="Color.Secondary">Chưa có dữ liệu</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Category Distribution -->
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Phân bố sản phẩm theo danh mục</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (_statistics.Charts?.CategoryDistribution != null && _statistics.Charts.CategoryDistribution.Any())
+            {
+                <MudChart T="double" ChartType="ChartType.Pie" 
+                          InputData="@GetCategoryData()" 
+                          InputLabels="@GetCategoryLabels()"
+                          Width="300px" Height="300px" />
+            }
+            else
+            {
+                <MudText Align="Align.Center" Color="Color.Secondary">Chưa có dữ liệu</MudText>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Sales & Product Stats -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" lg="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Thống kê bán hàng</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="object" Dense="true">
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Tổng đơn hàng</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Sales.TotalOrders</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đã hoàn thành</span>
+                                <MudText Color="Color.Success" Style="font-weight: bold;">@_statistics.Sales.CompletedOrders</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đang xử lý</span>
+                                <MudText Color="Color.Warning" Style="font-weight: bold;">@_statistics.Sales.ProcessingOrders</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đang giao</span>
+                                <MudText Color="Color.Info" Style="font-weight: bold;">@_statistics.Sales.ShippingOrders</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đã hủy</span>
+                                <MudText Color="Color.Error" Style="font-weight: bold;">@_statistics.Sales.CancelledOrders</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Giá trị đơn TB</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Sales.AverageOrderValue.ToString("N0")đ</MudText>
+                            </div>
+                        </MudListItem>
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" lg="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Thống kê sản phẩm</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="object" Dense="true">
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Tổng sản phẩm</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Products.TotalProducts</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đang bán</span>
+                                <MudText Color="Color.Success" Style="font-weight: bold;">@_statistics.Products.ActiveProducts</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Ngừng bán</span>
+                                <MudText Color="Color.Warning" Style="font-weight: bold;">@_statistics.Products.InactiveProducts</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Hết hàng</span>
+                                <MudText Color="Color.Error" Style="font-weight: bold;">@_statistics.Products.OutOfStockProducts</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Sắp hết hàng</span>
+                                <MudText Color="Color.Warning" Style="font-weight: bold;">@_statistics.Products.LowStockProducts</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đánh giá TB</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Products.AverageRating <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" /></MudText>
+                            </div>
+                        </MudListItem>
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- User & Inventory Stats -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Thống kê người dùng</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="object" Dense="true">
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Tổng người dùng</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Users.TotalUsers</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Người dùng mới tháng này</span>
+                                <MudText Color="Color.Success" Style="font-weight: bold;">+@_statistics.Users.NewUsersThisMonth</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Người dùng mới hôm nay</span>
+                                <MudText Color="Color.Info" Style="font-weight: bold;">+@_statistics.Users.NewUsersToday</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Người dùng hoạt động (30 ngày)</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Users.ActiveUsers</MudText>
+                            </div>
+                        </MudListItem>
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Thống kê tồn kho</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="object" Dense="true">
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Tổng kho</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Inventory.TotalWarehouses</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Nhà cung cấp</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Inventory.TotalSuppliers</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Phiếu nhập kho</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Inventory.TotalStockEntries</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Giá trị tồn kho</span>
+                                <MudText Color="Color.Primary" Style="font-weight: bold;">@_statistics.Inventory.TotalInventoryValue.ToString("N0")đ</MudText>
+                            </div>
+                        </MudListItem>
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Installation & Warranty Stats -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Thống kê lắp đặt</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="object" Dense="true">
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Tổng kỹ thuật viên</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Installation.TotalTechnicians</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>KT đang rảnh</span>
+                                <MudText Color="Color.Success" Style="font-weight: bold;">@_statistics.Installation.ActiveTechnicians</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Tổng lịch lắp</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Installation.TotalBookings</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Chờ xử lý</span>
+                                <MudText Color="Color.Warning" Style="font-weight: bold;">@_statistics.Installation.PendingBookings</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đã hoàn thành</span>
+                                <MudText Color="Color.Success" Style="font-weight: bold;">@_statistics.Installation.CompletedBookings</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Doanh thu lắp đặt</span>
+                                <MudText Color="Color.Primary" Style="font-weight: bold;">@_statistics.Installation.TotalInstallationRevenue.ToString("N0")đ</MudText>
+                            </div>
+                        </MudListItem>
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Thống kê bảo hành</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="object" Dense="true">
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Tổng bảo hành</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Warranty.TotalWarranties</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đang hiệu lực</span>
+                                <MudText Color="Color.Success" Style="font-weight: bold;">@_statistics.Warranty.ActiveWarranties</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đã hết hạn</span>
+                                <MudText Color="Color.Warning" Style="font-weight: bold;">@_statistics.Warranty.ExpiredWarranties</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Tổng yêu cầu BH</span>
+                                <MudText Style="font-weight: bold;">@_statistics.Warranty.TotalClaims</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Chờ xử lý</span>
+                                <MudText Color="Color.Warning" Style="font-weight: bold;">@_statistics.Warranty.PendingClaims</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đã duyệt</span>
+                                <MudText Color="Color.Success" Style="font-weight: bold;">@_statistics.Warranty.ApprovedClaims</MudText>
+                            </div>
+                        </MudListItem>
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Promotions Stats -->
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Thống kê khuyến mãi</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="0" Class="pa-4 text-center" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudText Typo="Typo.h4" Color="Color.Primary" Style="font-weight: bold;">@_statistics.Promotions.TotalBanners</MudText>
+                        <MudText Typo="Typo.body2">Banner (@_statistics.Promotions.ActiveBanners hoạt động)</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="0" Class="pa-4 text-center" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudText Typo="Typo.h4" Color="Color.Secondary" Style="font-weight: bold;">@_statistics.Promotions.TotalCoupons</MudText>
+                        <MudText Typo="Typo.body2">Coupon (@_statistics.Promotions.ActiveCoupons hoạt động)</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="0" Class="pa-4 text-center" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudText Typo="Typo.h4" Color="Color.Info" Style="font-weight: bold;">@_statistics.Promotions.TotalPromotions</MudText>
+                        <MudText Typo="Typo.body2">Chương trình (@_statistics.Promotions.ActivePromotions hoạt động)</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="0" Class="pa-4 text-center" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudText Typo="Typo.h4" Color="Color.Success" Style="font-weight: bold;">@_statistics.Promotions.UsedCouponsCount</MudText>
+                        <MudText Typo="Typo.body2">Coupon đã sử dụng</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+}
+else if (_loadError)
+{
+    <MudAlert Severity="Severity.Error" Class="my-4">
+        Không thể tải dữ liệu thống kê. Vui lòng thử lại sau.
+    </MudAlert>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadStatistics">
+        Thử lại
+    </MudButton>
+}
 
 @code {
-    
-    private Task OpenDialogAsync()
-    {
-        var options = new DialogOptions { CloseOnEscapeKey = true };
+    private DashboardStatisticsResponse? _statistics;
+    private bool _loading = true;
+    private bool _loadError = false;
 
-        return DialogService.ShowAsync<Dialog>("Simple Dialog", options);
+    private readonly ChartOptions _chartOptions = new()
+    {
+        ShowLegend = true
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatistics();
+    }
+
+    private async Task LoadStatistics()
+    {
+        _loading = true;
+        _loadError = false;
+        StateHasChanged();
+
+        try
+        {
+            _statistics = await StatisticsService.GetDashboardStatisticsAsync();
+        }
+        catch (Exception ex)
+        {
+            _loadError = true;
+            Snackbar.Add("Lỗi tải dữ liệu: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    // Chart data helpers
+    private string[] GetMonthLabels()
+    {
+        return _statistics?.Charts?.RevenueChart?.Select(x => x.Label).ToArray() ?? Array.Empty<string>();
+    }
+
+    private List<ChartSeries<double>> GetRevenueSeries()
+    {
+        if (_statistics?.Charts?.RevenueChart == null) return new List<ChartSeries<double>>();
+
+        return new List<ChartSeries<double>>
+        {
+            new ChartSeries<double>
+            {
+                Name = "Doanh thu",
+                Data = _statistics.Charts.RevenueChart.Select(x => (double)x.Value).ToArray()
+            },
+            new ChartSeries<double>
+            {
+                Name = "Đơn hàng",
+                Data = _statistics.Charts.OrdersChart?.Select(x => (double)x.Count).ToArray() ?? Array.Empty<double>()
+            }
+        };
+    }
+
+    private List<ChartSeries<double>> GetUsersSeries()
+    {
+        if (_statistics?.Charts?.UsersChart == null) return new List<ChartSeries<double>>();
+
+        return new List<ChartSeries<double>>
+        {
+            new ChartSeries<double>
+            {
+                Name = "Người dùng mới",
+                Data = _statistics.Charts.UsersChart.Select(x => (double)x.Count).ToArray()
+            }
+        };
+    }
+
+    private double[] GetOrderStatusData()
+    {
+        return _statistics?.Charts?.OrderStatusChart?.Select(x => (double)x.Value).ToArray() ?? Array.Empty<double>();
+    }
+
+    private string[] GetOrderStatusLabels()
+    {
+        return _statistics?.Charts?.OrderStatusChart?.Select(x => x.Label).ToArray() ?? Array.Empty<string>();
+    }
+
+    private double[] GetPaymentData()
+    {
+        return _statistics?.Charts?.PaymentMethodChart?.Select(x => (double)x.Value).ToArray() ?? Array.Empty<double>();
+    }
+
+    private string[] GetPaymentLabels()
+    {
+        return _statistics?.Charts?.PaymentMethodChart?.Select(x => x.Label).ToArray() ?? Array.Empty<string>();
+    }
+
+    private double[] GetCategoryData()
+    {
+        return _statistics?.Charts?.CategoryDistribution?.Select(x => (double)x.Value).ToArray() ?? Array.Empty<double>();
+    }
+
+    private string[] GetCategoryLabels()
+    {
+        return _statistics?.Charts?.CategoryDistribution?.Select(x => x.Label).ToArray() ?? Array.Empty<string>();
     }
 }
