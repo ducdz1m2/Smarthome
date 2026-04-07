@@ -290,8 +290,7 @@
             return;
         }
 
-        // TODO: Navigate to checkout page
-        Snackbar.Add("Chức năng thanh toán đang phát triển", Severity.Info);
+        NavigationManager.NavigateTo("/checkout");
     }
 
     private string FormatPrice(decimal price)
