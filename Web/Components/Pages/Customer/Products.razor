@@ -1,0 +1,441 @@
+@page "/products"
+@page "/products/category/{CategoryId:int}"
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IProductService ProductService
+@inject ICategoryService CategoryService
+@inject NavigationManager NavigationManager
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <!-- Page Header -->
+    <div class="d-flex align-center justify-space-between mb-4">
+        <div>
+            <MudText Typo="Typo.h4" Class="fw-bold">@_pageTitle</MudText>
+            @if (!string.IsNullOrEmpty(_pageSubtitle))
+            {
+                <MudText Typo="Typo.body1" Color="Color.Secondary">@_pageSubtitle</MudText>
+            }
+        </div>
+        <MudButton Href="/" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ArrowBack">
+            Về trang chủ
+        </MudButton>
+    </div>
+
+    <MudGrid>
+        <!-- Sidebar Filters -->
+        <MudItem xs="12" md="3">
+            <MudCard Elevation="2" Class="mb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.FilterList" Class="mr-2"/>
+                            Bộ lọc
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <!-- Search -->
+                    <MudTextField @bind-Value="_searchQuery"
+                                  Label="Tìm kiếm"
+                                  Placeholder="Nhập tên sản phẩm..."
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  OnAdornmentClick="ApplyFilters"
+                                  OnKeyDown="@((e) => { if (e.Key == "Enter") ApplyFilters(); })"
+                                  Class="mb-4"
+                                  Clearable="true"
+                                  Immediate="true"/>
+
+                    <!-- Categories -->
+                    <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Danh mục</MudText>
+                    @if (_categories != null)
+                    {
+                        <MudList T="CategoryResponse" Dense="true" Class="mb-4">
+                            <MudListItem T="CategoryResponse" 
+                                         OnClick="() => SelectCategory(null)"
+                                         Icon="@Icons.Material.Filled.AllInbox"
+                                         Selected="_selectedCategoryId == null"
+                                         Text="Tất cả danh mục"/>
+                            @foreach (var category in _categories.Where(c => c.IsActive))
+                            {
+                                <MudListItem T="CategoryResponse"
+                                             OnClick="() => SelectCategory(category.Id)"
+                                             Icon="@Icons.Material.Filled.Folder"
+                                             Selected="_selectedCategoryId == category.Id"
+                                             Text="@category.Name"/>
+                            }
+                        </MudList>
+                    }
+
+                    <MudDivider Class="my-2"/>
+
+                    <!-- Price Range -->
+                    <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Khoảng giá</MudText>
+                    <MudSlider Value="_maxPrice" ValueChanged="@(async (double v) => await OnMaxPriceChanged(v))" Min="0" Max="50000000" Step="1000000" 
+                               Color="Color.Primary" Class="mb-2">
+                        Tối đa: @FormatPrice((decimal)_maxPrice)
+                    </MudSlider>
+
+                    <!-- Reset Button -->
+                    <MudButton OnClick="ResetFilters" 
+                              Variant="Variant.Outlined" 
+                              Color="Color.Secondary" 
+                              FullWidth="true"
+                              StartIcon="@Icons.Material.Filled.Clear">
+                        Xóa bộ lọc
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Product Grid -->
+        <MudItem xs="12" md="9">
+            <!-- Toolbar -->
+            <MudCard Elevation="0" Class="mb-4">
+                <MudCardContent Class="d-flex align-center justify-space-between">
+                    <MudText Typo="Typo.body1">
+                        Hiển thị <strong>@_products.Count</strong> / <strong>@_totalCount</strong> sản phẩm
+                    </MudText>
+                    <MudSelect T="string" Value="_sortOrder" ValueChanged="OnSortChanged" Label="Sắp xếp" Dense="true" 
+                              Variant="Variant.Outlined" Style="width: 180px;">
+                        <MudSelectItem T="string" Value="@("newest")">Mới nhất</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("price_asc")">Giá tăng dần</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("price_desc")">Giá giảm dần</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("name_asc")">Tên A-Z</MudSelectItem>
+                    </MudSelect>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Products Grid -->
+            @if (_isLoading)
+            {
+                <MudGrid Spacing="3">
+                    @for (int i = 0; i < 6; i++)
+                    {
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="250px" Animation="Animation.Wave"/>
+                            <MudSkeleton SkeletonType="SkeletonType.Text" Animation="Animation.Wave"/>
+                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="60%" Animation="Animation.Wave"/>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+            else if (_products.Any())
+            {
+                <MudGrid Spacing="3">
+                    @foreach (var product in _products)
+                    {
+                        var isOutOfStock = product.StockQuantity <= 0;
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudCard Elevation="2" Class="h-100 cursor-pointer product-card" @onclick="() => NavigateToProduct(product.Id)">
+                                <div class="product-image-container">
+                                    @if (!string.IsNullOrEmpty(product.MainImageUrl))
+                                    {
+                                        <img src="@product.MainImageUrl" alt="@product.Name" class="product-image" />
+                                    }
+                                    else
+                                    {
+                                        <div class="no-image-placeholder">
+                                            <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Secondary"/>
+                                        </div>
+                                    }
+                                    @if (isOutOfStock)
+                                    {
+                                        <div class="out-of-stock-badge">Hết hàng</div>
+                                    }
+                                </div>
+                                <MudCardContent Class="pa-3">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">@product.CategoryName</MudText>
+                                    <MudText Typo="Typo.subtitle1" Class="fw-bold text-truncate mb-2" title="@product.Name">@product.Name</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">@product.BrandName</MudText>
+                                    <div class="d-flex align-center justify-space-between">
+                                        <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">@FormatPrice(product.BasePrice)</MudText>
+                                        <MudBadge Content="@product.StockQuantity" Color="Color.Info" Overlap="true">
+                                            <MudIconButton Icon="@Icons.Material.Filled.AddShoppingCart" 
+                                                           Color="Color.Primary" 
+                                                           Size="Size.Small"
+                                                           Disabled="@isOutOfStock"
+                                                           OnClick="@(async (e) => { await AddToCart(product.Id); })"/>
+                                        </MudBadge>
+                                    </div>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+
+                <!-- Pagination -->
+                @if (_totalPages > 1)
+                {
+                    <div class="d-flex justify-center mt-6">
+                        <MudPagination Count="_totalPages" 
+                                      Selected="_currentPage" 
+                                      SelectedChanged="OnPageChanged"
+                                      Color="Color.Primary"
+                                      ShowFirstButton="true"
+                                      ShowLastButton="true"/>
+                    </div>
+                }
+            }
+            else
+            {
+                <MudPaper Elevation="0" Class="pa-8 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" Class="mb-4"/>
+                    <MudText Typo="Typo.h6" Class="mb-2">Không tìm thấy sản phẩm</MudText>
+                    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                        Thử thay đổi bộ lọc hoặc tìm kiếm với từ khóa khác
+                    </MudText>
+                    <MudButton OnClick="ResetFilters" Variant="Variant.Filled" Color="Color.Primary">
+                        Xóa bộ lọc
+                    </MudButton>
+                </MudPaper>
+            }
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+<style>
+    .product-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .product-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+    }
+    .product-image-container {
+        height: 220px;
+        overflow: hidden;
+        position: relative;
+        background-color: #f5f5f5;
+    }
+    .product-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s;
+    }
+    .product-card:hover .product-image {
+        transform: scale(1.05);
+    }
+    .no-image-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .out-of-stock-badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .text-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .cursor-pointer {
+        cursor: pointer;
+    }
+    .fw-bold {
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    [Parameter] public int? CategoryId { get; set; }
+
+    private List<ProductListResponse> _products = new();
+    private List<CategoryResponse> _categories = new();
+    private int _totalCount = 0;
+    private int _currentPage = 1;
+    private int _pageSize = 12;
+    private int _totalPages => (_totalCount + _pageSize - 1) / _pageSize;
+    private bool _isLoading = true;
+
+    private string _searchQuery = "";
+    private int? _selectedCategoryId;
+    private double _maxPrice = 50000000;
+    private string _sortOrder = "newest";
+    private string _pageTitle = "Tất cả sản phẩm";
+    private string _pageSubtitle = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _selectedCategoryId = CategoryId;
+        await LoadCategoriesAsync();
+        await LoadProductsAsync();
+        UpdatePageTitle();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (CategoryId != _selectedCategoryId)
+        {
+            _selectedCategoryId = CategoryId;
+            _currentPage = 1;
+            UpdatePageTitle();
+            await LoadProductsAsync();
+        }
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        try
+        {
+            _categories = await CategoryService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading categories: {ex.Message}");
+        }
+    }
+
+    private async Task LoadProductsAsync()
+    {
+        try
+        {
+            _isLoading = true;
+            
+            var (items, total) = await ProductService.GetPagedAsync(
+                _currentPage, 
+                _pageSize, 
+                string.IsNullOrWhiteSpace(_searchQuery) ? null : _searchQuery,
+                _selectedCategoryId,
+                null,
+                true);
+
+            _products = items;
+            _totalCount = total;
+
+            // Apply price filter locally
+            if (_maxPrice < 50000000)
+            {
+                _products = _products.Where(p => p.BasePrice <= (decimal)_maxPrice).ToList();
+            }
+
+            // Apply sorting
+            ApplySorting();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading products: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ApplySorting()
+    {
+        _products = _sortOrder switch
+        {
+            "price_asc" => _products.OrderBy(p => p.BasePrice).ToList(),
+            "price_desc" => _products.OrderByDescending(p => p.BasePrice).ToList(),
+            "name_asc" => _products.OrderBy(p => p.Name).ToList(),
+            _ => _products.OrderByDescending(p => p.Id).ToList() // newest
+        };
+    }
+
+    private void UpdatePageTitle()
+    {
+        if (_selectedCategoryId.HasValue)
+        {
+            var category = _categories.FirstOrDefault(c => c.Id == _selectedCategoryId);
+            if (category != null)
+            {
+                _pageTitle = category.Name;
+                _pageSubtitle = $"Danh mục: {category.Name}";
+            }
+            else
+            {
+                _pageTitle = "Sản phẩm theo danh mục";
+                _pageSubtitle = "";
+            }
+        }
+        else
+        {
+            _pageTitle = "Tất cả sản phẩm";
+            _pageSubtitle = "";
+        }
+    }
+
+    private async Task SelectCategory(int? categoryId)
+    {
+        _selectedCategoryId = categoryId;
+        _currentPage = 1;
+        UpdatePageTitle();
+        
+        if (categoryId.HasValue)
+        {
+            NavigationManager.NavigateTo($"/products/category/{categoryId}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/products");
+        }
+        
+        await LoadProductsAsync();
+    }
+
+    private async Task ApplyFilters()
+    {
+        _currentPage = 1;
+        await LoadProductsAsync();
+    }
+
+    private async Task ResetFilters()
+    {
+        _searchQuery = "";
+        _selectedCategoryId = null;
+        _maxPrice = 50000000;
+        _sortOrder = "newest";
+        _currentPage = 1;
+        
+        NavigationManager.NavigateTo("/products");
+        UpdatePageTitle();
+        await LoadProductsAsync();
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _currentPage = page;
+        await LoadProductsAsync();
+    }
+
+    private async Task OnMaxPriceChanged(double value)
+    {
+        _maxPrice = value;
+        await ApplyFilters();
+    }
+
+    private void OnSortChanged(string sortOrder)
+    {
+        _sortOrder = sortOrder;
+        ApplySorting();
+    }
+
+    private void NavigateToProduct(int productId)
+    {
+        NavigationManager.NavigateTo($"/products/{productId}");
+    }
+
+    private async Task AddToCart(int productId)
+    {
+        // TODO: Implement cart functionality
+        NavigateToProduct(productId);
+        await Task.CompletedTask;
+    }
+
+    private string FormatPrice(decimal price)
+    {
+        return $"{price:N0} ₫";
+    }
+}

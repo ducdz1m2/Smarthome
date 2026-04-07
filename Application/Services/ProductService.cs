@@ -258,6 +258,19 @@ namespace Application.Services
                     IsMain = i.IsMain,
                     SortOrder = i.SortOrder
                 }).ToList() ?? new List<ProductImageResponse>(),
+                Comments = product.Comments?.Where(c => c.IsApproved)
+                    .Select(c => new ProductCommentResponse
+                    {
+                        Id = c.Id,
+                        ProductId = c.ProductId,
+                        UserId = c.UserId,
+                        UserName = $"User_{c.UserId}", // TODO: Get actual user name from user service
+                        Content = c.Content,
+                        Rating = c.Rating,
+                        IsApproved = c.IsApproved,
+                        IsVerifiedPurchase = c.IsVerifiedPurchase,
+                        CreatedAt = c.CreatedAt
+                    }).ToList() ?? new List<ProductCommentResponse>(),
                 CreatedAt = product.CreatedAt
             };
         }

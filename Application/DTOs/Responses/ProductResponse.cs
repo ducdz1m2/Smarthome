@@ -23,7 +23,21 @@ namespace Application.DTOs.Responses
         
         public List<ProductVariantResponse> Variants { get; set; } = new();
         public List<ProductImageResponse> Images { get; set; } = new();
+        public List<ProductCommentResponse> Comments { get; set; } = new();
         
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class ProductCommentResponse
+    {
+        public int Id { get; set; }
+        public int ProductId { get; set; }
+        public int UserId { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public string Content { get; set; } = string.Empty;
+        public int Rating { get; set; }
+        public bool IsApproved { get; set; }
+        public bool IsVerifiedPurchase { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 

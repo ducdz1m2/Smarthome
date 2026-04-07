@@ -1,0 +1,696 @@
+@page "/products/{ProductId:int}"
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IProductService ProductService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+@if (_isLoading)
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Animation="Animation.Wave"/>
+        <MudGrid Class="mt-4">
+            <MudItem xs="12" md="8">
+                <MudSkeleton SkeletonType="SkeletonType.Text" Height="60px" Animation="Animation.Wave"/>
+                <MudSkeleton SkeletonType="SkeletonType.Text" Height="30px" Width="60%" Animation="Animation.Wave"/>
+                <MudSkeleton SkeletonType="SkeletonType.Text" Height="20px" Width="40%" Animation="Animation.Wave"/>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" Animation="Animation.Wave"/>
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+}
+else if (_product == null)
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+        <MudPaper Elevation="0" Class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Color="Color.Error" Class="mb-4"/>
+            <MudText Typo="Typo.h5" Class="mb-2">Không tìm thấy sản phẩm</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                Sản phẩm bạn đang tìm kiếm không tồn tại hoặc đã bị xóa.
+            </MudText>
+            <MudButton Href="/products" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowBack">
+                Quay lại danh sách sản phẩm
+            </MudButton>
+        </MudPaper>
+    </MudContainer>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+        <!-- Breadcrumb -->
+        <div class="d-flex align-center gap-2 mb-4">
+            <MudLink Href="/" Color="Color.Primary" Underline="Underline.None">Trang chủ</MudLink>
+            <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Color="Color.Secondary"/>
+            <MudLink Href="/products" Color="Color.Primary" Underline="Underline.None">Sản phẩm</MudLink>
+            <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Color="Color.Secondary"/>
+            <MudLink Href="@($"/products/category/{_product?.CategoryId}")" Color="Color.Primary" Underline="Underline.None">@(_product?.CategoryName)</MudLink>
+            <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Color="Color.Secondary"/>
+            <MudText Color="Color.Secondary">@(_product?.Name)</MudText>
+        </div>
+
+        <MudGrid>
+            <!-- Product Images -->
+            <MudItem xs="12" md="5">
+                <MudCard Elevation="2">
+                    <div class="main-image-container">
+                        @if (!string.IsNullOrEmpty(_selectedImageUrl))
+                        {
+                            <img src="@_selectedImageUrl" alt="@_product.Name" class="main-product-image"/>
+                        }
+                        else
+                        {
+                            <div class="no-main-image">
+                                <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Secondary"/>
+                                <MudText>Chưa có hình ảnh</MudText>
+                            </div>
+                        }
+                    </div>
+                    @if (_product.Images.Any())
+                    {
+                        <MudCardContent Class="pt-2">
+                            <div class="thumbnail-container">
+                                @foreach (var image in _product.Images.OrderBy(i => i.SortOrder))
+                                {
+                                    <div class="thumbnail @(_selectedImageUrl == image.Url ? "active" : "")" 
+                                         @onclick="() => SelectImage(image.Url)">
+                                        <img src="@image.Url" alt="@image.AltText"/>
+                                    </div>
+                                }
+                            </div>
+                        </MudCardContent>
+                    }
+                </MudCard>
+            </MudItem>
+
+            <!-- Product Info -->
+            <MudItem xs="12" md="7">
+                <div class="d-flex flex-column gap-4">
+                    <!-- Title Section -->
+                    <div>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                            @(_product.CategoryName) / @(_product.BrandName)
+                        </MudText>
+                        <MudText Typo="Typo.h4" Class="fw-bold mb-2">@_product.Name</MudText>
+                        <div class="d-flex align-center gap-4">
+                            <MudText Typo="Typo.h4" Color="Color.Primary" Class="fw-bold">
+                                @FormatPrice(_product.BasePrice)
+                            </MudText>
+                            @if (_product.AvailableStock <= 0)
+                            {
+                                <MudChip T="string" Color="Color.Error" Size="Size.Small">Hết hàng</MudChip>
+                            }
+                            else if (_product.AvailableStock <= 10)
+                            {
+                                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Còn @_product.AvailableStock sản phẩm</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Color="Color.Success" Size="Size.Small">Còn hàng</MudChip>
+                            }
+                        </div>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                            SKU: @_product.Sku
+                        </MudText>
+                    </div>
+
+                    <MudDivider/>
+
+                    <!-- Short Description -->
+                    @if (!string.IsNullOrEmpty(_product.Description))
+                    {
+                        <div>
+                            <MudText Typo="Typo.body1">@_product.Description</MudText>
+                        </div>
+                    }
+
+                    <!-- Variants -->
+                    @if (_product.Variants.Any())
+                    {
+                        <div>
+                            <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Chọn phiên bản</MudText>
+                            <MudChipSet T="ProductVariantResponse" 
+                                       @bind-SelectedValue="_selectedVariant"
+                                       SelectionMode="SelectionMode.SingleSelection">
+                                @foreach (var variant in _product.Variants.Where(v => v.IsActive))
+                                {
+                                    var isDisabled = variant.StockQuantity <= 0;
+                                    <MudChip T="ProductVariantResponse" 
+                                            Value="@variant"
+                                            Text="@GetVariantDisplayText(variant)"
+                                            Color="Color.Primary"
+                                            Disabled="@isDisabled"/>
+                                }
+                            </MudChipSet>
+                            @if (_selectedVariant != null)
+                            {
+                                <MudText Typo="Typo.h5" Color="Color.Primary" Class="fw-bold mt-2">
+                                    @FormatPrice(_selectedVariant.Price)
+                                </MudText>
+                            }
+                        </div>
+                    }
+
+                    <!-- Quantity Selector -->
+                    <div>
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Số lượng</MudText>
+                        <div class="d-flex align-center gap-2">
+                            <MudIconButton Icon="@Icons.Material.Filled.Remove" 
+                                          OnClick="DecreaseQuantity" 
+                                          Disabled="@IsDecreaseDisabled()"/>
+                            <MudTextField @bind-Value="_quantity" 
+                                         Variant="Variant.Outlined" 
+                                         Style="width: 80px;"
+                                         TextAlign="TextAlign.Center"
+                                         Immediate="true"/>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                                          OnClick="IncreaseQuantity"
+                                          Disabled="@IsIncreaseDisabled()"/>
+                        </div>
+                        @if (GetAvailableStock() > 0)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                Có sẵn: @GetAvailableStock() sản phẩm
+                            </MudText>
+                        }
+                    </div>
+
+                    <!-- Installation Badge -->
+                    @if (_product.RequiresInstallation)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            <MudText Typo="Typo.body2">
+                                <MudIcon Icon="@Icons.Material.Filled.Handyman" Size="Size.Small" Class="mr-1"/>
+                                Sản phẩm này yêu cầu lắp đặt. Chúng tôi sẽ liên hệ để hỗ trợ sau khi đặt hàng.
+                            </MudText>
+                        </MudAlert>
+                    }
+
+                    <MudDivider/>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-3">
+                        <MudButton OnClick="AddToCart"
+                                  Variant="Variant.Filled" 
+                                  Color="Color.Primary" 
+                                  Size="Size.Large"
+                                  StartIcon="@Icons.Material.Filled.AddShoppingCart"
+                                  FullWidth="true"
+                                  Disabled="@(!CanAddToCart())">
+                            Thêm vào giỏ hàng
+                        </MudButton>
+                        <MudButton OnClick="BuyNow"
+                                  Variant="Variant.Filled" 
+                                  Color="Color.Secondary" 
+                                  Size="Size.Large"
+                                  StartIcon="@Icons.Material.Filled.ShoppingBag"
+                                  FullWidth="true"
+                                  Disabled="@(!CanAddToCart())">
+                            Mua ngay
+                        </MudButton>
+                    </div>
+
+                    <!-- Share Buttons -->
+                    <div class="d-flex gap-2">
+                        <MudIconButton Icon="@(_isInWishlist ? Icons.Material.Filled.Favorite : Icons.Material.Filled.FavoriteBorder)" 
+                                      Color="@(_isInWishlist ? Color.Error : Color.Secondary)"
+                                      OnClick="AddToFavorites"/>
+                        <MudIconButton Icon="@Icons.Material.Filled.Share" 
+                                      Color="Color.Secondary"
+                                      OnClick="ShareProduct"/>
+                    </div>
+                </div>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Product Details Tabs -->
+        <MudTabs Class="mt-8" Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+            <MudTabPanel Text="Thông số kỹ thuật" Icon="@Icons.Material.Filled.Settings">
+                @if (_product.Specs.Any())
+                {
+                    <MudGrid>
+                        @foreach (var spec in _product.Specs)
+                        {
+                            <MudItem xs="12" sm="6" md="4">
+                                <div class="spec-item">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@spec.Key</MudText>
+                                    <MudText Typo="Typo.body1" Class="fw-bold">@spec.Value</MudText>
+                                </div>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">Chưa có thông số kỹ thuật cho sản phẩm này.</MudText>
+                }
+            </MudTabPanel>
+
+            <MudTabPanel Text="Đánh giá" Icon="@Icons.Material.Filled.Star">
+                @if (_product.Comments.Any())
+                {
+                    <div class="d-flex flex-column gap-4">
+                        @foreach (var comment in _product.Comments.OrderByDescending(c => c.CreatedAt).Take(5))
+                        {
+                            <MudCard Elevation="0" Outlined="true">
+                                <MudCardContent>
+                                    <div class="d-flex align-center justify-space-between mb-2">
+                                        <div class="d-flex align-center gap-2">
+                                            <MudAvatar Color="Color.Primary" Size="Size.Small">
+                                                @GetInitials(comment.UserName)
+                                            </MudAvatar>
+                                            <MudText Typo="Typo.subtitle2" Class="fw-bold">@comment.UserName</MudText>
+                                        </div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @comment.CreatedAt.ToString("dd/MM/yyyy")
+                                        </MudText>
+                                    </div>
+                                    <MudRating ReadOnly="true" SelectedValue="@comment.Rating"/>
+                                    <MudText Typo="Typo.body2" Class="mt-2">@comment.Content</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <MudPaper Elevation="0" Class="pa-8 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.RateReview" Size="Size.Large" Color="Color.Secondary" Class="mb-4"/>
+                        <MudText Typo="Typo.h6" Class="mb-2">Chưa có đánh giá</MudText>
+                        <MudText Typo="Typo.body1" Color="Color.Secondary">
+                            Hãy trở thành người đầu tiên đánh giá sản phẩm này!
+                        </MudText>
+                    </MudPaper>
+                }
+            </MudTabPanel>
+
+            <MudTabPanel Text="Chính sách" Icon="@Icons.Material.Filled.Policy">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <div class="policy-item">
+                            <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Size="Size.Large" Color="Color.Primary" Class="mb-2"/>
+                            <MudText Typo="Typo.h6" Class="fw-bold mb-1">Giao hàng</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Giao hàng toàn quốc, miễn phí cho đơn từ 500.000₫
+                            </MudText>
+                        </div>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <div class="policy-item">
+                            <MudIcon Icon="@Icons.Material.Filled.Replay" Size="Size.Large" Color="Color.Primary" Class="mb-2"/>
+                            <MudText Typo="Typo.h6" Class="fw-bold mb-1">Đổi trả</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Đổi trả trong 7 ngày nếu sản phẩm lỗi
+                            </MudText>
+                        </div>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <div class="policy-item">
+                            <MudIcon Icon="@Icons.Material.Filled.Verified" Size="Size.Large" Color="Color.Primary" Class="mb-2"/>
+                            <MudText Typo="Typo.h6" Class="fw-bold mb-1">Bảo hành</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Bảo hành chính hãng 12 tháng
+                            </MudText>
+                        </div>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+        </MudTabs>
+
+        <!-- Related Products -->
+        <div class="mt-8">
+            <MudText Typo="Typo.h5" Class="fw-bold mb-4">Sản phẩm liên quan</MudText>
+            @if (_relatedProducts.Any())
+            {
+                <MudGrid Spacing="3">
+                    @foreach (var product in _relatedProducts.Take(4))
+                    {
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudCard Elevation="2" Class="h-100 cursor-pointer product-card" @onclick="() => NavigateToProduct(product.Id)">
+                                <div class="product-image-container">
+                                    @if (!string.IsNullOrEmpty(product.MainImageUrl))
+                                    {
+                                        <img src="@product.MainImageUrl" alt="@product.Name" class="product-image" />
+                                    }
+                                    else
+                                    {
+                                        <div class="no-image-placeholder">
+                                            <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Secondary"/>
+                                        </div>
+                                    }
+                                </div>
+                                <MudCardContent Class="pa-3">
+                                    <MudText Typo="Typo.subtitle1" Class="fw-bold text-truncate" title="@product.Name">@product.Name</MudText>
+                                    <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold mt-1">
+                                        @FormatPrice(product.BasePrice)
+                                    </MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </div>
+    </MudContainer>
+}
+
+<style>
+    .main-image-container {
+        height: 400px;
+        overflow: hidden;
+        background-color: #f5f5f5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .main-product-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+    .no-main-image {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+    .thumbnail-container {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 8px 0;
+    }
+    .thumbnail {
+        width: 80px;
+        height: 80px;
+        border: 2px solid transparent;
+        border-radius: 4px;
+        overflow: hidden;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    .thumbnail.active {
+        border-color: var(--mud-palette-primary);
+    }
+    .thumbnail img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .product-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .product-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+    }
+    .product-image-container {
+        height: 180px;
+        overflow: hidden;
+        background-color: #f5f5f5;
+    }
+    .product-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s;
+    }
+    .product-card:hover .product-image {
+        transform: scale(1.05);
+    }
+    .no-image-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .text-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .cursor-pointer {
+        cursor: pointer;
+    }
+    .spec-item {
+        padding: 12px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+    }
+    .policy-item {
+        text-align: center;
+        padding: 24px;
+        background-color: #f5f5f5;
+        border-radius: 8px;
+        height: 100%;
+    }
+    .fw-bold {
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    [Parameter] public int ProductId { get; set; }
+
+    private ProductResponse? _product;
+    private List<ProductListResponse> _relatedProducts = new();
+    private string _selectedImageUrl = "";
+    private ProductVariantResponse? _selectedVariant;
+    private int _quantity = 1;
+    private bool _isLoading = true;
+
+    private bool _isInWishlist = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProductAsync();
+        await CheckWishlistStatus();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_product == null || _product.Id != ProductId)
+        {
+            await LoadProductAsync();
+        }
+    }
+
+    private async Task LoadProductAsync()
+    {
+        try
+        {
+            _isLoading = true;
+            _product = await ProductService.GetByIdAsync(ProductId);
+            
+            if (_product != null)
+            {
+                _selectedImageUrl = _product.Images.FirstOrDefault(i => i.IsMain)?.Url 
+                                   ?? _product.Images.FirstOrDefault()?.Url 
+                                   ?? "";
+                
+                // Select first available variant
+                _selectedVariant = _product.Variants.FirstOrDefault(v => v.IsActive && v.StockQuantity > 0);
+                _quantity = 1;
+                
+                // Load related products
+                await LoadRelatedProductsAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải sản phẩm: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadRelatedProductsAsync()
+    {
+        try
+        {
+            if (_product?.CategoryId > 0)
+            {
+                var related = await ProductService.GetByCategoryAsync(_product.CategoryId);
+                _relatedProducts = related.Where(p => p.Id != ProductId).Take(4).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading related products: {ex.Message}");
+        }
+    }
+
+    private void SelectImage(string url)
+    {
+        _selectedImageUrl = url;
+    }
+
+    private void IncreaseQuantity()
+    {
+        if (_quantity < GetMaxQuantity())
+        {
+            _quantity++;
+        }
+    }
+
+    private void DecreaseQuantity()
+    {
+        if (_quantity > 1)
+        {
+            _quantity--;
+        }
+    }
+
+    private bool IsDecreaseDisabled() => _quantity <= 1;
+    private bool IsIncreaseDisabled() => _quantity >= GetMaxQuantity();
+
+    private int GetMaxQuantity()
+    {
+        return GetAvailableStock();
+    }
+
+    private int GetAvailableStock()
+    {
+        if (_selectedVariant != null)
+        {
+            return Math.Min(_selectedVariant.StockQuantity, _product?.AvailableStock ?? 0);
+        }
+        return _product?.AvailableStock ?? 0;
+    }
+
+    private bool CanAddToCart()
+    {
+        return GetAvailableStock() > 0 && _quantity > 0 && _quantity <= GetMaxQuantity();
+    }
+
+    private string GetVariantDisplayText(ProductVariantResponse variant)
+    {
+        var attrs = string.Join(", ", variant.Attributes.Select(a => $"{a.Key}: {a.Value}"));
+        return string.IsNullOrEmpty(attrs) ? variant.Sku : attrs;
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
+        }
+        return name[..Math.Min(2, name.Length)].ToUpper();
+    }
+
+    private async Task AddToCart()
+    {
+        if (!CanAddToCart())
+        {
+            Snackbar.Add("Không thể thêm vào giỏ hàng. Vui lòng kiểm tra lại số lượng.", Severity.Warning);
+            return;
+        }
+
+        // TODO: Implement cart functionality
+        Snackbar.Add($"Đã thêm {_quantity} sản phẩm vào giỏ hàng!", Severity.Success);
+        await Task.CompletedTask;
+    }
+
+    private async Task BuyNow()
+    {
+        await AddToCart();
+        NavigationManager.NavigateTo("/cart");
+    }
+
+    private async Task CheckWishlistStatus()
+    {
+        try
+        {
+            var wishlistJson = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "wishlist");
+            if (!string.IsNullOrEmpty(wishlistJson))
+            {
+                var wishlist = System.Text.Json.JsonSerializer.Deserialize<List<int>>(wishlistJson);
+                _isInWishlist = wishlist?.Contains(ProductId) ?? false;
+            }
+        }
+        catch { }
+    }
+
+    private async Task AddToFavorites()
+    {
+        try
+        {
+            var wishlistJson = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "wishlist");
+            var wishlist = string.IsNullOrEmpty(wishlistJson) 
+                ? new List<int>() 
+                : System.Text.Json.JsonSerializer.Deserialize<List<int>>(wishlistJson) ?? new List<int>();
+
+            if (wishlist.Contains(ProductId))
+            {
+                wishlist.Remove(ProductId);
+                _isInWishlist = false;
+                Snackbar.Add("Đã xóa khỏi danh sách yêu thích!", Severity.Success);
+            }
+            else
+            {
+                wishlist.Add(ProductId);
+                _isInWishlist = true;
+                Snackbar.Add("Đã thêm vào danh sách yêu thích!", Severity.Success);
+            }
+
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "wishlist", 
+                System.Text.Json.JsonSerializer.Serialize(wishlist));
+        }
+        catch
+        {
+            Snackbar.Add("Không thể cập nhật danh sách yêu thích", Severity.Error);
+        }
+    }
+
+    private async Task ShareProduct()
+    {
+        try
+        {
+            var url = NavigationManager.Uri;
+            var title = _product?.Name ?? "Sản phẩm";
+            
+            // Try Web Share API first (mobile/desktop modern browsers)
+            var canShare = await JSRuntime.InvokeAsync<bool>("eval", "typeof navigator.share === 'function'");
+            if (canShare)
+            {
+                await JSRuntime.InvokeVoidAsync("navigator.share", new 
+                { 
+                    title = title,
+                    text = $"Xem sản phẩm {title} tại Smarthome Store",
+                    url = url
+                });
+            }
+            else
+            {
+                // Fallback to clipboard
+                await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", url);
+                Snackbar.Add("Đã sao chép link sản phẩm!", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            // User cancelled share or error
+            if (!ex.Message.Contains("canceled") && !ex.Message.Contains("abort"))
+            {
+                Snackbar.Add("Không thể chia sẻ sản phẩm", Severity.Error);
+            }
+        }
+    }
+
+    private void NavigateToProduct(int productId)
+    {
+        NavigationManager.NavigateTo($"/products/{productId}");
+    }
+
+    private string FormatPrice(decimal price)
+    {
+        return $"{price:N0} ₫";
+    }
+}

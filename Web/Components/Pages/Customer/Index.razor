@@ -1,6 +1,306 @@
 ﻿@page "/"
-<h3>Index</h3>
+@inject IProductService ProductService
+@inject ICategoryService CategoryService
+@inject IBannerService BannerService
+@inject NavigationManager NavigationManager
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <!-- Hero Banner -->
+    @if (_banners.Any())
+    {
+        <MudCarousel Class="mud-width-full" Style="height:400px;" ShowArrows="true" ShowBullets="true" EnableSwipeGesture="true" AutoCycle="true" TData="object">
+            @foreach (var banner in _banners)
+            {
+                <MudCarouselItem Transition="Transition.Slide">
+                    <div class="d-flex flex-column flex-column justify-center" style="height:100%; background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url('@banner.ImageUrl'); background-size: cover; background-position: center;">
+                        <MudContainer MaxWidth="MaxWidth.Medium" Class="text-center">
+                            <MudText Typo="Typo.h2" Class="white-text fw-bold mb-4">@banner.Title</MudText>
+                            @if (!string.IsNullOrEmpty(banner.Subtitle))
+                            {
+                                <MudText Typo="Typo.h5" Class="white-text mb-6">@banner.Subtitle</MudText>
+                            }
+                            @if (!string.IsNullOrEmpty(banner.LinkUrl))
+                            {
+                                <MudButton Href="@banner.LinkUrl" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large">
+                                    Xem ngay
+                                </MudButton>
+                            }
+                        </MudContainer>
+                    </div>
+                </MudCarouselItem>
+            }
+        </MudCarousel>
+    }
+
+    <!-- Categories Section -->
+    <MudText Typo="Typo.h4" Class="mt-8 mb-4 fw-bold">Danh mục sản phẩm</MudText>
+    @if (_categories.Any())
+    {
+        <MudGrid Spacing="3">
+            @foreach (var category in _categories.Take(8))
+            {
+                <MudItem xs="6" sm="4" md="3" lg="3">
+                    <MudCard Elevation="2" Class="h-100 cursor-pointer" @onclick="() => NavigateToCategory(category.Id)">
+                        <MudCardContent Class="text-center pa-4">
+                            <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Color="Color.Primary" Class="mb-2"/>
+                            <MudText Typo="Typo.h6" Class="fw-bold">@category.Name</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@category.ProductCount sản phẩm</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else
+    {
+        <MudText Color="Color.Secondary">Chưa có danh mục sản phẩm</MudText>
+    }
+
+    <!-- Featured Products Section -->
+    <div class="d-flex align-center justify-space-between mt-8 mb-4">
+        <MudText Typo="Typo.h4" Class="fw-bold">Sản phẩm nổi bật</MudText>
+        <MudButton Href="/products" Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+            Xem tất cả
+        </MudButton>
+    </div>
+
+    @if (_featuredProducts.Any())
+    {
+        <MudGrid Spacing="3">
+            @foreach (var product in _featuredProducts.Take(8))
+            {
+                var isOutOfStock = product.StockQuantity <= 0;
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Elevation="2" Class="h-100 cursor-pointer product-card" @onclick="() => NavigateToProduct(product.Id)">
+                        <div class="product-image-container">
+                            @if (!string.IsNullOrEmpty(product.MainImageUrl))
+                            {
+                                <img src="@product.MainImageUrl" alt="@product.Name" class="product-image" />
+                            }
+                            else
+                            {
+                                <div class="no-image-placeholder">
+                                    <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Secondary"/>
+                                </div>
+                            }
+                            @if (isOutOfStock)
+                            {
+                                <div class="out-of-stock-badge">Hết hàng</div>
+                            }
+                        </div>
+                        <MudCardContent Class="pa-3">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">@product.CategoryName</MudText>
+                            <MudText Typo="Typo.subtitle1" Class="fw-bold text-truncate mb-2" title="@product.Name">@product.Name</MudText>
+                            <div class="d-flex align-center justify-space-between">
+                                <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">@FormatPrice(product.BasePrice)</MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.AddShoppingCart" 
+                                               Color="Color.Primary" 
+                                               Size="Size.Small"
+                                               Disabled="@isOutOfStock"
+                                               OnClick="@(async () => { await AddToCart(product.Id); })"/>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else if (_isLoading)
+    {
+        <MudGrid Spacing="3">
+            @for (int i = 0; i < 8; i++)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="250px" Animation="Animation.Wave"/>
+                    <MudSkeleton SkeletonType="SkeletonType.Text" Animation="Animation.Wave"/>
+                    <MudSkeleton SkeletonType="SkeletonType.Text" Width="60%" Animation="Animation.Wave"/>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info">Chưa có sản phẩm nào</MudAlert>
+    }
+
+    <!-- New Products Section -->
+    @if (_newProducts.Any())
+    {
+        <div class="d-flex align-center justify-space-between mt-8 mb-4">
+            <MudText Typo="Typo.h4" Class="fw-bold">Sản phẩm mới</MudText>
+        </div>
+
+        <MudGrid Spacing="3">
+            @foreach (var product in _newProducts.Take(4))
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Elevation="2" Class="h-100 cursor-pointer product-card" @onclick="() => NavigateToProduct(product.Id)">
+                        <div class="product-image-container">
+                            @if (!string.IsNullOrEmpty(product.MainImageUrl))
+                            {
+                                <img src="@product.MainImageUrl" alt="@product.Name" class="product-image" />
+                            }
+                            else
+                            {
+                                <div class="no-image-placeholder">
+                                    <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Secondary"/>
+                                </div>
+                            }
+                            <div class="new-badge">Mới</div>
+                        </div>
+                        <MudCardContent Class="pa-3">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">@product.CategoryName</MudText>
+                            <MudText Typo="Typo.subtitle1" Class="fw-bold text-truncate mb-2" title="@product.Name">@product.Name</MudText>
+                            <div class="d-flex align-center justify-space-between">
+                                <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">@FormatPrice(product.BasePrice)</MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.AddShoppingCart" 
+                                               Color="Color.Primary" 
+                                               Size="Size.Small"
+                                               OnClick="@(async () => { await AddToCart(product.Id); })"/>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+<style>
+    .white-text {
+        color: white !important;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+    }
+    .product-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .product-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+    }
+    .product-image-container {
+        height: 200px;
+        overflow: hidden;
+        position: relative;
+        background-color: #f5f5f5;
+    }
+    .product-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s;
+    }
+    .product-card:hover .product-image {
+        transform: scale(1.05);
+    }
+    .no-image-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .out-of-stock-badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .new-badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: var(--mud-palette-primary);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .text-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .cursor-pointer {
+        cursor: pointer;
+    }
+</style>
 
 @code {
+    private List<BannerResponse> _banners = new();
+    private List<CategoryResponse> _categories = new();
+    private List<ProductListResponse> _featuredProducts = new();
+    private List<ProductListResponse> _newProducts = new();
+    private bool _isLoading = true;
 
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            _isLoading = true;
+
+            // Load banners - check IsActive, IsVisible, Position and date range
+            var allBanners = await BannerService.GetAllAsync();
+            var now = DateTime.Now;
+            _banners = allBanners
+                .Where(b => b.IsActive 
+                    && b.IsVisible 
+                    && b.Position.ToLower() == "home"
+                    && (b.StartDate == null || b.StartDate <= now)
+                    && (b.EndDate == null || b.EndDate >= now))
+                .OrderBy(b => b.SortOrder)
+                .ToList();
+
+            // Load categories
+            _categories = await CategoryService.GetAllAsync();
+
+            // Load featured products (active products, get first page)
+            var (featuredItems, _) = await ProductService.GetPagedAsync(1, 8, null, null, null, true);
+            _featuredProducts = featuredItems;
+
+            // Load new products (recently added)
+            _newProducts = featuredItems.OrderByDescending(p => p.Id).Take(4).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading home page data: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void NavigateToProduct(int productId)
+    {
+        NavigationManager.NavigateTo($"/products/{productId}");
+    }
+
+    private void NavigateToCategory(int categoryId)
+    {
+        NavigationManager.NavigateTo($"/products?category={categoryId}");
+    }
+
+    private async Task AddToCart(int productId)
+    {
+        // TODO: Implement cart functionality
+        // For now, just navigate to product detail
+        NavigateToProduct(productId);
+    }
+
+    private string FormatPrice(decimal price)
+    {
+        return $"{price:N0} ₫";
+    }
 }
