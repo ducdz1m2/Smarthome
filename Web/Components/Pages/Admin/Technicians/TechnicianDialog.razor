@@ -1,0 +1,368 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject ITechnicianProfileService TechnicianService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+                <MudTabPanel Text="Tài khoản & Thông tin" Icon="@Icons.Material.Filled.Person">
+                    <MudGrid>
+                        @if (!_isEdit)
+                        {
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_request.Username" 
+                                              Label="Tên đăng nhập *" 
+                                              Required="true" RequiredError="Nhập tên đăng nhập"
+                                              Variant="Variant.Outlined" Class="mb-3" />
+                            </MudItem>
+                            
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_request.Password" 
+                                              Label="Mật khẩu *" 
+                                              Required="true" RequiredError="Nhập mật khẩu"
+                                              Variant="Variant.Outlined" Class="mb-3"
+                                              InputType="InputType.Password" />
+                            </MudItem>
+                        }
+                        
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_request.FullName" 
+                                          Label="Họ và tên *" 
+                                          Required="true" RequiredError="Nhập họ tên"
+                                          Variant="Variant.Outlined" Class="mb-3" />
+                        </MudItem>
+                        
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_request.EmployeeCode" 
+                                          Label="Mã nhân viên *" 
+                                          Required="true" RequiredError="Nhập mã nhân viên"
+                                          Variant="Variant.Outlined" Class="mb-3"
+                                          Disabled="_isEdit" />
+                        </MudItem>
+                        
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_request.PhoneNumber" 
+                                          Label="Số điện thoại *" 
+                                          Required="true" RequiredError="Nhập SĐT"
+                                          Variant="Variant.Outlined" Class="mb-3" />
+                        </MudItem>
+                        
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_request.Email" 
+                                          Label="Email" 
+                                          Variant="Variant.Outlined" Class="mb-3" />
+                        </MudItem>
+                        
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_request.IdentityCard" 
+                                          Label="Số CCCD/CMND" 
+                                          Variant="Variant.Outlined" Class="mb-3" />
+                        </MudItem>
+                        
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker @bind-Date="_request.DateOfBirth" 
+                                           Label="Ngày sinh"
+                                           Variant="Variant.Outlined" Class="mb-3" />
+                        </MudItem>
+                        
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_request.Address" 
+                                          Label="Địa chỉ thường trú" 
+                                          Variant="Variant.Outlined" Class="mb-3"
+                                          Lines="2" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+                
+                <MudTabPanel Text="Công việc & Khu vực" Icon="@Icons.Material.Filled.LocationOn">
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="decimal" @bind-Value="_request.BaseSalary" 
+                                             Label="Lương cơ bản" 
+                                             Variant="Variant.Outlined" Class="mb-3"
+                                             Adornment="Adornment.End" AdornmentText="đ" />
+                        </MudItem>
+                        
+                        <MudItem xs="12" md="6">
+                            <MudSwitch T="bool" @bind-Value="_isAvailable" 
+                                       Label="Đang làm việc" 
+                                       Color="Color.Success" />
+                        </MudItem>
+                        
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" Value="_selectedCity" 
+                                       Label="Thành phố *"
+                                       Required="true" RequiredError="Chọn thành phố"
+                                       Variant="Variant.Outlined" Class="mb-3"
+                                       ValueChanged="OnCityChanged">
+                                @foreach (var city in _availableCities)
+                                {
+                                    <MudSelectItem T="string" Value="@city">@city</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        
+                        <MudItem xs="12" md="6">
+                            <MudAutocomplete T="string" @bind-Value="_newDistrict" 
+                                             Label="Thêm quận/huyện"
+                                             SearchFunc="SearchDistricts"
+                                             Variant="Variant.Outlined"
+                                             AdornmentIcon="@Icons.Material.Filled.Add"
+                                             Adornment="Adornment.End"
+                                             OnAdornmentClick="AddDistrict"
+                                             Disabled="string.IsNullOrEmpty(_selectedCity)"
+                                             Class="mb-2" />
+                        </MudItem>
+                        
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">
+                                Khu vực phục vụ @(!string.IsNullOrEmpty(_selectedCity) ? $"({_selectedCity})" : "")
+                            </MudText>
+                            <MudChipSet T="string" AllClosable="true" OnClose="RemoveDistrict">
+                                @foreach (var district in _districts)
+                                {
+                                    <MudChip T="string" Color="Color.Primary" Text="@district" Value="@district" />
+                                }
+                            </MudChipSet>
+                            @if (!_districts.Any())
+                            {
+                                <MudText Color="Color.Error" Typo="Typo.caption">
+                                    Vui lòng chọn thành phố và thêm ít nhất một quận/huyện
+                                </MudText>
+                            }
+                        </MudItem>
+                        
+                        <MudItem xs="12" Class="mt-4">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Kỹ năng</MudText>
+                            <MudTextField @bind-Value="_newSkill" 
+                                          Label="Thêm kỹ năng (VD: Lắp khóa, Lắp camera...)"
+                                          Variant="Variant.Outlined"
+                                          AdornmentIcon="@Icons.Material.Filled.Add"
+                                          Adornment="Adornment.End"
+                                          OnAdornmentClick="AddSkill"
+                                          Class="mb-2" />
+                            <MudChipSet T="string" AllClosable="true" OnClose="RemoveSkill">
+                                @foreach (var skill in _skills)
+                                {
+                                    <MudChip T="string" Color="Color.Info" Text="@skill" Value="@skill" />
+                                }
+                            </MudChipSet>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+            </MudTabs>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid || !_districts.Any() || string.IsNullOrEmpty(_selectedCity)">
+            @(_isEdit ? "Cập nhật" : "Thêm mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? TechnicianId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isEdit => TechnicianId.HasValue;
+    
+    private CreateTechnicianProfileRequest _request = new()
+    {
+        FullName = "",
+        PhoneNumber = "",
+        EmployeeCode = "",
+        City = "",
+        Districts = new(),
+        Skills = new()
+    };
+    
+    private string _selectedCity = "";
+    private List<string> _districts = new();
+    private List<string> _skills = new();
+    private string _newDistrict = "";
+    private string _newSkill = "";
+    private bool _isAvailable = true;
+
+    // Danh sách thành phố
+    private readonly List<string> _availableCities = new()
+    {
+        "Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ",
+        "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu",
+        "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước",
+        "Bình Thuận", "Cà Mau", "Cao Bằng", "Đắk Lắk", "Đắk Nông",
+        "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Giang",
+        "Hà Nam", "Hà Tĩnh", "Hải Dương", "Hậu Giang", "Hoà Bình",
+        "Hưng Yên", "Khánh Hòa", "Kiên Giang", "Kon Tum", "Lai Châu",
+        "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Long An", "Nam Định",
+        "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Phú Yên",
+        "Quảng Bình", "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị",
+        "Sóc Trăng", "Sơn La", "Tây Ninh", "Thái Bình", "Thái Nguyên",
+        "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang", "Trà Vinh", "Tuyên Quang",
+        "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"
+    };
+
+    // Districts theo city
+    private readonly Dictionary<string, List<string>> _cityDistricts = new()
+    {
+        ["Hà Nội"] = new() { "Ba Đình", "Hoàn Kiếm", "Tây Hồ", "Long Biên", "Cầu Giấy", "Đống Đa", "Hai Bà Trưng", "Hoàng Mai", "Thanh Xuân", "Hà Đông", "Bắc Từ Liêm", "Nam Từ Liêm", "Sơn Tây", "Ba Vì", "Chương Mỹ", "Đan Phượng", "Đông Anh", "Gia Lâm", "Hoài Đức", "Mê Linh", "Mỹ Đức", "Phú Xuyên", "Phúc Thọ", "Quốc Oai", "Sóc Sơn", "Thạch Thất", "Thanh Oai", "Thanh Trì", "Thường Tín", "Ứng Hòa" },
+        ["TP. Hồ Chí Minh"] = new() { "Quận 1", "Quận 2", "Quận 3", "Quận 4", "Quận 5", "Quận 6", "Quận 7", "Quận 8", "Quận 9", "Quận 10", "Quận 11", "Quận 12", "Bình Tân", "Bình Thạnh", "Gò Vấp", "Phú Nhuận", "Tân Bình", "Tân Phú", "Thủ Đức", "Bình Chánh", "Cần Giờ", "Củ Chi", "Hóc Môn", "Nhà Bè" },
+        ["Đà Nẵng"] = new() { "Hải Châu", "Thanh Khê", "Sơn Trà", "Ngũ Hành Sơn", "Liên Chiểu", "Cẩm Lệ", "Hòa Vang", "Hoàng Sa" },
+        ["Hải Phòng"] = new() { "Hồng Bàng", "Ngô Quyền", "Lê Chân", "Hải An", "Kiến An", "Đồ Sơn", "Dương Kinh", "Thuỷ Nguyên", "An Dương", "An Lão", "Kiến Thuỵ", "Tiên Lãng", "Vĩnh Bảo", "Cát Hải", "Bạch Long Vĩ" },
+        ["Cần Thơ"] = new() { "Ninh Kiều", "Ô Môn", "Bình Thuỷ", "Cái Răng", "Thốt Nốt", "Vĩnh Thạnh", "Cờ Đỏ", "Phong Điền", "Thới Lai" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_isEdit)
+        {
+            await LoadTechnician();
+        }
+    }
+
+    private async Task LoadTechnician()
+    {
+        try
+        {
+            var tech = await TechnicianService.GetByIdAsync(TechnicianId.Value);
+            if (tech != null)
+            {
+                _request.FullName = tech.FullName;
+                _request.PhoneNumber = tech.PhoneNumber;
+                _request.Email = tech.Email;
+                _request.IdentityCard = tech.IdentityCard;
+                _request.Address = tech.Address;
+                _request.DateOfBirth = tech.DateOfBirth;
+                _request.EmployeeCode = tech.EmployeeCode;
+                _request.BaseSalary = tech.BaseSalary;
+                _selectedCity = tech.City;
+                _request.City = tech.City;
+                _districts = tech.Districts.ToList();
+                _skills = tech.Skills.ToList();
+                _isAvailable = tech.IsAvailable;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải kỹ thuật viên: {ex.Message}", Severity.Error);
+            MudDialog.Cancel();
+        }
+    }
+
+    private void OnCityChanged(string city)
+    {
+        _selectedCity = city;
+        _request.City = city;
+        _districts.Clear();
+        _newDistrict = "";
+    }
+
+    private async Task<IEnumerable<string>> SearchDistricts(string value, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(_selectedCity))
+            return new List<string>();
+        
+        var availableDistricts = _cityDistricts.ContainsKey(_selectedCity) 
+            ? _cityDistricts[_selectedCity] 
+            : new List<string>();
+        
+        if (string.IsNullOrEmpty(value))
+            return availableDistricts.Where(d => !_districts.Contains(d));
+        
+        return availableDistricts
+            .Where(d => d.Contains(value, StringComparison.OrdinalIgnoreCase) && !_districts.Contains(d));
+    }
+
+    private void AddDistrict()
+    {
+        if (!string.IsNullOrWhiteSpace(_newDistrict) && !_districts.Contains(_newDistrict))
+        {
+            _districts.Add(_newDistrict);
+            _newDistrict = "";
+        }
+    }
+
+    private void RemoveDistrict(MudChip<string> chip)
+    {
+        _districts.Remove(chip.Value);
+    }
+
+    private void AddSkill()
+    {
+        if (!string.IsNullOrWhiteSpace(_newSkill) && !_skills.Contains(_newSkill))
+        {
+            _skills.Add(_newSkill);
+            _newSkill = "";
+        }
+    }
+
+    private void RemoveSkill(MudChip<string> chip)
+    {
+        _skills.Remove(chip.Value);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        if (string.IsNullOrEmpty(_selectedCity))
+        {
+            Snackbar.Add("Vui lòng chọn thành phố", Severity.Warning);
+            return;
+        }
+
+        if (!_districts.Any())
+        {
+            Snackbar.Add("Vui lòng thêm ít nhất một quận/huyện", Severity.Warning);
+            return;
+        }
+
+        _request.City = _selectedCity;
+        _request.Districts = _districts;
+        _request.Skills = _skills;
+
+        try
+        {
+            if (_isEdit)
+            {
+                var updateRequest = new UpdateTechnicianProfileRequest
+                {
+                    FullName = _request.FullName,
+                    PhoneNumber = _request.PhoneNumber,
+                    Email = _request.Email,
+                    IdentityCard = _request.IdentityCard,
+                    Address = _request.Address,
+                    DateOfBirth = _request.DateOfBirth,
+                    BaseSalary = _request.BaseSalary,
+                    City = _selectedCity,
+                    Districts = _districts,
+                    Skills = _skills,
+                    IsAvailable = _isAvailable
+                };
+                await TechnicianService.UpdateAsync(TechnicianId.Value, updateRequest);
+                Snackbar.Add("Đã cập nhật kỹ thuật viên", Severity.Success);
+            }
+            else
+            {
+                await TechnicianService.CreateAsync(_request);
+                Snackbar.Add("Đã thêm kỹ thuật viên mới", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

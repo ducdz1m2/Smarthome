@@ -1,0 +1,212 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IInstallationSlotService SlotService
+@inject ITechnicianProfileService TechnicianService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudDatePicker Date="_selectedDate" 
+                               Label="Chọn ngày"
+                               Variant="Variant.Outlined"
+                               DateChanged="OnDateChanged" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                           OnClick="OpenCreateBatchDialog" Class="mt-4">
+                    Tạo lịch hàng loạt
+                </MudButton>
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudText Typo="Typo.h6" Class="mb-2">
+                    Lịch làm việc ngày @(_selectedDate?.ToString("dd/MM/yyyy") ?? "")
+                </MudText>
+                
+                @if (_slots.Any())
+                {
+                    <MudTable Items="_slots" Dense="true" Hover="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>Thời gian</MudTh>
+                            <MudTh>Trạng thái</MudTh>
+                            <MudTh>Thao tác</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.StartTime.ToString("hh\\:mm") - @context.EndTime.ToString("hh\\:mm")</MudTd>
+                            <MudTd>
+                                @if (context.IsBooked)
+                                {
+                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Đã đặt</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Trống</MudChip>
+                                }
+                            </MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                               Color="Color.Error"
+                                               OnClick="@(() => DeleteSlot(context))"
+                                               Disabled="context.IsBooked"
+                                               Size="Size.Small" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">
+                        Không có lịch làm việc cho ngày này. 
+                        <MudLink OnClick="OpenCreateBatchDialog">Tạo lịch ngay</MudLink>
+                    </MudAlert>
+                }
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.subtitle2">Thêm slot mới</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudTimePicker @bind-Time="_newStartTime" 
+                                       Label="Bắt đầu"
+                                       Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudTimePicker @bind-Time="_newEndTime" 
+                                       Label="Kết thúc"
+                                       Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" 
+                                   OnClick="AddSlot" Class="mt-4">
+                            Thêm
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Close())">Đóng</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int TechnicianId { get; set; }
+
+    private List<InstallationSlotResponse> _slots = new();
+    private DateTime? _selectedDate = DateTime.Today;
+    private TimeSpan? _newStartTime = TimeSpan.FromHours(8);
+    private TimeSpan? _newEndTime = TimeSpan.FromHours(10);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSlots();
+    }
+
+    private async Task LoadSlots()
+    {
+        if (!_selectedDate.HasValue) return;
+
+        try
+        {
+            _slots = await SlotService.GetByTechnicianAndDateAsync(TechnicianId, _selectedDate.Value);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải lịch: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnDateChanged(DateTime? date)
+    {
+        _selectedDate = date;
+        await LoadSlots();
+    }
+
+    private async Task AddSlot()
+    {
+        if (!_selectedDate.HasValue || !_newStartTime.HasValue || !_newEndTime.HasValue)
+        {
+            Snackbar.Add("Vui lòng chọn đầy đủ thông tin", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var request = new CreateInstallationSlotRequest
+            {
+                TechnicianId = TechnicianId,
+                Date = _selectedDate.Value,
+                StartTime = _newStartTime.Value,
+                EndTime = _newEndTime.Value
+            };
+
+            await SlotService.CreateAsync(request);
+            Snackbar.Add("Đã thêm slot mới", Severity.Success);
+            await LoadSlots();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteSlot(InstallationSlotResponse slot)
+    {
+        try
+        {
+            await SlotService.DeleteAsync(slot.Id);
+            Snackbar.Add("Đã xóa slot", Severity.Success);
+            await LoadSlots();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenCreateBatchDialog()
+    {
+        // This would open another dialog for batch creation
+        // For simplicity, we'll just create a default schedule
+        _ = CreateDefaultSchedule();
+    }
+
+    private async Task CreateDefaultSchedule()
+    {
+        if (!_selectedDate.HasValue) return;
+
+        try
+        {
+            var request = new BatchCreateSlotRequest
+            {
+                TechnicianId = TechnicianId,
+                StartDate = _selectedDate.Value,
+                EndDate = _selectedDate.Value.AddDays(6), // One week
+                TimeSlots = new List<TimeSlot>
+                {
+                    new() { StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(10) },
+                    new() { StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(12) },
+                    new() { StartTime = TimeSpan.FromHours(14), EndTime = TimeSpan.FromHours(16) },
+                    new() { StartTime = TimeSpan.FromHours(16), EndTime = TimeSpan.FromHours(18) }
+                }
+            };
+
+            await SlotService.CreateBatchAsync(request);
+            Snackbar.Add("Đã tạo lịch làm việc", Severity.Success);
+            await LoadSlots();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

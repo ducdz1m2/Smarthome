@@ -5,37 +5,116 @@ namespace Domain.Entities.Installation
 
     public class TechnicianProfile : BaseEntity
     {
-        public int UserId { get; private set; }
+        public int? UserId { get; private set; }
+        
+        // Thông tin cá nhân
+        public string FullName { get; private set; } = string.Empty;
+        public string PhoneNumber { get; private set; } = string.Empty;
+        public string? Email { get; private set; }
+        public string? IdentityCard { get; private set; } // CCCD
+        public string? Address { get; private set; }
+        public DateTime? DateOfBirth { get; private set; }
+        
+        // Thông tin công việc
+        public string EmployeeCode { get; private set; } = string.Empty; // Mã nhân viên
+        public DateTime HireDate { get; private set; }
+        public decimal BaseSalary { get; private set; }
+        
+        // Phân công & năng lực
+        public string City { get; private set; } = string.Empty; // Hà Nội, TP.HCM...
         public string Districts { get; private set; } = string.Empty; // JSON: ["Q1","Q2","Q3"]
+        public string SkillsJson { get; private set; } = "[]"; // ["Lắp khóa","Lắp camera"]
+        public bool IsAvailable { get; private set; } = true;
+        
+        // Thống kê
         public double Rating { get; private set; } = 5.0;
         public int CompletedJobs { get; private set; } = 0;
         public int CancelledJobs { get; private set; } = 0;
-        public bool IsAvailable { get; private set; } = true;
-        public string SkillsJson { get; private set; } = "[]"; // ["Lắp khóa","Lắp camera"]
 
         public virtual ICollection<InstallationSlot> Slots { get; private set; } = new List<InstallationSlot>();
         public virtual ICollection<InstallationBooking> Bookings { get; private set; } = new List<InstallationBooking>();
 
         private TechnicianProfile() { }
 
-        public static TechnicianProfile Create(int userId, List<string> districts)
+        public static TechnicianProfile Create(
+            string fullName, 
+            string phoneNumber, 
+            string employeeCode,
+            string city,
+            List<string> districts,
+            string? email = null,
+            string? identityCard = null,
+            string? address = null,
+            DateTime? dateOfBirth = null,
+            decimal baseSalary = 0)
         {
-            if (userId <= 0)
-                throw new DomainException("UserId không hợp lệ");
+            if (string.IsNullOrWhiteSpace(fullName))
+                throw new DomainException("Họ tên không được trống");
+
+            if (string.IsNullOrWhiteSpace(phoneNumber))
+                throw new DomainException("Số điện thoại không được trống");
+
+            if (string.IsNullOrWhiteSpace(employeeCode))
+                throw new DomainException("Mã nhân viên không được trống");
+
+            if (string.IsNullOrWhiteSpace(city))
+                throw new DomainException("Thành phố không được trống");
 
             if (!districts.Any())
                 throw new DomainException("Phải có ít nhất một khu vực phục vụ");
 
             return new TechnicianProfile
             {
-                UserId = userId,
+                FullName = fullName.Trim(),
+                PhoneNumber = phoneNumber.Trim(),
+                Email = email?.Trim().ToLower(),
+                IdentityCard = identityCard?.Trim(),
+                Address = address?.Trim(),
+                DateOfBirth = dateOfBirth,
+                EmployeeCode = employeeCode.Trim().ToUpper(),
+                HireDate = DateTime.UtcNow,
+                BaseSalary = baseSalary,
+                City = city.Trim(),
                 Districts = System.Text.Json.JsonSerializer.Serialize(districts),
+                SkillsJson = "[]",
+                IsAvailable = true,
                 Rating = 5.0,
                 CompletedJobs = 0,
-                CancelledJobs = 0,
-                IsAvailable = true,
-                SkillsJson = "[]"
+                CancelledJobs = 0
             };
+        }
+
+        public void UpdateInfo(
+            string fullName, 
+            string phoneNumber,
+            string? email = null,
+            string? identityCard = null,
+            string? address = null,
+            DateTime? dateOfBirth = null)
+        {
+            if (string.IsNullOrWhiteSpace(fullName))
+                throw new DomainException("Họ tên không được trống");
+
+            FullName = fullName.Trim();
+            PhoneNumber = phoneNumber.Trim();
+            Email = email?.Trim().ToLower();
+            IdentityCard = identityCard?.Trim();
+            Address = address?.Trim();
+            DateOfBirth = dateOfBirth;
+        }
+
+        public void UpdateWorkInfo(decimal baseSalary, string city, List<string> districts)
+        {
+            BaseSalary = baseSalary;
+            if (!string.IsNullOrWhiteSpace(city))
+                City = city.Trim();
+            if (districts.Any())
+                Districts = System.Text.Json.JsonSerializer.Serialize(districts);
+        }
+
+        public void LinkToUser(int userId)
+        {
+            UserId = userId;
         }
 
         public void AddSkill(string skill)

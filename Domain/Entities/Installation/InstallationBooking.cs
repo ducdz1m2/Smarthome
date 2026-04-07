@@ -21,6 +21,7 @@ namespace Domain.Entities.Installation
         public string? CustomerSignature { get; private set; }
         public string? Notes { get; private set; }
 
+        public virtual Entities.Sales.Order Order { get; private set; } = null!;
         public virtual TechnicianProfile Technician { get; private set; } = null!;
         public virtual InstallationSlot Slot { get; private set; } = null!;
         public virtual ICollection<InstallationMaterial> Materials { get; private set; } = new List<InstallationMaterial>();

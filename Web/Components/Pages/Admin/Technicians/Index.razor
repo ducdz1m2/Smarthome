@@ -1,0 +1,216 @@
+@page "/admin/technicians"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@layout AdminLayout
+@inject ITechnicianProfileService TechnicianService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Kỹ thuật viên</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+           OnClick="@(() => OpenDialog(null))" Class="mb-4">
+    Thêm kỹ thuật viên
+</MudButton>
+
+<MudTable Items="_technicians" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterItems">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách kỹ thuật viên</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true" Class="mr-2" Style="width: 200px;" />
+        <MudSelect T="bool?" @bind-Value="_statusFilter" Label="Trạng thái" 
+                   Clearable="true" Dense="true" Class="mr-2" Style="width: 130px;"
+                   AnchorOrigin="Origin.BottomCenter">
+            <MudSelectItem T="bool?" Value="@true">Đang làm</MudSelectItem>
+            <MudSelectItem T="bool?" Value="@false">Nghỉ</MudSelectItem>
+        </MudSelect>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadData">
+            Lọc
+        </MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Mã NV</MudTh>
+        <MudTh>Họ tên</MudTh>
+        <MudTh>SĐT</MudTh>
+        <MudTh>Khu vực</MudTh>
+        <MudTh><MudTableSortLabel T="TechnicianListResponse" SortBy="@(t => t.Rating)">Đánh giá</MudTableSortLabel></MudTh>
+        <MudTh>Công việc</MudTh>
+        <MudTh>Trạng thái</MudTh>
+        <MudTh>Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Mã NV">
+            <MudText Style="font-weight: 600;">@context.EmployeeCode</MudText>
+        </MudTd>
+        <MudTd DataLabel="Họ tên">
+            <MudText Style="font-weight: 500;">@context.FullName</MudText>
+        </MudTd>
+        <MudTd DataLabel="SĐT">@context.PhoneNumber</MudTd>
+        <MudTd DataLabel="Khu vực">
+            <MudChipSet T="string">
+                @foreach (var district in context.Districts.Take(2))
+                {
+                    <MudChip T="string" Color="Color.Info" Size="Size.Small">@district</MudChip>
+                }
+                @if (context.Districts.Count > 2)
+                {
+                    <MudChip T="string" Color="Color.Default" Size="Size.Small">+@(context.Districts.Count - 2)</MudChip>
+                }
+            </MudChipSet>
+        </MudTd>
+        <MudTd DataLabel="Đánh giá">
+            <MudRating Value="@((int)Math.Round(context.Rating))" ReadOnly="true" Size="Size.Small" />
+            <MudText Typo="Typo.caption">(@context.Rating.ToString("F1"))</MudText>
+        </MudTd>
+        <MudTd DataLabel="Công việc">
+            <MudText Color="Color.Success" Typo="Typo.body2">@context.CompletedJobs hoàn thành</MudText>
+            <MudText Color="Color.Error" Typo="Typo.caption">@context.CancelledJobs hủy</MudText>
+        </MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudSwitch T="bool" Value="@context.IsAvailable" 
+                       ValueChanged="@((v) => OnToggleStatus(context.Id, v))"
+                       Color="Color.Success" UncheckedColor="Color.Error" />
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Event" Color="Color.Info" 
+                           OnClick="@(() => OpenSlotsDialog(context.Id))" Size="Size.Small"
+                           title="Quản lý lịch" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeleteItem(context))" Size="Size.Small" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 10, 25, 50, 100 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<TechnicianListResponse> _technicians = new();
+    private bool _loading = true;
+    private string _searchString = "";
+    private bool? _statusFilter;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            _technicians = await TechnicianService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải dữ liệu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterItems(TechnicianListResponse tech)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        var search = _searchString.ToLowerInvariant();
+        return tech.FullName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               tech.EmployeeCode.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               tech.PhoneNumber.Contains(_searchString) ||
+               tech.Districts.Any(d => d.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task OpenDialog(TechnicianListResponse? tech)
+    {
+        var parameters = new DialogParameters<TechnicianDialog>();
+        if (tech != null)
+        {
+            parameters.Add(x => x.TechnicianId, tech.Id);
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TechnicianDialog>(tech == null ? "Thêm kỹ thuật viên" : "Sửa kỹ thuật viên", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task OpenSlotsDialog(int technicianId)
+    {
+        var parameters = new DialogParameters<TechnicianSlotsDialog>();
+        parameters.Add(x => x.TechnicianId, technicianId);
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TechnicianSlotsDialog>("Quản lý lịch làm việc", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task ToggleStatus(int id, bool isAvailable)
+    {
+        try
+        {
+            await TechnicianService.SetAvailableAsync(id, isAvailable);
+            Snackbar.Add($"Đã {(isAvailable ? "kích hoạt" : "vô hiệu hóa")} kỹ thuật viên", Severity.Success);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            await LoadData();
+        }
+    }
+
+    private void OnToggleStatus(int id, bool isAvailable)
+    {
+        _ = ToggleStatus(id, isAvailable);
+    }
+
+    private async Task DeleteItem(TechnicianListResponse tech)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa kỹ thuật viên #{tech.Id}?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await TechnicianService.DeleteAsync(tech.Id);
+                Snackbar.Add("Đã xóa kỹ thuật viên", Severity.Success);
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

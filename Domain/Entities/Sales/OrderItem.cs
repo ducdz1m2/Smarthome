@@ -19,6 +19,7 @@ namespace Domain.Entities.Sales
         public int? InstallationBookingId { get; private set; }
 
         public virtual Order Order { get; private set; } = null!;
+        public virtual Entities.Catalog.Product Product { get; private set; } = null!;
 
         private OrderItem() { }
 

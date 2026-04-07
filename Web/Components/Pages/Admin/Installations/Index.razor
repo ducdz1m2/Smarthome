@@ -1,0 +1,229 @@
+@page "/admin/installations"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@layout AdminLayout
+@inject IInstallationService InstallationService
+@inject ITechnicianProfileService TechnicianService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Lịch Lắp đặt</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+           OnClick="@(() => OpenDialog(null))" Class="mb-4">
+    Thêm lịch lắp đặt
+</MudButton>
+
+<MudTable Items="_bookings" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterItems">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách lịch lắp đặt</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true" Class="mr-2" Style="width: 200px;" />
+        <MudSelect T="string" @bind-Value="_statusFilter" Label="Trạng thái" 
+                   Clearable="true" Dense="true" Class="mr-2" Style="width: 150px;"
+                   AnchorOrigin="Origin.BottomCenter">
+            <MudSelectItem T="string" Value="@("Pending")">Chờ xử lý</MudSelectItem>
+            <MudSelectItem T="string" Value="@("TechnicianAssigned")">Đã phân công</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Preparing")">Đang chuẩn bị</MudSelectItem>
+            <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Installing")">Đang lắp</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
+        </MudSelect>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadData">
+            Lọc
+        </MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>ID</MudTh>
+        <MudTh>Đơn hàng</MudTh>
+        <MudTh>Kỹ thuật viên</MudTh>
+        <MudTh><MudTableSortLabel T="InstallationBookingListResponse" SortBy="@(b => b.ScheduledDate)">Ngày lắp</MudTableSortLabel></MudTh>
+        <MudTh>Khung giờ</MudTh>
+        <MudTh>Trạng thái</MudTh>
+        <MudTh>Đánh giá</MudTh>
+        <MudTh>Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Đơn hàng">#@context.OrderId</MudTd>
+        <MudTd DataLabel="Kỹ thuật viên">@(context.TechnicianName ?? "Chưa phân công")</MudTd>
+        <MudTd DataLabel="Ngày lắp">@context.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
+        <MudTd DataLabel="Khung giờ">
+            @if (context.StartTime.HasValue && context.EndTime.HasValue)
+            {
+                <span>@context.StartTime.Value.ToString("hh\\:mm") - @context.EndTime.Value.ToString("hh\\:mm")</span>
+            }
+            else
+            {
+                <span>--:--</span>
+            }
+        </MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">
+                @GetStatusText(context.Status)
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Đánh giá">
+            @if (context.CustomerRating.HasValue)
+            {
+                <MudRating Value="@context.CustomerRating.Value" ReadOnly="true" Size="Size.Small" />
+            }
+            else
+            {
+                <MudText Color="Color.Surface">--</MudText>
+            }
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeleteItem(context))" Size="Size.Small" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 10, 25, 50, 100 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<InstallationBookingListResponse> _bookings = new();
+    private List<TechnicianResponse> _technicians = new();
+    private bool _loading = true;
+    private string _searchString = "";
+    private string? _statusFilter;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTechnicians();
+        await LoadData();
+    }
+
+    private async Task LoadTechnicians()
+    {
+        try
+        {
+            _technicians = await TechnicianService.GetAvailableAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải kỹ thuật viên: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            _bookings = await InstallationService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải dữ liệu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterItems(InstallationBookingListResponse booking)
+    {
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            return booking.OrderId.ToString().Contains(_searchString) ||
+                   (booking.TechnicianName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_statusFilter))
+        {
+            return booking.Status == _statusFilter;
+        }
+
+        return true;
+    }
+
+    private async Task OpenDialog(InstallationBookingListResponse? booking)
+    {
+        var parameters = new DialogParameters<InstallationBookingDialog>();
+        if (booking != null)
+        {
+            parameters.Add(x => x.BookingId, booking.Id);
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<InstallationBookingDialog>(booking == null ? "Thêm lịch lắp đặt" : "Sửa lịch lắp đặt", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task DeleteItem(InstallationBookingListResponse booking)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa lịch lắp đặt #{booking.Id}?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await InstallationService.DeleteAsync(booking.Id);
+                Snackbar.Add("Đã xóa lịch lắp đặt", Severity.Success);
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private static Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => Color.Default,
+            "TechnicianAssigned" => Color.Info,
+            "Preparing" => Color.Warning,
+            "OnTheWay" => Color.Primary,
+            "Installing" => Color.Secondary,
+            "Completed" => Color.Success,
+            "Cancelled" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetStatusText(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ xử lý",
+            "TechnicianAssigned" => "Đã phân công",
+            "Preparing" => "Chuẩn bị",
+            "OnTheWay" => "Đang đi",
+            "Installing" => "Đang lắp",
+            "Completed" => "Hoàn thành",
+            "Cancelled" => "Đã hủy",
+            _ => status
+        };
+    }
+}

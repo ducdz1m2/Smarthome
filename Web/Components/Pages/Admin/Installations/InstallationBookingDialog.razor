@@ -1,0 +1,340 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Enums
+@inject IInstallationService InstallationService
+@inject ITechnicianProfileService TechnicianService
+@inject IInstallationSlotService SlotService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudNumericField T="int" @bind-Value="_request.OrderId" 
+                                     Label="Mã đơn hàng *" 
+                                     Required="true" RequiredError="Nhập mã đơn hàng"
+                                     Variant="Variant.Outlined" Class="mb-3"
+                                     Disabled="_isEdit" Min="1" />
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudDatePicker @bind-Date="_scheduledDate" 
+                                   Label="Ngày lắp đặt *"
+                                   Required="true" RequiredError="Chọn ngày lắp đặt"
+                                   Variant="Variant.Outlined" Class="mb-3"
+                                   MinDate="DateTime.Today" />
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudSelect T="int" Value="_request.TechnicianId" 
+                               Label="Kỹ thuật viên *"
+                               Required="true" RequiredError="Chọn kỹ thuật viên"
+                               Variant="Variant.Outlined" Class="mb-3"
+                               ValueChanged="OnTechnicianChanged">
+                        @foreach (var tech in _technicians)
+                        {
+                            <MudSelectItem T="int" Value="@tech.Id">@tech.FullName (@string.Join(", ", tech.Districts))</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudSelect T="int" @bind-Value="_request.SlotId" 
+                               Label="Khung giờ *"
+                               Required="true" RequiredError="Chọn khung giờ"
+                               Variant="Variant.Outlined" Class="mb-3"
+                               Disabled="!_selectedTechnicianId.HasValue || _availableSlots.Count == 0">
+                        @foreach (var slot in _availableSlots)
+                        {
+                            <MudSelectItem T="int" Value="@slot.Id">
+                                @slot.StartTime.ToString("hh\\:mm") - @slot.EndTime.ToString("hh\\:mm")
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                    @if (_selectedTechnicianId.HasValue && _availableSlots.Count == 0)
+                    {
+                        <MudText Color="Color.Warning" Typo="Typo.caption">
+                            Không có slot trống cho ngày này
+                        </MudText>
+                    }
+                </MudItem>
+                
+                @if (_isEdit && _booking != null)
+                {
+                    <MudItem xs="12">
+                        <MudDivider Class="my-4" />
+                        <MudText Typo="Typo.subtitle2" Class="mb-3">Cập nhật trạng thái</MudText>
+                        <MudGrid>
+                            <MudItem xs="12" md="6">
+                                <MudSelect T="string" @bind-Value="_newStatus" Label="Trạng thái mới"
+                                           Variant="Variant.Outlined" Class="mb-3">
+                                    <MudSelectItem T="string" Value="@("Pending")">Chờ xử lý</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("TechnicianAssigned")">Đã phân công</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Preparing")">Chuẩn bị</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Installing")">Đang lắp</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                                           OnClick="UpdateStatus" Class="mt-4">
+                                    Cập nhật trạng thái
+                                </MudButton>
+                            </MudItem>
+                        </MudGrid>
+                        
+                        @if (_newStatus == "Completed")
+                        {
+                            <MudGrid Class="mt-2">
+                                <MudItem xs="12" md="4">
+                                    <MudNumericField T="int" @bind-Value="_customerRating" 
+                                                     Label="Đánh giá (1-5)" Min="1" Max="5"
+                                                     Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" md="8">
+                                    <MudTextField @bind-Value="_customerSignature" 
+                                                  Label="Chữ ký khách hàng"
+                                                  Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudTextField @bind-Value="_completionNotes" 
+                                                  Label="Ghi chú" Lines="2"
+                                                  Variant="Variant.Outlined" />
+                                </MudItem>
+                            </MudGrid>
+                        }
+                        
+                        @if (_newStatus == "Cancelled")
+                        {
+                            <MudItem xs="12" Class="mt-2">
+                                <MudTextField @bind-Value="_cancelReason" 
+                                              Label="Lý do hủy" Required="true"
+                                              RequiredError="Nhập lý do hủy"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                        }
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            @(_isEdit ? "Cập nhật" : "Thêm mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? BookingId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isEdit => BookingId.HasValue;
+    
+    private List<TechnicianResponse> _technicians = new();
+    private List<InstallationSlotResponse> _availableSlots = new();
+    private InstallationBookingResponse? _booking;
+    
+    private CreateInstallationBookingRequest _request = new()
+    {
+        OrderId = 0,
+        TechnicianId = 0,
+        SlotId = 0,
+        ScheduledDate = DateTime.Today
+    };
+    
+    private DateTime? _scheduledDate = DateTime.Today;
+    private int? _selectedTechnicianId;
+    
+    private string? _newStatus;
+    private int _customerRating = 5;
+    private string _customerSignature = "";
+    private string _completionNotes = "";
+    private string _cancelReason = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTechnicians();
+        if (_isEdit)
+        {
+            await LoadBooking();
+        }
+        else
+        {
+            // Set default values for new booking
+            var firstTech = _technicians.FirstOrDefault();
+            if (firstTech != null)
+            {
+                _selectedTechnicianId = firstTech.Id;
+                _request.TechnicianId = firstTech.Id;
+                await LoadAvailableSlots();
+            }
+        }
+    }
+
+    private async Task LoadTechnicians()
+    {
+        try
+        {
+            _technicians = await TechnicianService.GetAvailableAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải kỹ thuật viên: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadBooking()
+    {
+        try
+        {
+            _booking = await InstallationService.GetByIdAsync(BookingId.Value);
+            if (_booking != null)
+            {
+                _request = new CreateInstallationBookingRequest
+                {
+                    OrderId = _booking.OrderId,
+                    TechnicianId = _booking.TechnicianId ?? 0,
+                    SlotId = _booking.SlotId,
+                    ScheduledDate = _booking.ScheduledDate
+                };
+                _scheduledDate = _booking.ScheduledDate;
+                _selectedTechnicianId = _booking.TechnicianId;
+                _newStatus = _booking.Status;
+                
+                await LoadAvailableSlots();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải lịch lắp đặt: {ex.Message}", Severity.Error);
+            MudDialog.Cancel();
+        }
+    }
+
+    private async Task OnTechnicianChanged(int technicianId)
+    {
+        _selectedTechnicianId = technicianId;
+        _request.TechnicianId = technicianId;
+        _request.SlotId = 0;
+        await LoadAvailableSlots();
+    }
+
+    private async Task LoadAvailableSlots()
+    {
+        if (!_selectedTechnicianId.HasValue || !_scheduledDate.HasValue)
+            return;
+
+        try
+        {
+            var allSlots = await SlotService.GetByTechnicianAndDateAsync(_selectedTechnicianId.Value, _scheduledDate.Value);
+            // Filter available slots or slots belonging to this booking (for edit mode)
+            _availableSlots = allSlots.Where(s => !s.IsBooked || (_isEdit && s.Id == _booking?.SlotId)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải slots: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task UpdateStatus()
+    {
+        if (_booking == null || string.IsNullOrEmpty(_newStatus)) return;
+
+        try
+        {
+            switch (_newStatus)
+            {
+                case "Preparing":
+                    await InstallationService.StartPreparationAsync(_booking.Id);
+                    break;
+                case "OnTheWay":
+                    await InstallationService.StartTravelAsync(_booking.Id);
+                    break;
+                case "Installing":
+                    await InstallationService.StartInstallationAsync(_booking.Id);
+                    break;
+                case "Completed":
+                    var completeRequest = new CompleteInstallationRequest
+                    {
+                        CustomerSignature = _customerSignature,
+                        CustomerRating = _customerRating,
+                        Notes = _completionNotes
+                    };
+                    await InstallationService.CompleteAsync(_booking.Id, completeRequest);
+                    break;
+                case "Cancelled":
+                    if (string.IsNullOrWhiteSpace(_cancelReason))
+                    {
+                        Snackbar.Add("Vui lòng nhập lý do hủy", Severity.Warning);
+                        return;
+                    }
+                    var cancelRequest = new CancelInstallationRequest { Reason = _cancelReason };
+                    await InstallationService.CancelAsync(_booking.Id, cancelRequest);
+                    break;
+                default:
+                    // For other status changes, just update the booking
+                    await InstallationService.UpdateAsync(_booking.Id, new UpdateInstallationBookingRequest());
+                    break;
+            }
+            
+            Snackbar.Add("Đã cập nhật trạng thái", Severity.Success);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        if (!_scheduledDate.HasValue)
+        {
+            Snackbar.Add("Vui lòng chọn ngày lắp đặt", Severity.Warning);
+            return;
+        }
+
+        _request.ScheduledDate = _scheduledDate.Value;
+
+        try
+        {
+            if (_isEdit)
+            {
+                var updateRequest = new UpdateInstallationBookingRequest
+                {
+                    TechnicianId = _request.TechnicianId,
+                    SlotId = _request.SlotId,
+                    ScheduledDate = _request.ScheduledDate
+                };
+                await InstallationService.UpdateAsync(BookingId.Value, updateRequest);
+                Snackbar.Add("Đã cập nhật lịch lắp đặt", Severity.Success);
+            }
+            else
+            {
+                await InstallationService.CreateAsync(_request);
+                Snackbar.Add("Đã tạo lịch lắp đặt mới", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

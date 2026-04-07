@@ -25,6 +25,11 @@ namespace Infrastructure
             services.AddScoped<ICouponRepository, CouponRepository>();
             services.AddScoped<IBannerRepository, BannerRepository>();
 
+            // Installation repositories
+            services.AddScoped<IInstallationBookingRepository, InstallationBookingRepository>();
+            services.AddScoped<ITechnicianProfileRepository, TechnicianProfileRepository>();
+            services.AddScoped<IInstallationSlotRepository, InstallationSlotRepository>();
+
             return services;
         }
     }

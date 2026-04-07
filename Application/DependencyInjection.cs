@@ -23,6 +23,11 @@ namespace Application
             services.AddScoped<ICouponService, CouponService>();
             services.AddScoped<IBannerService, BannerService>();
 
+            // Installation services
+            services.AddScoped<IInstallationService, InstallationService>();
+            services.AddScoped<ITechnicianProfileService, TechnicianProfileService>();
+            services.AddScoped<IInstallationSlotService, InstallationSlotService>();
+
             return services;
         }
     }
