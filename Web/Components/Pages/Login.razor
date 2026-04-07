@@ -1,0 +1,106 @@
+@page "/login"
+@layout EmptyLayout
+@using Application.DTOs.Requests
+@using Application.Interfaces.Services
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="height: 100vh;">
+    <MudPaper Elevation="3" Class="pa-6" Style="width: 400px;">
+        <MudText Typo="Typo.h4" Class="mb-4 text-center">Đăng nhập</MudText>
+        
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField T="string" 
+                          @bind-Value="_request.UserName" 
+                          Label="Tên đăng nhập" 
+                          Required="true" 
+                          RequiredError="Vui lòng nhập tên đăng nhập"
+                          Variant="Variant.Outlined" 
+                          Class="mb-3"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Person" />
+            
+            <MudTextField T="string" 
+                          @bind-Value="_request.Password" 
+                          Label="Mật khẩu" 
+                          Required="true" 
+                          RequiredError="Vui lòng nhập mật khẩu"
+                          Variant="Variant.Outlined" 
+                          InputType="InputType.Password"
+                          Class="mb-3"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Lock" />
+            
+            <MudCheckBox @bind-Value="_request.RememberMe" 
+                         Label="Ghi nhớ đăng nhập" 
+                         Color="Color.Primary" 
+                         Class="mb-4" />
+            
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       FullWidth="true"
+                       OnClick="Submit"
+                       Disabled="!_isValid || _loading"
+                       Class="mb-3">
+                @if (_loading)
+                {
+                    <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Class="mr-2" />
+                    <span>Đang đăng nhập...</span>
+                }
+                else
+                {
+                    <span>Đăng nhập</span>
+                }
+            </MudButton>
+            
+            <MudDivider Class="my-4" />
+            
+            <MudText Align="Align.Center">
+                Chưa có tài khoản? 
+                <MudLink Href="/register">Đăng ký ngay</MudLink>
+            </MudText>
+        </MudForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _loading;
+    private LoginRequest _request = new();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _loading = true;
+        try
+        {
+            var response = await AuthService.LoginAsync(_request);
+            
+            // Store token in local storage or session
+            // For Blazor Server, we'll use a custom AuthStateProvider
+            Snackbar.Add("Đăng nhập thành công!", Severity.Success);
+            
+            // Redirect based on role
+            if (response.User.Roles.Contains("Admin"))
+            {
+                NavigationManager.NavigateTo("/admin");
+            }
+            else
+            {
+                NavigationManager.NavigateTo("/");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Đăng nhập thất bại: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

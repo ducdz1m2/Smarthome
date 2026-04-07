@@ -37,6 +37,10 @@ namespace Infrastructure
             services.AddScoped<IWarrantyRepository, WarrantyRepository>();
             services.AddScoped<IWarrantyClaimRepository, WarrantyClaimRepository>();
 
+            // Identity repositories
+            services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<IRoleRepository, RoleRepository>();
+
             return services;
         }
     }

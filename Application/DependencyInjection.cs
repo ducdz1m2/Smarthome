@@ -33,6 +33,9 @@ namespace Application
             // Warranty services
             services.AddScoped<IWarrantyService, WarrantyService>();
 
+            // Auth services
+            services.AddScoped<IAuthService, AuthService>();
+
             return services;
         }
     }

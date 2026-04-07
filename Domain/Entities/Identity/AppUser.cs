@@ -10,6 +10,8 @@ namespace Domain.Entities.Identity
         public string? PhoneNumber { get; private set; }
         public string FullName { get; private set; } = string.Empty;
         public string? Avatar { get; private set; }
+        public string PasswordHash { get; private set; } = string.Empty;
+        public string PasswordSalt { get; private set; } = string.Empty;
         public bool IsActive { get; private set; } = true;
         public DateTime? LastLoginAt { get; private set; }
 
@@ -18,7 +20,7 @@ namespace Domain.Entities.Identity
 
         private AppUser() { }
 
-        public static AppUser Create(string userName, string email, string fullName, string? phone = null)
+        public static AppUser Create(string userName, string email, string fullName, string passwordHash, string passwordSalt, string? phone = null)
         {
             if (string.IsNullOrWhiteSpace(userName))
                 throw new DomainException("Tên đăng nhập không được trống");
@@ -26,12 +28,17 @@ namespace Domain.Entities.Identity
             if (string.IsNullOrWhiteSpace(fullName))
                 throw new DomainException("Họ tên không được trống");
 
+            if (string.IsNullOrWhiteSpace(passwordHash))
+                throw new DomainException("Mật khẩu không được trống");
+
             return new AppUser
             {
                 UserName = userName.Trim().ToLower(),
                 Email = email.Trim().ToLower(),
                 FullName = fullName.Trim(),
                 PhoneNumber = phone?.Trim(),
+                PasswordHash = passwordHash,
+                PasswordSalt = passwordSalt,
                 IsActive = true
             };
         }

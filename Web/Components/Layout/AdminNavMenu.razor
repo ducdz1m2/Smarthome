@@ -1,3 +1,8 @@
+@using Application.Interfaces.Services
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
 <MudNavMenu>
     <MudNavLink Href="/admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
     
@@ -36,4 +41,18 @@
         <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Users</MudNavLink>
         <MudNavLink Href="/admin/statistics" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BarChart">Statistics</MudNavLink>
     </MudNavGroup>
+    
+    <MudDivider Class="my-2" />
+    
+    <MudNavLink OnClick="Logout" Icon="@Icons.Material.Filled.Logout" Color="Color.Error">Đăng xuất</MudNavLink>
 </MudNavMenu>
+
+@code {
+    private void Logout()
+    {
+        // Clear any stored auth state if needed
+        // For now just redirect to login
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+        Snackbar.Add("Đã đăng xuất", Severity.Success);
+    }
+}
