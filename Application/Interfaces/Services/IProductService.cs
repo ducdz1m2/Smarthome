@@ -5,17 +5,18 @@ namespace Application.Interfaces.Services
 {
     public interface IProductService
     {
-        //Queries
-        Task<List<ProductResponse>> GetAllAsync();
+        Task<List<ProductListResponse>> GetAllAsync();
         Task<ProductResponse?> GetByIdAsync(int id);
-        Task<List<ProductResponse>> GetByCategoryAsync(int categoryId);
-        Task<List<ProductResponse>> SearchAsync(string keyword, string? filters);
-
-        //Commands
+        Task<ProductResponse?> GetBySkuAsync(string sku);
+        Task<(List<ProductListResponse> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? search = null, int? categoryId = null, int? brandId = null, bool? isActive = null);
+        Task<List<ProductListResponse>> GetByCategoryAsync(int categoryId);
+        Task<List<ProductListResponse>> SearchAsync(string keyword, string? filters);
         Task<int> CreateAsync(CreateProductRequest request);
         Task UpdateAsync(int id, UpdateProductRequest request);
         Task DeleteAsync(int id);
+        Task<bool> ActivateAsync(int id);
+        Task<bool> DeactivateAsync(int id);
+        Task AddStockAsync(int id, AddStockRequest request);
         Task<bool> UpdateStockAsync(int productId, int quantity);
-
     }
 }

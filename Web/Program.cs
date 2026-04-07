@@ -20,6 +20,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 // Register custom services
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 

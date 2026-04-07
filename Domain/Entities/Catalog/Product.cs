@@ -176,6 +176,32 @@ namespace Domain.Entities.Catalog
             BrandId = newBrandId;
         }
 
+        public void SetRequiresInstallation(bool requiresInstallation)
+        {
+            RequiresInstallation = requiresInstallation;
+        }
+
+        public void SetStockQuantity(int quantity)
+        {
+            if (quantity < 0)
+                throw new InvalidQuantityException(quantity, "SetStockQuantity");
+            
+            StockQuantity = quantity;
+        }
+
+        public void ChangeSupplier(int supplierId)
+        {
+            if (supplierId <= 0)
+                throw new ValidationException(nameof(supplierId), "SupplierId không hợp lệ");
+            
+            SupplierId = supplierId;
+        }
+
+        public void RemoveSupplier()
+        {
+            SupplierId = null;
+        }
+
         public decimal GetEffectivePrice(DiscountType discountType, decimal discountValue)
         {
             return discountType switch

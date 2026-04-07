@@ -7,11 +7,20 @@ namespace Web.Services
     {
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<FileUploadService> _logger;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public FileUploadService(IWebHostEnvironment environment, ILogger<FileUploadService> logger)
+        public FileUploadService(IWebHostEnvironment environment, ILogger<FileUploadService> logger, IHttpContextAccessor httpContextAccessor)
         {
             _environment = environment;
             _logger = logger;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        private string GetBaseUrl()
+        {
+            var request = _httpContextAccessor.HttpContext?.Request;
+            if (request == null) return "";
+            return $"{request.Scheme}://{request.Host}";
         }
 
         public async Task<string> UploadTempAsync(IFormFile file)
@@ -41,7 +50,8 @@ namespace Web.Services
             }
 
             _logger.LogInformation("Temp file uploaded: {FileName}", fileName);
-            return $"/uploads/temp/{fileName}";
+            var baseUrl = GetBaseUrl();
+            return $"{baseUrl}/uploads/temp/{fileName}";
         }
 
         public async Task<string> MoveToPermanentAsync(string tempPath, string folder)
@@ -76,7 +86,7 @@ namespace Web.Services
             File.Move(tempFullPath, permanentPath);
             _logger.LogInformation("File moved from temp to {Folder}: {FileName}", folder, fileName);
 
-            return $"/uploads/{folder}/{fileName}";
+            return $"{GetBaseUrl()}/uploads/{folder}/{fileName}";
         }
 
         public void DeleteTempFile(string tempPath)

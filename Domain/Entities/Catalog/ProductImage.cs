@@ -20,9 +20,6 @@ namespace Domain.Entities.Catalog
 
         public static ProductImage Create(int productId, string url, string? altText = null, bool isMain = false, int sortOrder = 0)
         {
-            if (productId <= 0)
-                throw new DomainException("ProductId không hợp lệ");
-
             if (string.IsNullOrWhiteSpace(url))
                 throw new DomainException("URL hình ảnh không được trống");
 

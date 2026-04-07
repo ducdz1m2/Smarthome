@@ -1,0 +1,255 @@
+@page "/admin/products"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@layout AdminLayout
+@inject IProductService ProductService
+@inject ICategoryService CategoryService
+@inject IBrandService BrandService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Sản phẩm</MudText>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+           OnClick="@(() => OpenProductDialog(null))" Class="mb-4">
+    Thêm sản phẩm
+</MudButton>
+
+<MudTable Items="_products" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterProducts">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách sản phẩm</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true" Class="mr-2" Style="width: 200px;" />
+        <MudSelect T="int?" @bind-Value="_categoryFilter" Label="Danh mục" 
+                   Clearable="true" Dense="true" Class="mr-2" Style="width: 150px;"
+                   AnchorOrigin="Origin.BottomCenter">
+            @foreach (var cat in _categories)
+            {
+                <MudSelectItem T="int?" Value="@cat.Id">@cat.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="bool?" @bind-Value="_statusFilter" Label="Trạng thái" 
+                   Clearable="true" Dense="true" Class="mr-2" Style="width: 130px;"
+                   AnchorOrigin="Origin.BottomCenter">
+            <MudSelectItem T="bool?" Value="@true">Đang bán</MudSelectItem>
+            <MudSelectItem T="bool?" Value="@false">Ngừng bán</MudSelectItem>
+        </MudSelect>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadProducts">
+            Lọc
+        </MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>ID</MudTh>
+        <MudTh>Hình</MudTh>
+        <MudTh><MudTableSortLabel T="ProductListResponse" SortBy="@(p => p.Name)">Tên sản phẩm</MudTableSortLabel></MudTh>
+        <MudTh>SKU</MudTh>
+        <MudTh><MudTableSortLabel T="ProductListResponse" SortBy="@(p => p.BasePrice)">Giá</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="ProductListResponse" SortBy="@(p => p.StockQuantity)">Tồn kho</MudTableSortLabel></MudTh>
+        <MudTh>Danh mục</MudTh>
+        <MudTh>Thương hiệu</MudTh>
+        <MudTh>Trạng thái</MudTh>
+        <MudTh>Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Hình" Style="width: 80px;">
+            @if (!string.IsNullOrEmpty(context.MainImageUrl))
+            {
+                <MudAvatar Size="Size.Large" Square="true" Style="width: 60px; height: 60px; border-radius: 8px;">
+                    <MudImage Src="@context.MainImageUrl" Alt="@context.Name" ObjectFit="ObjectFit.Cover" />
+                </MudAvatar>
+            }
+            else
+            {
+                <MudAvatar Size="Size.Large" Square="true" Style="width: 60px; height: 60px; border-radius: 8px; background-color: var(--mud-palette-background-grey);">
+                    <MudIcon Icon="@Icons.Material.Filled.Image" Color="Color.Surface" />
+                </MudAvatar>
+            }
+        </MudTd>
+        <MudTd DataLabel="Tên">
+            <MudText Style="font-weight: 500;">@context.Name</MudText>
+        </MudTd>
+        <MudTd DataLabel="SKU">@context.Sku</MudTd>
+        <MudTd DataLabel="Giá">@context.BasePrice.ToString("N0")đ</MudTd>
+        <MudTd DataLabel="Tồn kho">
+            <MudChip T="int" Color="@GetStockColor(context.StockQuantity)" Size="Size.Small">
+                @context.StockQuantity
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Danh mục">@context.CategoryName</MudTd>
+        <MudTd DataLabel="Thương hiệu">@context.BrandName</MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudSwitch T="bool" Value="@context.IsActive" 
+                       ValueChanged="@(v => OnToggleStatus(context.Id, v))"
+                       Color="Color.Success" UncheckedColor="Color.Error" />
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenProductDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Info" 
+                           OnClick="@(() => OpenAddStockDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeleteProduct(context))" Size="Size.Small" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 10, 25, 50, 100 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<ProductListResponse> _products = new();
+    private List<CategoryResponse> _categories = new();
+    private bool _loading = true;
+    private string _searchString = "";
+    private int? _categoryFilter;
+    private bool? _statusFilter;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+        await LoadProducts();
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            _categories = await CategoryService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải danh mục: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadProducts()
+    {
+        _loading = true;
+        try
+        {
+            _products = await ProductService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải sản phẩm: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterProducts(ProductListResponse product)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return product.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               product.Sku.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task OpenProductDialog(ProductListResponse? product)
+    {
+        var parameters = new DialogParameters<ProductDialog>();
+        if (product != null)
+        {
+            parameters.Add(x => x.ProductId, product.Id);
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ProductDialog>(product == null ? "Thêm sản phẩm" : "Sửa sản phẩm", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadProducts();
+        }
+    }
+
+    private async Task OpenAddStockDialog(ProductListResponse product)
+    {
+        var parameters = new DialogParameters<AddStockDialog>();
+        parameters.Add(x => x.ProductId, product.Id);
+        parameters.Add(x => x.ProductName, product.Name);
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<AddStockDialog>("Nhập kho", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadProducts();
+            Snackbar.Add("Đã cập nhật tồn kho", Severity.Success);
+        }
+    }
+
+    private async Task ToggleStatus(int id, bool isActive)
+    {
+        try
+        {
+            if (isActive)
+                await ProductService.ActivateAsync(id);
+            else
+                await ProductService.DeactivateAsync(id);
+            
+            Snackbar.Add($"Đã {(isActive ? "kích hoạt" : "vô hiệu hóa")} sản phẩm", Severity.Success);
+            await LoadProducts();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            await LoadProducts();
+        }
+    }
+
+    private void OnToggleStatus(int id, bool isActive)
+    {
+        _ = ToggleStatus(id, isActive);
+    }
+
+    private async Task DeleteProduct(ProductListResponse product)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận xóa" },
+            { "Content", $"Bạn có chắc muốn xóa sản phẩm \"{product.Name}\"?" },
+            { "ConfirmText", "Xóa" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await ProductService.DeleteAsync(product.Id);
+                Snackbar.Add("Đã xóa sản phẩm", Severity.Success);
+                await LoadProducts();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private static Color GetStockColor(int stock)
+    {
+        return stock switch
+        {
+            0 => Color.Error,
+            <= 10 => Color.Warning,
+            _ => Color.Success
+        };
+    }
+}

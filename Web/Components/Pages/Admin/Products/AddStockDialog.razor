@@ -1,0 +1,67 @@
+@using Application.DTOs.Requests
+@using Application.Interfaces.Services
+@inject IProductService ProductService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudText Typo="Typo.h6" Class="mb-4">@ProductName</MudText>
+            
+            <MudNumericField T="int" @bind-Value="_request.Quantity" 
+                             Label="Số lượng nhập *" 
+                             Required="true" RequiredError="Nhập số lượng"
+                             Variant="Variant.Outlined" Class="mb-3"
+                             Min="1" />
+            
+            <MudTextField @bind-Value="_request.Reason" Label="Lý do nhập kho" 
+                          Variant="Variant.Outlined" Class="mb-3"
+                          HelperText="VD: Nhập từ nhà cung cấp, kiểm kê thêm..." />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            Nhập kho
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int ProductId { get; set; }
+
+    [Parameter]
+    public string ProductName { get; set; } = "";
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    
+    private AddStockRequest _request = new()
+    {
+        Quantity = 0,
+        Reason = ""
+    };
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        try
+        {
+            await ProductService.AddStockAsync(ProductId, _request);
+            Snackbar.Add($"Đã nhập {_request.Quantity} sản phẩm vào kho", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}
