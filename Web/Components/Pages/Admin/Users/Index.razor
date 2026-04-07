@@ -1,0 +1,186 @@
+@page "/admin/users"
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@layout AdminLayout
+@inject IUserService UserService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Người dùng</MudText>
+
+<MudTable Items="_users" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+          Filter="@FilterUsers" SortMode="SortMode.Single" AllowUnsorted="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Danh sách người dùng</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateDialog" Class="mr-2">
+            Thêm mới
+        </MudButton>
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh Width="60px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh Width="150px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.UserName)">Tên đăng nhập</MudTableSortLabel></MudTh>
+        <MudTh Width="200px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.FullName)">Họ tên</MudTableSortLabel></MudTh>
+        <MudTh Width="200px">Email</MudTh>
+        <MudTh Width="100px">SĐT</MudTh>
+        <MudTh Width="150px">Vai trò</MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh Width="150px">Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Tên đăng nhập">
+            <MudText Style="font-weight: 500;">@context.UserName</MudText>
+        </MudTd>
+        <MudTd DataLabel="Họ tên">@context.FullName</MudTd>
+        <MudTd DataLabel="Email">@context.Email</MudTd>
+        <MudTd DataLabel="SĐT">@(context.PhoneNumber ?? "-")</MudTd>
+        <MudTd DataLabel="Vai trò">
+            @foreach (var role in context.Roles)
+            {
+                <MudChip T="string" Size="Size.Small" Color="GetRoleColor(role)" Class="mr-1">@role</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Error)">
+                @(context.IsActive ? "Hoạt động" : "Vô hiệu")
+            </MudChip>
+        </MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                           OnClick="@(() => OpenEditDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Lock" Color="Color.Warning" 
+                           OnClick="@(() => OpenResetPasswordDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                           OnClick="@(() => DeleteUser(context))" Size="Size.Small" />
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<UserResponse> _users = new();
+    private bool _loading = true;
+    private string _searchString = "";
+
+    private bool FilterUsers(UserResponse user)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return user.UserName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               user.FullName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               user.Email.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        _loading = true;
+        try
+        {
+            _users = await UserService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<UserDialog>("Thêm người dùng mới", options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadUsers();
+        }
+    }
+
+    private async Task OpenEditDialog(UserResponse user)
+    {
+        var parameters = new DialogParameters<UserDialog>();
+        parameters.Add(x => x.User, user);
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<UserDialog>("Chỉnh sửa người dùng", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadUsers();
+        }
+    }
+
+    private async Task OpenResetPasswordDialog(UserResponse user)
+    {
+        var parameters = new DialogParameters<ResetPasswordDialog>();
+        parameters.Add(x => x.UserId, user.Id);
+        parameters.Add(x => x.UserName, user.UserName);
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ResetPasswordDialog>("Đặt lại mật khẩu", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            Snackbar.Add("Đã đặt lại mật khẩu", Severity.Success);
+        }
+    }
+
+    private async Task DeleteUser(UserResponse user)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>();
+        parameters.Add(x => x.Title, "Xác nhận xóa");
+        parameters.Add(x => x.Content, $"Bạn có chắc muốn xóa người dùng '{user.UserName}'?");
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Xác nhận", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && (bool)result.Data)
+        {
+            try
+            {
+                await UserService.DeleteAsync(user.Id);
+                await LoadUsers();
+                Snackbar.Add("Đã xóa người dùng", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private static Color GetRoleColor(string role)
+    {
+        return role switch
+        {
+            "Admin" => Color.Error,
+            "Technician" => Color.Info,
+            "Customer" => Color.Success,
+            _ => Color.Default
+        };
+    }
+}

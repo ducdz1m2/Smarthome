@@ -1,0 +1,176 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IUserService UserService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+                <MudTabPanel Text="Thông tin cơ bản">
+                    <MudTextField @bind-Value="_request.UserName" Label="Tên đăng nhập *" 
+                                  Required="true" RequiredError="Vui lòng nhập tên đăng nhập"
+                                  Variant="Variant.Outlined" Class="mb-3"
+                                  Disabled="IsEdit" />
+                    
+                    <MudTextField @bind-Value="_request.FullName" Label="Họ và tên *" 
+                                  Required="true" RequiredError="Vui lòng nhập họ tên"
+                                  Variant="Variant.Outlined" Class="mb-3" />
+                    
+                    <MudTextField @bind-Value="_request.Email" Label="Email *" 
+                                  Required="true" RequiredError="Vui lòng nhập email"
+                                  Variant="Variant.Outlined" Class="mb-3"
+                                  InputType="InputType.Email" />
+                    
+                    <MudTextField @bind-Value="_request.PhoneNumber" Label="Số điện thoại" 
+                                  Variant="Variant.Outlined" Class="mb-3" />
+                    
+                    @if (!IsEdit)
+                    {
+                        <MudTextField @bind-Value="_request.Password" Label="Mật khẩu *" 
+                                      Required="true" RequiredError="Vui lòng nhập mật khẩu"
+                                      Variant="Variant.Outlined" Class="mb-3"
+                                      InputType="InputType.Password"
+                                      HelperText="Mật khẩu phải có ít nhất 6 ký tự" />
+                    }
+                    
+                    <MudSwitch @bind-Value="_request.IsActive" Color="Color.Primary" 
+                               Label="@(_request.IsActive ? "Đang hoạt động" : "Vô hiệu hóa")" />
+                </MudTabPanel>
+                
+                <MudTabPanel Text="Vai trò">
+                    <MudText Typo="Typo.body2" Class="mb-3">Chọn vai trò cho người dùng:</MudText>
+                    @foreach (var role in _availableRoles)
+                    {
+                        <MudCheckBox T="bool" 
+                                     Value="_request.Roles.Contains(role)"
+                                     ValueChanged="(val) => ToggleRole(role, val)"
+                                     Label="@role" 
+                                     Color="Color.Primary" />
+                    }
+                </MudTabPanel>
+            </MudTabs>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+            @(IsEdit ? "Cập nhật" : "Tạo mới")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public UserResponse? User { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isActive = true;
+
+    private UserDialogRequest _request = new();
+    private List<string> _availableRoles = new() { "Admin", "Customer", "Technician" };
+
+    private bool IsEdit => User != null;
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit && User != null)
+        {
+            _request = new UserDialogRequest
+            {
+                Id = User.Id,
+                UserName = User.UserName,
+                FullName = User.FullName,
+                Email = User.Email,
+                PhoneNumber = User.PhoneNumber,
+                IsActive = User.IsActive,
+                Roles = new List<string>(User.Roles)
+            };
+            _isActive = User.IsActive;
+        }
+        else
+        {
+            _request = new UserDialogRequest
+            {
+                IsActive = true,
+                Roles = new List<string> { "Customer" }
+            };
+        }
+    }
+
+    private void ToggleRole(string role, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!_request.Roles.Contains(role))
+                _request.Roles.Add(role);
+        }
+        else
+        {
+            _request.Roles.Remove(role);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        try
+        {
+            if (IsEdit)
+            {
+                var updateRequest = new UpdateUserRequest
+                {
+                    Id = _request.Id,
+                    Email = _request.Email,
+                    FullName = _request.FullName,
+                    PhoneNumber = _request.PhoneNumber,
+                    IsActive = _request.IsActive,
+                    Roles = _request.Roles
+                };
+                await UserService.UpdateAsync(updateRequest);
+                Snackbar.Add("Cập nhật người dùng thành công", Severity.Success);
+            }
+            else
+            {
+                var createRequest = new CreateUserRequest
+                {
+                    UserName = _request.UserName,
+                    Email = _request.Email,
+                    FullName = _request.FullName,
+                    PhoneNumber = _request.PhoneNumber,
+                    Password = _request.Password,
+                    Roles = _request.Roles
+                };
+                await UserService.CreateAsync(createRequest);
+                Snackbar.Add("Tạo người dùng thành công", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public class UserDialogRequest
+    {
+        public int Id { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string? PhoneNumber { get; set; }
+        public bool IsActive { get; set; } = true;
+        public List<string> Roles { get; set; } = new();
+    }
+}

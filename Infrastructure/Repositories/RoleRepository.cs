@@ -22,7 +22,6 @@ namespace Infrastructure.Repositories
         public async Task<AppRole?> GetByNameAsync(string name)
         {
             return await _context.Roles
-                .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.Name == name);
         }
 

@@ -22,14 +22,12 @@ namespace Infrastructure.Repositories
         public async Task<AppUser?> GetByUserNameAsync(string userName)
         {
             return await _context.Users
-                .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.UserName == userName.ToLower());
         }
 
         public async Task<AppUser?> GetByEmailAsync(string email)
         {
             return await _context.Users
-                .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Email == email.ToLower());
         }
 
