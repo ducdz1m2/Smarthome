@@ -2,9 +2,12 @@ using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Catalog;
+using Domain.Entities.Identity;
 using Domain.Entities.Installation;
 using Domain.Entities.Sales;
 using Domain.Enums;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.Services
 {
@@ -14,7 +17,7 @@ namespace Application.Services
         private readonly IProductRepository _productRepository;
         private readonly ICategoryRepository _categoryRepository;
         private readonly IBrandRepository _brandRepository;
-        private readonly IUserRepository _userRepository;
+        private readonly UserManager<ApplicationUser> _userManager;
         private readonly IWarehouseRepository _warehouseRepository;
         private readonly ISupplierRepository _supplierRepository;
         private readonly IStockEntryRepository _stockEntryRepository;
@@ -31,7 +34,7 @@ namespace Application.Services
             IProductRepository productRepository,
             ICategoryRepository categoryRepository,
             IBrandRepository brandRepository,
-            IUserRepository userRepository,
+            UserManager<ApplicationUser> userManager,
             IWarehouseRepository warehouseRepository,
             ISupplierRepository supplierRepository,
             IStockEntryRepository stockEntryRepository,
@@ -47,7 +50,7 @@ namespace Application.Services
             _productRepository = productRepository;
             _categoryRepository = categoryRepository;
             _brandRepository = brandRepository;
-            _userRepository = userRepository;
+            _userManager = userManager;
             _warehouseRepository = warehouseRepository;
             _supplierRepository = supplierRepository;
             _stockEntryRepository = stockEntryRepository;
@@ -101,7 +104,7 @@ namespace Application.Services
                 TotalOrders = totalOrders,
                 TotalRevenue = totalRevenue,
                 TotalProducts = products.Count,
-                TotalUsers = await _userRepository.CountAsync(),
+                TotalUsers = await _userManager.Users.CountAsync(),
                 TotalBrands = await _brandRepository.CountAsync(),
                 TodayOrders = todayOrders,
                 TodayRevenue = todayRevenue,
@@ -252,7 +255,7 @@ namespace Application.Services
             var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
             var oneMonthAgo = DateTime.Now.AddMonths(-1);
 
-            var users = await _userRepository.GetAllAsync();
+            var users = await _userManager.Users.ToListAsync();
             var orders = await _orderRepository.GetAllAsync();
 
             var newUsersThisMonth = users.Count(u => u.CreatedAt >= firstDayOfMonth);
@@ -459,7 +462,7 @@ namespace Application.Services
         private async Task<ChartDataResponse> GetChartDataAsync()
         {
             var orders = await _orderRepository.GetAllAsync();
-            var users = await _userRepository.GetAllAsync();
+            var users = await _userManager.Users.ToListAsync();
             var categories = await _categoryRepository.GetAllAsync();
 
             var last6Months = Enumerable.Range(0, 6)

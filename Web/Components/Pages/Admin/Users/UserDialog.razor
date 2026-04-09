@@ -1,7 +1,7 @@
 @using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
-@inject IUserService UserService
+@inject IIdentityService IdentityService
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -136,7 +136,9 @@
                     IsActive = _request.IsActive,
                     Roles = _request.Roles
                 };
-                await UserService.UpdateAsync(updateRequest);
+                var result = await IdentityService.UpdateUserAsync(updateRequest);
+                if (!result.Succeeded)
+                    throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
                 Snackbar.Add("Cập nhật người dùng thành công", Severity.Success);
             }
             else
@@ -150,7 +152,9 @@
                     Password = _request.Password,
                     Roles = _request.Roles
                 };
-                await UserService.CreateAsync(createRequest);
+                var (result, userId) = await IdentityService.CreateUserAsync(createRequest);
+                if (!result.Succeeded)
+                    throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
                 Snackbar.Add("Tạo người dùng thành công", Severity.Success);
             }
 

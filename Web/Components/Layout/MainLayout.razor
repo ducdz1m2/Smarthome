@@ -1,6 +1,8 @@
 ﻿@inherits LayoutComponentBase
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@implements IDisposable
 
 <MudThemeProvider />
 <MudPopoverProvider />
@@ -15,20 +17,25 @@
         </MudHidden>
         <MudButton href="/" Variant="Variant.Text">Trang chủ</MudButton>
         <MudButton href="/products" Variant="Variant.Text">Sản phẩm</MudButton>
-        <MudBadge Content="3" Color="Color.Secondary" Overlap="true" Class="mx-4">
+        
+        @* Giỏ hàng với số lượng động *@
+        <MudBadge Content="@_cartCount" Color="Color.Secondary" Overlap="true" Class="mx-4" Visible="@(_cartCount > 0)">
             <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" />
         </MudBadge>
-        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
-            <ActivatorContent>
-                <MudIconButton Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" />
-            </ActivatorContent>
-            <ChildContent>
-                <MudMenuItem Href="/profile">Hồ sơ</MudMenuItem>
-                <MudMenuItem Href="/orders">Đơn hàng</MudMenuItem>
-                <MudDivider />
-                <MudMenuItem OnClick="Logout" Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error">Đăng xuất</MudMenuItem>
-            </ChildContent>
-        </MudMenu>
+        
+        @* Nút tài khoản với avatar *@
+        <MudIconButton Href="/profile" Title="Quản lý tài khoản">
+            @if (!string.IsNullOrEmpty(_avatarUrl))
+            {
+                <MudAvatar Size="Size.Medium">
+                    <MudImage Src="@_avatarUrl" ObjectFit="ObjectFit.Cover" />
+                </MudAvatar>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" />
+            }
+        </MudIconButton>
     </MudAppBar>
     <MudMainContent Class="mt-16 pa-4">
         <MudContainer MaxWidth="MaxWidth.Large">
@@ -38,9 +45,84 @@
 </MudLayout>
 
 @code {
-    private void Logout()
+    private int _cartCount = 0;
+    private string? _avatarUrl;
+
+    protected override async Task OnInitializedAsync()
     {
-        NavigationManager.NavigateTo("/login", forceLoad: true);
-        Snackbar.Add("Đã đăng xuất", Severity.Success);
+        await UpdateCartCount();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Listen for storage changes
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                window.addEventListener('storage', function(e) {
+                    if (e.key === 'cart') {
+                        window.dotNetHelper?.invokeMethodAsync('UpdateCartCountFromJs');
+                    }
+                    if (e.key === 'userAvatar') {
+                        // Reload page to update avatar across all layouts
+                        window.location.reload();
+                    }
+                });
+            ");
+            await LoadAvatar();
+        }
+    }
+
+    [JSInvokable]
+    public async Task UpdateAvatar()
+    {
+        await LoadAvatar();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadAvatar()
+    {
+        try
+        {
+            _avatarUrl = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userAvatar");
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    private async Task UpdateCartCount()
+    {
+        try
+        {
+            var cartJson = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "cart");
+            if (!string.IsNullOrEmpty(cartJson))
+            {
+                var cartItems = System.Text.Json.JsonSerializer.Deserialize<List<CartItem>>(cartJson);
+                _cartCount = cartItems?.Sum(i => i.Quantity) ?? 0;
+            }
+            else
+            {
+                _cartCount = 0;
+            }
+            StateHasChanged();
+        }
+        catch { }
+    }
+
+    public class CartItem
+    {
+        public int Id { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    public void Dispose()
+    {
+        // Cleanup if needed
+    }
+
+    [JSInvokable]
+    public async Task UpdateCartCountFromJs()
+    {
+        await UpdateCartCount();
     }
 }

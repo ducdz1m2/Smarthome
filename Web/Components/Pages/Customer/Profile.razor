@@ -1,0 +1,258 @@
+@page "/profile"
+@layout Web.Components.Layout.AccountLayout
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IIdentityService IdentityService
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+@* For file upload *@
+@using System.Net.Http
+
+<MudCard Elevation="2">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">Thông tin cá nhân</MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField @bind-Value="_editModel.FullName" 
+                          Label="Họ và tên" 
+                          Required="true"
+                          RequiredError="Vui lòng nhập họ tên"
+                          Variant="Variant.Outlined" 
+                          Class="mb-3" />
+            
+            <MudTextField @bind-Value="_editModel.Email" 
+                          Label="Email" 
+                          Required="true"
+                          RequiredError="Vui lòng nhập email"
+                          InputType="InputType.Email"
+                          Variant="Variant.Outlined" 
+                          Class="mb-3" />
+            
+            <MudTextField @bind-Value="_editModel.PhoneNumber" 
+                          Label="Số điện thoại" 
+                          Variant="Variant.Outlined" 
+                          Class="mb-3" />
+            
+            @* Avatar Upload Section *@
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Ảnh đại diện</MudText>
+            
+            @if (!string.IsNullOrEmpty(_editModel.Avatar))
+            {
+                <div class="d-flex align-center mb-3">
+                    <MudAvatar Size="Size.Large" Class="mr-3">
+                        <MudImage Src="@_editModel.Avatar" Alt="Avatar" ObjectFit="ObjectFit.Cover" />
+                    </MudAvatar>
+                    <MudButton Variant="Variant.Text" 
+                               Color="Color.Error" 
+                               OnClick="RemoveAvatar"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Delete">
+                        Xóa ảnh
+                    </MudButton>
+                </div>
+            }
+            
+            <MudFileUpload T="IBrowserFile" 
+                           FilesChanged="UploadAvatar" 
+                           Accept=".jpg,.jpeg,.png,.gif,.webp">
+                <ActivatorContent>
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Secondary" 
+                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                               Disabled="_isUploading"
+                               Size="Size.Small">
+                        @if (_isUploading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Class="mr-2" />
+                            <span>Đang upload...</span>
+                        }
+                        else
+                        {
+                            <span>@(string.IsNullOrEmpty(_editModel.Avatar) ? "Chọn ảnh" : "Đổi ảnh")</span>
+                        }
+                    </MudButton>
+                </ActivatorContent>
+            </MudFileUpload>
+            
+            @if (_isUploading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-2" />
+            }
+        </MudForm>
+    </MudCardContent>
+    <MudCardActions Class="justify-end">
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary"
+                   OnClick="SaveProfile"
+                   Disabled="!_isValid || _isSaving"
+                   StartIcon="@Icons.Material.Filled.Save">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Class="mr-2" />
+                <span>Đang lưu...</span>
+            }
+            else
+            {
+                <span>Lưu thay đổi</span>
+            }
+        </MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+    private UserResponse? _user;
+    private EditModel _editModel = new();
+
+    public class EditModel
+    {
+        public int Id { get; set; }
+        public string FullName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string? PhoneNumber { get; set; }
+        public string? Avatar { get; set; }
+    }
+
+    private bool _isUploading = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadUserProfile();
+        }
+    }
+
+    private async Task LoadUserProfile()
+    {
+        try
+        {
+            // TODO: Get current user ID from auth state
+            var users = await IdentityService.GetAllUsersAsync();
+            _user = users.FirstOrDefault();
+            
+            if (_user != null)
+            {
+                _editModel = new EditModel
+                {
+                    Id = _user.Id,
+                    FullName = _user.FullName,
+                    Email = _user.Email,
+                    PhoneNumber = _user.PhoneNumber,
+                    Avatar = _user.Avatar
+                };
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _isSaving = true;
+        try
+        {
+            var request = new Application.DTOs.Requests.UpdateUserRequest
+            {
+                Id = _editModel.Id,
+                FullName = _editModel.FullName,
+                Email = _editModel.Email,
+                PhoneNumber = _editModel.PhoneNumber,
+                Avatar = _editModel.Avatar,
+                IsActive = true,
+                Roles = _user?.Roles ?? new List<string>()
+            };
+
+            var result = await IdentityService.UpdateUserAsync(request);
+            if (result.Succeeded)
+            {
+                // Save avatar to localStorage for navbar/sidebar
+                if (!string.IsNullOrEmpty(_editModel.Avatar))
+                {
+                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userAvatar", _editModel.Avatar);
+                }
+                else
+                {
+                    await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userAvatar");
+                }
+                Snackbar.Add("Cập nhật thông tin thành công!", Severity.Success);
+                await LoadUserProfile();
+            }
+            else
+            {
+                Snackbar.Add($"Lỗi: {string.Join(", ", result.Errors.Select(e => e.Description))}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task UploadAvatar(IBrowserFile file)
+    {
+        _isUploading = true;
+        try
+        {
+            var httpClient = new HttpClient { BaseAddress = new Uri(NavigationManager.BaseUri) };
+            var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 2 * 1024 * 1024)); // Max 2MB for avatar
+            content.Add(fileContent, "file", file.Name);
+
+            var response = await httpClient.PostAsync("api/upload/temp", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<UploadResult>();
+                if (result != null)
+                {
+                    _editModel.Avatar = result.url;
+                    // Save to localStorage for navbar/sidebar
+                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userAvatar", result.url);
+                    Snackbar.Add("Upload ảnh thành công!", Severity.Success);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Upload ảnh thất bại!", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi upload: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isUploading = false;
+        }
+    }
+
+    private async Task RemoveAvatar()
+    {
+        _editModel.Avatar = null;
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userAvatar");
+        Snackbar.Add("Đã xóa ảnh đại diện", Severity.Info);
+    }
+
+    private class UploadResult
+    {
+        public string url { get; set; } = "";
+    }
+}

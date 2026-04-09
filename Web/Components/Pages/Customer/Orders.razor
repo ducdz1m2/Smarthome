@@ -1,15 +1,15 @@
 @page "/orders"
+@layout Web.Components.Layout.AccountLayout
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @using Domain.Enums
+
 @inject IOrderService OrderService
-@inject IAuthService AuthService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
-    <MudText Typo="Typo.h4" Class="mb-4">Đơn hàng của tôi</MudText>
+<MudText Typo="Typo.h5" Class="mb-4">Đơn hàng của tôi</MudText>
 
     @if (_isLoading)
     {
@@ -105,7 +105,6 @@
             }
         </MudGrid>
     }
-</MudContainer>
 
 <style>
     .cursor-pointer {
@@ -125,9 +124,12 @@
     private List<OrderResponse> _orders = new();
     private bool _isLoading = true;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await LoadOrdersAsync();
+        if (firstRender)
+        {
+            await LoadOrdersAsync();
+        }
     }
 
     private async Task LoadOrdersAsync()
@@ -147,6 +149,7 @@
         finally
         {
             _isLoading = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 

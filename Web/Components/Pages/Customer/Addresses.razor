@@ -1,0 +1,371 @@
+@page "/addresses"
+@layout Web.Components.Layout.AccountLayout
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IUserAddressService AddressService
+@inject IIdentityService IdentityService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h5" Class="mb-4">Quản lý địa chỉ</MudText>
+
+<MudCard Elevation="2" Class="mb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Thêm địa chỉ mới</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudForm @ref="_form" @bind-IsValid="_isValid">
+                        <MudGrid>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_newAddress.Label" 
+                                              Label="Tên địa chỉ (VD: Nhà, Công ty)" 
+                                              Required="true"
+                                              RequiredError="Vui lòng nhập tên địa chỉ"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_newAddress.ReceiverName" 
+                                              Label="Tên người nhận" 
+                                              Required="true"
+                                              RequiredError="Vui lòng nhập tên người nhận"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_newAddress.ReceiverPhone" 
+                                              Label="Số điện thoại" 
+                                              Required="true"
+                                              RequiredError="Vui lòng nhập số điện thoại"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="_newAddress.Street" 
+                                              Label="Địa chỉ (số nhà, đường)" 
+                                              Required="true"
+                                              RequiredError="Vui lòng nhập địa chỉ"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudTextField @bind-Value="_newAddress.Ward" 
+                                              Label="Phường/Xã" 
+                                              Required="true"
+                                              RequiredError="Vui lòng nhập phường/xã"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudTextField @bind-Value="_newAddress.District" 
+                                              Label="Quận/Huyện" 
+                                              Required="true"
+                                              RequiredError="Vui lòng nhập quận/huyện"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudTextField @bind-Value="_newAddress.City" 
+                                              Label="Tỉnh/Thành phố" 
+                                              Required="true"
+                                              RequiredError="Vui lòng nhập tỉnh/thành"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudCheckBox @bind-Value="_newAddress.IsDefault" 
+                                             Label="Đặt làm địa chỉ mặc định" 
+                                             Color="Color.Primary" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudForm>
+                </MudCardContent>
+                <MudCardActions Class="justify-end">
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary"
+                               OnClick="AddAddress"
+                               Disabled="!_isValid || _isSaving"
+                               StartIcon="@Icons.Material.Filled.Add">
+                        @if (_isSaving)
+                        {
+                            <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Class="mr-2" />
+                            <span>Đang lưu...</span>
+                        }
+                        else
+                        {
+                            <span>Thêm địa chỉ</span>
+                        }
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+
+            @if (_addresses.Any())
+            {
+                <MudText Typo="Typo.h6" Class="mb-3">Danh sách địa chỉ</MudText>
+                
+                @foreach (var address in _addresses)
+                {
+                    var currentAddress = address; // Capture variable to avoid closure issues
+                    <MudCard Elevation="1" Class="mb-3" @key="currentAddress.Id">
+                        <MudCardContent>
+                            <div class="d-flex justify-space-between align-start">
+                                <div>
+                                    <div class="d-flex align-center gap-2 mb-2">
+                                        <MudText Typo="Typo.subtitle1" Class="fw-bold">@currentAddress.Label</MudText>
+                                        @if (currentAddress.IsDefault)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">Mặc định</MudChip>
+                                        }
+                                    </div>
+                                    <MudText Typo="Typo.body2">@currentAddress.ReceiverName - @currentAddress.ReceiverPhone</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        @currentAddress.Street, @currentAddress.Ward, @currentAddress.District, @currentAddress.City
+                                    </MudText>
+                                </div>
+                                <div class="d-flex">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                                   Size="Size.Small" 
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => EditAddress(currentAddress))"
+                                                   Title="Chỉnh sửa" />
+                                    @if (!currentAddress.IsDefault)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.Check" 
+                                                       Size="Size.Small" 
+                                                       Color="Color.Success"
+                                                       OnClick="@(() => SetAsDefault(currentAddress.Id))"
+                                                       Title="Đặt mặc định" />
+                                    }
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                   Size="Size.Small" 
+                                                   Color="Color.Error"
+                                                   OnClick="@(() => DeleteAddress(currentAddress.Id))"
+                                                   Title="Xóa" />
+                                </div>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-4">
+                    Bạn chưa có địa chỉ nào. Hãy thêm địa chỉ giao hàng ở form bên trên.
+                </MudAlert>
+            }
+
+<MudDialog @bind-Visible="_showEditDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Chỉnh sửa địa chỉ</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_editForm" @bind-IsValid="_isEditValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_editAddress.Label" 
+                                  Label="Tên địa chỉ" 
+                                  Required="true"
+                                  RequiredError="Vui lòng nhập tên địa chỉ"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_editAddress.ReceiverName" 
+                                  Label="Tên người nhận" 
+                                  Required="true"
+                                  RequiredError="Vui lòng nhập tên người nhận"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_editAddress.ReceiverPhone" 
+                                  Label="Số điện thoại" 
+                                  Required="true"
+                                  RequiredError="Vui lòng nhập số điện thoại"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_editAddress.Street" 
+                                  Label="Địa chỉ (số nhà, đường)" 
+                                  Required="true"
+                                  RequiredError="Vui lòng nhập địa chỉ"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_editAddress.Ward" 
+                                  Label="Phường/Xã" 
+                                  Required="true"
+                                  RequiredError="Vui lòng nhập phường/xã"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_editAddress.District" 
+                                  Label="Quận/Huyện" 
+                                  Required="true"
+                                  RequiredError="Vui lòng nhập quận/huyện"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_editAddress.City" 
+                                  Label="Tỉnh/Thành phố" 
+                                  Required="true"
+                                  RequiredError="Vui lòng nhập tỉnh/thành"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudCheckBox @bind-Value="_editAddress.IsDefault" 
+                                 Label="Đặt làm địa chỉ mặc định" 
+                                 Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showEditDialog = false">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="SaveEditAddress" Disabled="!_isEditValid">Lưu</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .fw-bold { font-weight: 600; }
+</style>
+
+@code {
+    private MudForm _form = null!;
+    private MudForm _editForm = null!;
+    private bool _isValid;
+    private bool _isEditValid;
+    private bool _isSaving;
+    private bool _showEditDialog;
+    private int _currentUserId = 1; // TODO: Get from auth
+    
+    private CreateUserAddressRequest _newAddress = new();
+    private UserAddressResponse _editAddress = new();
+    private List<UserAddressResponse> _addresses = new();
+    
+    private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadAddresses();
+        }
+    }
+
+    private async Task LoadAddresses()
+    {
+        try
+        {
+            _addresses = await AddressService.GetByUserIdAsync(_currentUserId);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải địa chỉ: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task AddAddress()
+    {
+        await _form.Validate();
+        if (!_isValid) return;
+
+        _isSaving = true;
+        try
+        {
+            await AddressService.CreateAsync(_currentUserId, _newAddress);
+            Snackbar.Add("Thêm địa chỉ thành công!", Severity.Success);
+            _newAddress = new CreateUserAddressRequest();
+            await LoadAddresses();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void EditAddress(UserAddressResponse address)
+    {
+        _editAddress = new UserAddressResponse
+        {
+            Id = address.Id,
+            Label = address.Label,
+            ReceiverName = address.ReceiverName,
+            ReceiverPhone = address.ReceiverPhone,
+            Street = address.Street,
+            Ward = address.Ward,
+            District = address.District,
+            City = address.City,
+            IsDefault = address.IsDefault
+        };
+        _showEditDialog = true;
+    }
+
+    private async Task SaveEditAddress()
+    {
+        await _editForm.Validate();
+        if (!_isEditValid) return;
+
+        try
+        {
+            var request = new CreateUserAddressRequest
+            {
+                Label = _editAddress.Label,
+                ReceiverName = _editAddress.ReceiverName,
+                ReceiverPhone = _editAddress.ReceiverPhone,
+                Street = _editAddress.Street,
+                Ward = _editAddress.Ward,
+                District = _editAddress.District,
+                City = _editAddress.City,
+                IsDefault = _editAddress.IsDefault
+            };
+            
+            await AddressService.UpdateAsync(_editAddress.Id, request);
+            Snackbar.Add("Cập nhật địa chỉ thành công!", Severity.Success);
+            _showEditDialog = false;
+            await LoadAddresses();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SetAsDefault(int addressId)
+    {
+        try
+        {
+            await AddressService.SetAsDefaultAsync(_currentUserId, addressId);
+            Snackbar.Add("Đã đặt địa chỉ mặc định!", Severity.Success);
+            await LoadAddresses();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteAddress(int id)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Content", "Bạn có chắc muốn xóa địa chỉ này?");
+        
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<Web.Components.Shared.ConfirmDialog>("Xác nhận xóa", parameters, options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled && (bool)result.Data)
+        {
+            try
+            {
+                await AddressService.DeleteAsync(id);
+                Snackbar.Add("Đã xóa địa chỉ!", Severity.Success);
+                await LoadAddresses();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

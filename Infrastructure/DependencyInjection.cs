@@ -1,6 +1,8 @@
 ﻿using Application.Interfaces.Repositories;
+using Domain.Entities.Identity;
 using Infrastructure.Data;
 using Infrastructure.Repositories;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +16,19 @@ namespace Infrastructure
             // Cấu hình DbContext
             services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+
+            // Đăng ký Identity
+            services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
+            {
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireNonAlphanumeric = false;
+                options.Password.RequireUppercase = false;
+                options.Password.RequiredLength = 6;
+                options.User.RequireUniqueEmail = true;
+            })
+            .AddEntityFrameworkStores<AppDbContext>()
+            .AddDefaultTokenProviders();
 
             // Đăng ký các Repositories
             services.AddScoped<IProductVariantRepository, ProductVariantRepository>();
@@ -38,9 +53,8 @@ namespace Infrastructure
             services.AddScoped<IWarrantyRepository, WarrantyRepository>();
             services.AddScoped<IWarrantyClaimRepository, WarrantyClaimRepository>();
 
-            // Identity repositories
-            services.AddScoped<IUserRepository, UserRepository>();
-            services.AddScoped<IRoleRepository, RoleRepository>();
+            // User Address repository
+            services.AddScoped<IUserAddressRepository, UserAddressRepository>();
 
             return services;
         }

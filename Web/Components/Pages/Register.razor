@@ -2,7 +2,7 @@
 @layout EmptyLayout
 @using Application.DTOs.Requests
 @using Application.Interfaces.Services
-@inject IAuthService AuthService
+@inject IIdentityService IdentityService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
@@ -113,7 +113,7 @@
         _loading = true;
         try
         {
-            var response = await AuthService.RegisterAsync(_request);
+            var response = await IdentityService.RegisterAsync(_request);
             
             Snackbar.Add("Đăng ký thành công!", Severity.Success);
             NavigationManager.NavigateTo("/");

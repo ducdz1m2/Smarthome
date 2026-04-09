@@ -1,4 +1,7 @@
 @inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
 <MudThemeProvider />
 <MudPopoverProvider />
 <MudDialogProvider />
@@ -9,7 +12,19 @@
         <MudText Typo="Typo.h6" Class="ml-3">Smarthome Admin</MudText>
         <MudSpacer />
         <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" />
-        <MudIconButton Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" />
+        @* Avatar button *@
+        <MudIconButton Href="/profile" Title="Quản lý tài khoản">
+            @if (!string.IsNullOrEmpty(_avatarUrl))
+            {
+                <MudAvatar Size="Size.Medium">
+                    <MudImage Src="@_avatarUrl" ObjectFit="ObjectFit.Cover" />
+                </MudAvatar>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" />
+            }
+        </MudIconButton>
     </MudAppBar>
     <MudDrawer @bind-Open="@_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2" Variant="DrawerVariant.Mini" OpenMiniOnHover="true">
         <AdminNavMenu />
@@ -23,6 +38,25 @@
 
 @code {
     bool _drawerOpen = true;
+    private string? _avatarUrl;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadAvatar();
+        }
+    }
+
+    private async Task LoadAvatar()
+    {
+        try
+        {
+            _avatarUrl = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userAvatar");
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
 
     void DrawerToggle()
     {

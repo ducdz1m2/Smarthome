@@ -6,11 +6,12 @@ using Domain.Entities.Inventory;
 using Domain.Entities.Promotions;
 using Domain.Entities.Sales;
 using Domain.Entities.Shipping;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Data
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, int>
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -40,10 +41,6 @@ namespace Infrastructure.Data
         public DbSet<WarrantyClaim> WarrantyClaims => Set<WarrantyClaim>();
         public DbSet<ReturnOrder> ReturnOrders => Set<ReturnOrder>();
         public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
-
-        // Identity
-        public DbSet<AppUser> Users => Set<AppUser>();
-        public DbSet<AppRole> Roles => Set<AppRole>();
 
         // Installation
         public DbSet<TechnicianProfile> TechnicianProfiles => Set<TechnicianProfile>();

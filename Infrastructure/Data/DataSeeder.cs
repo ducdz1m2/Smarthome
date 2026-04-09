@@ -1,65 +1,71 @@
-using Application.Interfaces.Repositories;
 using Domain.Entities.Identity;
-using Infrastructure.Data;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Infrastructure.Data
 {
     public static class DataSeeder
     {
-        public static async Task SeedAsync(AppDbContext context, IUserRepository userRepository, IRoleRepository roleRepository)
+        public static async Task SeedAsync(IServiceProvider serviceProvider)
         {
+            using var scope = serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+
             // Ensure database is created
             await context.Database.EnsureCreatedAsync();
 
-            // Seed Admin Role
-            if (!await roleRepository.ExistsAsync("Admin"))
-            {
-                var adminRole = AppRole.Create("Admin", "Quản trị viên - Toàn quyền hệ thống");
-                await context.Roles.AddAsync(adminRole);
-                await context.SaveChangesAsync();
-            }
-
-            // Seed Customer Role
-            if (!await roleRepository.ExistsAsync("Customer"))
-            {
-                var customerRole = AppRole.Create("Customer", "Khách hàng");
-                await context.Roles.AddAsync(customerRole);
-                await context.SaveChangesAsync();
-            }
-
-            // Seed Technician Role
-            if (!await roleRepository.ExistsAsync("Technician"))
-            {
-                var techRole = AppRole.Create("Technician", "Kỹ thuật viên");
-                await context.Roles.AddAsync(techRole);
-                await context.SaveChangesAsync();
-            }
+            // Seed Roles
+            await SeedRolesAsync(roleManager);
 
             // Seed Admin User
-            if (!await userRepository.ExistsAsync("admin"))
+            await SeedAdminUserAsync(userManager);
+        }
+
+        private static async Task SeedRolesAsync(RoleManager<ApplicationRole> roleManager)
+        {
+            string[] roles = { "Admin", "Customer", "Technician" };
+            string[] descriptions = { "Quản trị viên - Toàn quyền hệ thống", "Khách hàng", "Kỹ thuật viên" };
+
+            for (int i = 0; i < roles.Length; i++)
             {
-                var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin");
-                
-                // Hash password: admin123
-                string passwordHash = BCrypt.Net.BCrypt.HashPassword("admin123");
-                
-                var adminUser = AppUser.Create(
-                    "admin",
-                    "admin@smarthome.com",
-                    "Administrator",
-                    passwordHash,
-                    "bcrypt",
-                    null
-                );
-
-                if (adminRole != null)
+                if (!await roleManager.RoleExistsAsync(roles[i]))
                 {
-                    adminUser.AssignRole(adminRole);
+                    await roleManager.CreateAsync(new ApplicationRole
+                    {
+                        Name = roles[i],
+                        Description = descriptions[i],
+                        CreatedAt = DateTime.UtcNow
+                    });
                 }
+            }
+        }
 
-                await context.Users.AddAsync(adminUser);
-                await context.SaveChangesAsync();
+        private static async Task SeedAdminUserAsync(UserManager<ApplicationUser> userManager)
+        {
+            const string adminUserName = "admin";
+            const string adminEmail = "admin@smarthome.com";
+            const string adminPassword = "admin123";
+
+            var existingAdmin = await userManager.FindByNameAsync(adminUserName);
+            if (existingAdmin == null)
+            {
+                var adminUser = new ApplicationUser
+                {
+                    UserName = adminUserName,
+                    Email = adminEmail,
+                    FullName = "Administrator",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                var result = await userManager.CreateAsync(adminUser, adminPassword);
+                if (result.Succeeded)
+                {
+                    await userManager.AddToRoleAsync(adminUser, "Admin");
+                }
             }
         }
     }

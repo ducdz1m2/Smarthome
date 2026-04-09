@@ -4,13 +4,18 @@ using Application;
 using Infrastructure;
 using Web.Services;
 using Infrastructure.Data;
-using Application.Interfaces.Repositories;
+using Application.Interfaces.Services;
+using Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Enable detailed errors for debugging
+builder.Services.AddServerSideBlazor()
+    .AddCircuitOptions(options => options.DetailedErrors = true);
 builder.Services.AddMudServices();
 
 // Add controllers for API endpoints
@@ -22,18 +27,13 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 // Register custom services
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<IIdentityService, IdentityService>();
 builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
 // Seed data
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-    var roleRepository = scope.ServiceProvider.GetRequiredService<IRoleRepository>();
-    await DataSeeder.SeedAsync(context, userRepository, roleRepository);
-}
+await DataSeeder.SeedAsync(app.Services);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

@@ -34,14 +34,15 @@ namespace Application
             // Warranty services
             services.AddScoped<IWarrantyService, WarrantyService>();
 
-            // Auth services
-            services.AddScoped<IAuthService, AuthService>();
-
-            // User services
-            services.AddScoped<IUserService, UserService>();
+            // Identity services (User, Role, Auth combined)
+            // Note: IIdentityService and IdentityService are registered in Web/Program.cs
+            // to ensure proper dependency injection order with UserManager/RoleManager
 
             // Statistics services
             services.AddScoped<IStatisticsService, StatisticsService>();
+
+            // User Address service
+            services.AddScoped<IUserAddressService, UserAddressService>();
 
             return services;
         }

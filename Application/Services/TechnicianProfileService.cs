@@ -82,11 +82,9 @@ namespace Application.Services
             );
             
             // Note: For now, UserId remains null. To complete user creation:
-            // 1. Create IUserRepository interface
-            // 2. Implement UserRepository 
-            // 3. Inject IUserRepository into this service
-            // 4. Create AppUser with request.Username and request.Password
-            // 5. Link technician to user: technician.LinkToUser(user.Id);
+            // Note: User creation is handled through IIdentityService
+            // Inject IIdentityService and create user account if needed
+            // Link technician to user: technician.LinkToUser(userId);
 
             // Add skills if provided
             foreach (var skill in request.Skills)

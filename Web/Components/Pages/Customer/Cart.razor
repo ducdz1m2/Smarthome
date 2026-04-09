@@ -210,30 +210,7 @@
             }
             else
             {
-                // Demo data for testing
-                _cartItems = new List<CartItem>
-                {
-                    new CartItem
-                    {
-                        Id = 1,
-                        ProductId = 1,
-                        ProductName = "Đèn thông minh Xiaomi",
-                        UnitPrice = 299000,
-                        Quantity = 2,
-                        ImageUrl = "https://via.placeholder.com/150"
-                    },
-                    new CartItem
-                    {
-                        Id = 2,
-                        ProductId = 2,
-                        ProductName = "Ổ cắm thông minh",
-                        VariantName = "Màu trắng",
-                        UnitPrice = 159000,
-                        Quantity = 1,
-                        ImageUrl = "https://via.placeholder.com/150"
-                    }
-                };
-                await SaveCartAsync();
+                _cartItems = new List<CartItem>();
             }
         }
         catch (Exception ex)

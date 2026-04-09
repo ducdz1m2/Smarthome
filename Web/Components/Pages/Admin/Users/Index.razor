@@ -3,7 +3,7 @@
 @using Application.Interfaces.Services
 @using MudBlazor
 @layout AdminLayout
-@inject IUserService UserService
+@inject IIdentityService IdentityService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
@@ -93,7 +93,7 @@
         _loading = true;
         try
         {
-            _users = await UserService.GetAllAsync();
+            _users = await IdentityService.GetAllUsersAsync();
         }
         catch (Exception ex)
         {
@@ -162,7 +162,9 @@
         {
             try
             {
-                await UserService.DeleteAsync(user.Id);
+                var deleteResult = await IdentityService.DeleteUserAsync(user.Id);
+                if (!deleteResult.Succeeded)
+                    throw new Exception(string.Join(", ", deleteResult.Errors.Select(e => e.Description)));
                 await LoadUsers();
                 Snackbar.Add("Đã xóa người dùng", Severity.Success);
             }

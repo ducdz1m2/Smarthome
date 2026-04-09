@@ -1,0 +1,149 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IIdentityService IdentityService
+@inject IJSRuntime JSRuntime
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudLayout>
+    <MudAppBar Elevation="2" Color="Color.Primary" Fixed="true">
+        <MudText Typo="Typo.h5" Color="Color.Inherit" Class="fw-bold">Smarthome Store</MudText>
+        <MudSpacer />
+        <MudButton href="/" Variant="Variant.Text">Trang chủ</MudButton>
+        <MudButton href="/products" Variant="Variant.Text">Sản phẩm</MudButton>
+        @* Avatar button *@
+        <MudIconButton Href="/profile" Title="Quản lý tài khoản" Class="ml-2">
+            @if (!string.IsNullOrEmpty(_avatarUrl))
+            {
+                <MudAvatar Size="Size.Medium">
+                    <MudImage Src="@_avatarUrl" ObjectFit="ObjectFit.Cover" />
+                </MudAvatar>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" />
+            }
+        </MudIconButton>
+    </MudAppBar>
+    <MudMainContent Class="mt-16 pa-4">
+        <MudContainer MaxWidth="MaxWidth.Large">
+            <MudGrid>
+                @* Sidebar - cố định cho tất cả các trang tài khoản *@
+                <MudItem xs="12" md="3">
+                    <MudCard Elevation="2" Class="mb-4">
+                        <MudCardContent Class="text-center">
+                            @if (!string.IsNullOrEmpty(_avatarUrl))
+                            {
+                                <MudAvatar Size="Size.Large" Class="mb-3">
+                                    <MudImage Src="@_avatarUrl" ObjectFit="ObjectFit.Cover" />
+                                </MudAvatar>
+                            }
+                            else
+                            {
+                                <MudAvatar Size="Size.Large" Color="Color.Primary" Class="mb-3">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Large" />
+                                </MudAvatar>
+                            }
+                            <MudText Typo="Typo.h6">Tài khoản</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Quản lý tài khoản</MudText>
+                        </MudCardContent>
+                    </MudCard>
+
+                    <MudCard Elevation="2">
+                        <MudList T="string" Dense="true">
+                            <MudListItem Href="/profile" 
+                                         Icon="@Icons.Material.Filled.Person" 
+                                         Text="Thông tin cá nhân"
+                                         Selected="IsActive('/profile')" />
+                            <MudListItem Href="/orders" 
+                                         Icon="@Icons.Material.Filled.ShoppingBag" 
+                                         Text="Đơn hàng của tôi"
+                                         Selected="IsActive('/orders')" />
+                            <MudListItem Href="/addresses" 
+                                         Icon="@Icons.Material.Filled.LocationOn" 
+                                         Text="Địa chỉ giao hàng"
+                                         Selected="IsActive('/addresses')" />
+                            <MudListItem Href="/change-password" 
+                                         Icon="@Icons.Material.Filled.Lock" 
+                                         Text="Đổi mật khẩu"
+                                         Selected="IsActive('/change-password')" />
+                            <MudDivider />
+                            <MudListItem OnClick="Logout" 
+                                         Icon="@Icons.Material.Filled.Logout" 
+                                         Text="Đăng xuất"
+                                         IconColor="Color.Error" />
+                        </MudList>
+                    </MudCard>
+                </MudItem>
+
+                @* Content area *@
+                <MudItem xs="12" md="9">
+                    @Body
+                </MudItem>
+            </MudGrid>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+<style>
+    .fw-bold { font-weight: 600; }
+</style>
+
+@code {
+    private string? _avatarUrl;
+    private int _currentUserId = 1; // TODO: Get from auth
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Setup dotNetHelper for JS interop
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                window.dotNetHelperAccount = {
+                    invokeMethodAsync: function(methodName) {
+                        return DotNet.invokeMethodAsync('Web', methodName);
+                    }
+                };
+            ");
+            
+            // Listen for storage changes
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                window.addEventListener('storage', function(e) {
+                    if (e.key === 'userAvatar') {
+                        // Reload the page to update avatar across all components
+                        window.location.reload();
+                    }
+                });
+            ");
+            await LoadAvatar();
+        }
+    }
+
+    private async Task LoadAvatar()
+    {
+        try
+        {
+            _avatarUrl = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userAvatar");
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    private bool IsActive(string href)
+    {
+        var currentUri = NavigationManager.Uri;
+        var baseUri = NavigationManager.BaseUri;
+        var relativeUri = currentUri.Replace(baseUri, "/").TrimStart('/');
+        
+        return relativeUri.Equals(href.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void Logout()
+    {
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+        Snackbar.Add("Đã đăng xuất", Severity.Success);
+    }
+}

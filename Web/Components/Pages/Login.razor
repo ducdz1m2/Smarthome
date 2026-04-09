@@ -2,7 +2,7 @@
 @layout EmptyLayout
 @using Application.DTOs.Requests
 @using Application.Interfaces.Services
-@inject IAuthService AuthService
+@inject IIdentityService IdentityService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
@@ -78,7 +78,7 @@
         _loading = true;
         try
         {
-            var response = await AuthService.LoginAsync(_request);
+            var response = await IdentityService.LoginAsync(_request);
             
             // Store token in local storage or session
             // For Blazor Server, we'll use a custom AuthStateProvider
