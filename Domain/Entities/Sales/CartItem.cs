@@ -1,10 +1,13 @@
-namespace Domain.Entities.Sales
-{
-    using Domain.Entities.Common;
-    using Domain.Exceptions;
+namespace Domain.Entities.Sales;
 
-    public class CartItem : BaseEntity
-    {
+using Domain.Abstractions;
+using Domain.Exceptions;
+
+/// <summary>
+/// CartItem entity - represents an item in a user's shopping cart.
+/// </summary>
+public class CartItem : Entity
+{
         public int UserId { get; private set; }
         public int ProductId { get; private set; }
         public int? VariantId { get; private set; }
@@ -16,7 +19,7 @@ namespace Domain.Entities.Sales
         public static CartItem Create(int userId, int productId, int? variantId, int quantity)
         {
             if (quantity <= 0)
-                throw new DomainException("Số lượng phải lớn hơn 0");
+                throw new ValidationException(nameof(quantity), "Số lượng phải lớn hơn 0");
 
             return new CartItem
             {
@@ -31,9 +34,8 @@ namespace Domain.Entities.Sales
         public void UpdateQuantity(int newQuantity)
         {
             if (newQuantity <= 0)
-                throw new DomainException("Số lượng phải lớn hơn 0");
+                throw new ValidationException(nameof(newQuantity), "Số lượng phải lớn hơn 0");
 
             Quantity = newQuantity;
         }
     }
-}

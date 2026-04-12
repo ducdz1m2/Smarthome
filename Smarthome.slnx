@@ -9,4 +9,5 @@
   <Folder Name="/Pres/">
     <Project Path="Web/Web.csproj" Id="8fcce73d-2d69-4084-872d-777910c99644" />
   </Folder>
+  <Project Path="Domain.Tests/Domain.Tests.csproj" Id="e109d23d-4dd8-4897-8691-6f4c5f108b1f" />
 </Solution>

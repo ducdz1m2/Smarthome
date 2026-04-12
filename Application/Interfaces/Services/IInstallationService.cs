@@ -24,5 +24,10 @@ namespace Application.Interfaces.Services
         Task AddMaterialAsync(int bookingId, AddInstallationMaterialRequest request);
         Task RecordMaterialUsageAsync(int bookingId, RecordMaterialUsageRequest request);
         Task DeleteAsync(int id);
+
+        // Technician acceptance flow
+        Task AcceptBookingAsync(int bookingId, int technicianId);
+        Task RejectBookingAsync(int bookingId, int technicianId, RejectBookingRequest request);
+        Task<List<InstallationBookingListResponse>> GetPendingForTechnicianAsync(int technicianId);
     }
 }

@@ -1,11 +1,13 @@
-﻿
-
-using Domain.Entities.Common;
+﻿using Domain.Abstractions;
 using Domain.Exceptions;
+using Domain.ValueObjects;
 
-namespace Domain.Entities.Catalog
-{
-    public class ProductImage : BaseEntity
+namespace Domain.Entities.Catalog;
+
+/// <summary>
+/// ProductImage entity - represents a product image.
+/// </summary>
+public class ProductImage : Entity
     {
         public int ProductId { get; private set; }
         public string Url { get; private set; } = string.Empty;
@@ -18,22 +20,28 @@ namespace Domain.Entities.Catalog
 
         private ProductImage() { } // EF Core
 
-        public static ProductImage Create(int productId, string url, string? altText = null, bool isMain = false, int sortOrder = 0)
+        public static ProductImage Create(int productId, WebsiteUrl url, string? altText = null, bool isMain = false, int sortOrder = 0)
         {
-            if (string.IsNullOrWhiteSpace(url))
-                throw new DomainException("URL hình ảnh không được trống");
-
-            if (!Uri.TryCreate(url, UriKind.Absolute, out _))
-                throw new DomainException("URL hình ảnh không hợp lệ");
+            if (string.IsNullOrWhiteSpace(url?.Value))
+                throw new ValidationException(nameof(url), "URL hình ảnh không được trống");
 
             return new ProductImage
             {
                 ProductId = productId,
-                Url = url.Trim(),
+                Url = url.Value,
                 AltText = altText?.Trim(),
                 IsMain = isMain,
                 SortOrder = sortOrder
             };
+        }
+
+        // Legacy overload for backward compatibility
+        public static ProductImage Create(int productId, string url, string? altText = null, bool isMain = false, int sortOrder = 0)
+        {
+            var websiteUrl = WebsiteUrl.Create(url);
+            if (websiteUrl == null)
+                throw new ArgumentException("URL không được để trống", nameof(url));
+            return Create(productId, websiteUrl, altText, isMain, sortOrder);
         }
 
         public void SetAsMain()
@@ -56,4 +64,3 @@ namespace Domain.Entities.Catalog
             AltText = altText?.Trim();
         }
     }
-}

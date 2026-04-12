@@ -130,7 +130,7 @@
         var dialog = await DialogService.ShowAsync<CouponDialog>(coupon == null ? "Thêm mã giảm giá" : "Sửa mã giảm giá", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadCoupons();
         }
@@ -173,7 +173,7 @@
         var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is true)
+        if (result is { Canceled: false, Data: true })
         {
             try
             {

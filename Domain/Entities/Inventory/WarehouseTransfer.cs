@@ -1,10 +1,13 @@
-﻿using Domain.Entities.Common;
+﻿namespace Domain.Entities.Inventory;
+
+using Domain.Abstractions;
 using Domain.Enums;
 using Domain.Exceptions;
 
-namespace Domain.Entities.Inventory
-{
-    public class WarehouseTransfer : BaseEntity
+/// <summary>
+/// WarehouseTransfer aggregate root - represents a stock transfer between warehouses.
+/// </summary>
+public class WarehouseTransfer : AggregateRoot
     {
         public int FromWarehouseId { get; private set; }
         public int ToWarehouseId { get; private set; }
@@ -59,4 +62,3 @@ namespace Domain.Entities.Inventory
             Reason = reason;
         }
     }
-}

@@ -147,7 +147,7 @@
 
     private async Task Submit()
     {
-        await _form.Validate();
+        await _form.ValidateAsync();
         if (!_isValid) return;
 
         if (!_expiryDate.HasValue)
@@ -160,8 +160,8 @@
         {
             if (_isEdit)
             {
-                _request.ExpiryDate = _expiryDate.Value;
-                await CouponService.UpdateAsync(CouponId.Value, _request);
+                _request.ExpiryDate = _expiryDate!.Value;
+                await CouponService.UpdateAsync(CouponId!.Value, _request);
                 Snackbar.Add("Đã cập nhật mã giảm giá", Severity.Success);
             }
             else

@@ -1,16 +1,20 @@
-namespace Domain.Entities.Promotions
-{
-    using Domain.Entities.Common;
-    using Domain.Enums;
-    using Domain.Exceptions;
+namespace Domain.Entities.Promotions;
 
-    public class Coupon : BaseEntity
+using Domain.Abstractions;
+using Domain.Enums;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// Coupon aggregate root - represents a discount coupon code.
+/// </summary>
+public class Coupon : AggregateRoot
     {
         public string Code { get; private set; } = string.Empty;
         public DiscountType DiscountType { get; private set; }
-        public decimal DiscountValue { get; private set; }
-        public decimal? MinOrderAmount { get; private set; }
-        public decimal? MaxDiscountAmount { get; private set; }
+        public Money DiscountValue { get; private set; } = null!;
+        public Money? MinOrderAmount { get; private set; }
+        public Money? MaxDiscountAmount { get; private set; }
         public DateTime ExpiryDate { get; private set; }
         public int MaxUsage { get; private set; }
         public int UsedCount { get; private set; }
@@ -18,12 +22,12 @@ namespace Domain.Entities.Promotions
 
         private Coupon() { }
 
-        public static Coupon Create(string code, DiscountType type, decimal value, DateTime expiry, int maxUsage = 100)
+        public static Coupon Create(string code, DiscountType type, Money value, DateTime expiry, int maxUsage = 100, Money? minOrderAmount = null, Money? maxDiscountAmount = null)
         {
             if (string.IsNullOrWhiteSpace(code))
                 throw new ValidationException(nameof(code), "Mã coupon không được trống");
 
-            if (value <= 0)
+            if (value.IsLessThanOrEqualTo(Money.Zero()))
                 throw new ValidationException(nameof(value), "Giá trị giảm giá phải lớn hơn 0");
 
             if (expiry <= DateTime.UtcNow)
@@ -34,6 +38,8 @@ namespace Domain.Entities.Promotions
                 Code = code.Trim().ToUpper(),
                 DiscountType = type,
                 DiscountValue = value,
+                MinOrderAmount = minOrderAmount,
+                MaxDiscountAmount = maxDiscountAmount,
                 ExpiryDate = expiry,
                 MaxUsage = maxUsage,
                 UsedCount = 0,
@@ -41,22 +47,34 @@ namespace Domain.Entities.Promotions
             };
         }
 
-        public bool IsValid(decimal orderAmount)
+        // Legacy overload for backward compatibility
+        public static Coupon Create(string code, DiscountType type, decimal value, DateTime expiry, int maxUsage = 100)
+        {
+            return Create(code, type, Money.Vnd(value), expiry, maxUsage);
+        }
+
+        public bool IsValid(Money orderAmount)
         {
             if (!IsActive) return false;
             if (DateTime.UtcNow > ExpiryDate) return false;
             if (UsedCount >= MaxUsage) return false;
-            if (MinOrderAmount.HasValue && orderAmount < MinOrderAmount.Value) return false;
+            if (MinOrderAmount != null && orderAmount.IsLessThan(MinOrderAmount)) return false;
 
             return true;
         }
 
-        public decimal CalculateDiscount(decimal orderAmount)
+        // Legacy overload for backward compatibility
+        public bool IsValid(decimal orderAmount)
+        {
+            return IsValid(Money.Vnd(orderAmount));
+        }
+
+        public Money CalculateDiscount(Money orderAmount)
         {
             if (!IsValid(orderAmount))
-                throw new CouponExpiredException(Code, ExpiryDate);
+                throw new InvalidCouponException(Code, "Coupon is not valid for this order");
 
-            decimal discount;
+            Money discount;
 
             if (DiscountType == DiscountType.FixedAmount)
             {
@@ -64,15 +82,21 @@ namespace Domain.Entities.Promotions
             }
             else
             {
-                discount = orderAmount * DiscountValue / 100;
+                discount = orderAmount.ApplyDiscount(DiscountValue.Amount);
             }
 
-            if (MaxDiscountAmount.HasValue && discount > MaxDiscountAmount.Value)
+            if (MaxDiscountAmount != null && discount.IsGreaterThan(MaxDiscountAmount))
             {
-                discount = MaxDiscountAmount.Value;
+                discount = MaxDiscountAmount;
             }
 
             return discount;
+        }
+
+        // Legacy overload for backward compatibility
+        public decimal CalculateDiscount(decimal orderAmount)
+        {
+            return CalculateDiscount(Money.Vnd(orderAmount)).Amount;
         }
 
         public void IncrementUsage()
@@ -88,10 +112,9 @@ namespace Domain.Entities.Promotions
             IsActive = false;
         }
 
-        public void SetConstraints(decimal? minOrder, decimal? maxDiscount)
+        public void SetConstraints(Money? minOrder, Money? maxDiscount)
         {
             MinOrderAmount = minOrder;
             MaxDiscountAmount = maxDiscount;
         }
     }
-}

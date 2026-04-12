@@ -451,7 +451,7 @@ namespace Application.Services
                 TotalBanners = banners.Count,
                 ActiveBanners = banners.Count(b => b.IsActive),
                 TotalCoupons = coupons.Count,
-                ActiveCoupons = coupons.Count(c => c.IsActive && (c.ExpiryDate == null || c.ExpiryDate >= now)),
+                ActiveCoupons = coupons.Count(c => c.IsActive && c.ExpiryDate >= now),
                 TotalPromotions = promotions.Count,
                 ActivePromotions = promotions.Count(p => p.StartDate <= now && p.EndDate >= now),
                 UsedCouponsCount = coupons.Sum(c => c.UsedCount),

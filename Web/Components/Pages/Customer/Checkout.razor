@@ -285,7 +285,7 @@
     {
         if (!_isValid || !_cartItems.Any()) return;
 
-        await _form.Validate();
+        await _form.ValidateAsync();
         if (!_isValid) return;
 
         _isPlacingOrder = true;

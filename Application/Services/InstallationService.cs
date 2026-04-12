@@ -287,6 +287,46 @@ namespace Application.Services
             await _bookingRepository.SaveChangesAsync();
         }
 
+        public async Task AcceptBookingAsync(int bookingId, int technicianId)
+        {
+            var booking = await _bookingRepository.GetByIdAsync(bookingId);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            if (booking.TechnicianId != technicianId)
+                throw new DomainException("Bạn không được phân công cho lịch này");
+
+            booking.Accept();
+            await _bookingRepository.SaveChangesAsync();
+        }
+
+        public async Task RejectBookingAsync(int bookingId, int technicianId, RejectBookingRequest request)
+        {
+            var booking = await _bookingRepository.GetByIdAsync(bookingId);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            if (booking.TechnicianId != technicianId)
+                throw new DomainException("Bạn không được phân công cho lịch này");
+
+            // Release slot when rejecting
+            var slot = await _slotRepository.GetByIdAsync(booking.SlotId);
+            if (slot != null)
+            {
+                slot.Release();
+            }
+
+            booking.Reject(request.Reason);
+            await _bookingRepository.SaveChangesAsync();
+        }
+
+        public async Task<List<InstallationBookingListResponse>> GetPendingForTechnicianAsync(int technicianId)
+        {
+            var bookings = await _bookingRepository.GetByTechnicianIdAsync(technicianId);
+            var pending = bookings.Where(b => b.Status == Domain.Enums.InstallationStatus.Assigned).ToList();
+            return pending.Select(MapToListResponse).ToList();
+        }
+
         private InstallationBookingResponse MapToResponse(InstallationBooking booking)
         {
             var order = booking.Order;
@@ -374,6 +414,8 @@ namespace Application.Services
                 OrderNumber = order?.OrderNumber ?? $"#{booking.OrderId}",
                 TechnicianId = booking.TechnicianId,
                 TechnicianName = technician?.FullName ?? $"KTV #{booking.TechnicianId}",
+                CustomerName = order?.ReceiverName ?? string.Empty,
+                CustomerPhone = order?.ReceiverPhone ?? string.Empty,
                 ScheduledDate = booking.ScheduledDate,
                 StartTime = booking.Slot?.StartTime,
                 EndTime = booking.Slot?.EndTime,

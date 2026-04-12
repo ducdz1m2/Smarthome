@@ -1,12 +1,15 @@
-namespace Domain.Entities.Inventory
-{
-    using Domain.Entities.Common;
-    using Domain.Enums;
-    using Domain.Events;
-    using Domain.Exceptions;
+namespace Domain.Entities.Inventory;
 
-    public class ProductWarehouse : BaseEntity
-    {
+using Domain.Abstractions;
+using Domain.Enums;
+using Domain.Events;
+using Domain.Exceptions;
+
+/// <summary>
+/// ProductWarehouse entity - tracks product stock in a specific warehouse.
+/// </summary>
+public class ProductWarehouse : Entity
+{
         public int ProductId { get; private set; }
         public int WarehouseId { get; private set; }
         public int Quantity { get; private set; }
@@ -80,4 +83,3 @@ namespace Domain.Entities.Inventory
 
         public bool IsLowStock(int threshold = 10) => GetAvailableStock() <= threshold;
     }
-}

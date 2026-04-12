@@ -1,82 +1,98 @@
-namespace Domain.Entities.Catalog
+namespace Domain.Entities.Catalog;
+
+using System.Text.Json;
+using Domain.Abstractions;
+using Domain.Entities.Inventory;
+using Domain.Enums;
+using Domain.Events;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// Product aggregate root - represents a product in the catalog.
+/// </summary>
+public class Product : AggregateRoot
 {
-    using System.Text.Json;
-    using Domain.Entities.Common;
-    using Domain.Entities.Inventory;
-    using Domain.Enums;
-    using Domain.Events;
-    using Domain.Exceptions;
+    public string Name { get; private set; } = string.Empty;
+    public Sku Sku { get; private set; } = null!;
+    public Money BasePrice { get; private set; } = null!;
+    public int StockQuantity { get; private set; }
+    public int FrozenStockQuantity { get; private set; }
+    public string? Description { get; private set; }
+    public string SpecsJson { get; private set; } = "{}";
+    public bool IsActive { get; private set; } = true;
+    public bool RequiresInstallation { get; private set; }
+    public int CategoryId { get; private set; }
+    public int BrandId { get; private set; }
+    public int? SupplierId { get; private set; }
 
-    public class Product : BaseEntity
+    public virtual Category Category { get; private set; } = null!;
+    public virtual Brand Brand { get; private set; } = null!;
+    public virtual Supplier? Supplier { get; private set; }
+    public virtual ICollection<ProductVariant> Variants { get; private set; } = new List<ProductVariant>();
+    public virtual ICollection<ProductImage> Images { get; private set; } = new List<ProductImage>();
+    public virtual ICollection<ProductComment> Comments { get; private set; } = new List<ProductComment>();
+
+    private Product() { }
+
+    public static Product Create(string name, string sku, Money basePrice, int categoryId, int brandId, int? supplierId = null, bool requiresInstallation = false)
     {
-        public string Name { get; private set; } = string.Empty;
-        public string Sku { get; private set; } = null!;
-        public decimal BasePrice { get; private set; }
-        public int StockQuantity { get; private set; }
-        public int FrozenStockQuantity { get; private set; }
-        public string? Description { get; private set; }
-        public string SpecsJson { get; private set; } = "{}";
-        public bool IsActive { get; private set; } = true;
-        public bool RequiresInstallation { get; private set; }
-        public int CategoryId { get; private set; }
-        public int BrandId { get; private set; }
-        public int? SupplierId { get; private set; }
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ValidationException(nameof(name), "Tên sản phẩm không được trống");
 
-        public virtual Category Category { get; private set; } = null!;
-        public virtual Brand Brand { get; private set; } = null!;
-        public virtual Supplier? Supplier { get; private set; }
-        public virtual ICollection<ProductVariant> Variants { get; private set; } = new List<ProductVariant>();
-        public virtual ICollection<ProductImage> Images { get; private set; } = new List<ProductImage>();
-        public virtual ICollection<ProductComment> Comments { get; private set; } = new List<ProductComment>();
+        if (categoryId <= 0)
+            throw new ValidationException(nameof(categoryId), "CategoryId không hợp lệ");
 
-        private Product() { }
+        if (brandId <= 0)
+            throw new ValidationException(nameof(brandId), "BrandId không hợp lệ");
 
-        public static Product Create(string name, string sku, decimal basePrice, int categoryId, int brandId, int? supplierId = null, bool requiresInstallation = false)
+        if (basePrice.IsLessThan(Money.Zero()))
+            throw new ValidationException(nameof(basePrice), "Giá không thể âm");
+
+        var product = new Product
         {
-            if (string.IsNullOrWhiteSpace(name))
-                throw new ValidationException(nameof(name), "Tên sản phẩm không được trống");
+            Name = name.Trim(),
+            Sku = Sku.Create(sku),
+            BasePrice = basePrice,
+            CategoryId = categoryId,
+            BrandId = brandId,
+            SupplierId = supplierId,
+            RequiresInstallation = requiresInstallation,
+            StockQuantity = 0,
+            FrozenStockQuantity = 0,
+            SpecsJson = "{}"
+        };
 
-            if (categoryId <= 0)
-                throw new ValidationException(nameof(categoryId), "CategoryId không hợp lệ");
+        product.AddDomainEvent(new ProductCreatedEvent(product.Id));
+        return product;
+    }
 
-            if (brandId <= 0)
-                throw new ValidationException(nameof(brandId), "BrandId không hợp lệ");
+    // Legacy factory method for backward compatibility
+    public static Product Create(string name, string sku, decimal basePrice, int categoryId, int brandId, int? supplierId = null, bool requiresInstallation = false)
+    {
+        return Create(name, sku, Money.Vnd(basePrice), categoryId, brandId, supplierId, requiresInstallation);
+    }
 
-            if (basePrice < 0)
-                throw new ValidationException(nameof(basePrice), "Giá không thể âm");
-
-            var product = new Product
-            {
-                Name = name.Trim(),
-                Sku = sku.Trim().ToUpper(),
-                BasePrice = basePrice,
-                CategoryId = categoryId,
-                BrandId = brandId,
-                SupplierId = supplierId,
-                RequiresInstallation = requiresInstallation,
-                StockQuantity = 0,
-                FrozenStockQuantity = 0,
-                SpecsJson = "{}"
-            };
-
-            product.AddDomainEvent(new ProductCreatedEvent(product.Id));
-            return product;
-        }
-
-        public void Update(string name, decimal basePrice, string? description)
+        public void Update(string name, Money basePrice, string? description)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Tên sản phẩm không được trống", nameof(name));
 
-            if (basePrice != BasePrice)
+            if (!BasePrice.Equals(basePrice))
             {
                 var oldPrice = BasePrice;
                 BasePrice = basePrice;
-                AddDomainEvent(new ProductPriceChangedEvent(Id, oldPrice, basePrice));
+                AddDomainEvent(new ProductPriceChangedEvent(Id, oldPrice.Amount, basePrice.Amount));
             }
 
             Name = name.Trim();
             Description = description?.Trim();
+        }
+
+        // Legacy overload for backward compatibility
+        public void Update(string name, decimal basePrice, string? description)
+        {
+            Update(name, Money.Vnd(basePrice), description);
         }
 
         public void UpdateSpecs(Dictionary<string, string> specs)
@@ -99,52 +115,18 @@ namespace Domain.Entities.Catalog
             IsActive = false;
         }
 
-        public void AddStock(int quantity)
+        
+        public ProductVariant AddVariant(string sku, Money price, Dictionary<string, string> attributes)
         {
-            if (quantity <= 0)
-                throw new InvalidQuantityException(quantity, "AddStock");
-
-            StockQuantity += quantity;
-        }
-
-        public void ReserveStock(int quantity)
-        {
-            if (quantity <= 0)
-                throw new InvalidQuantityException(quantity, "ReserveStock");
-
-            if (GetAvailableStock() < quantity)
-                throw new InsufficientStockException(Id, 0, quantity, GetAvailableStock());
-
-            FrozenStockQuantity += quantity;
-        }
-
-        public void ReleaseStock(int quantity)
-        {
-            if (quantity <= 0)
-                throw new InvalidQuantityException(quantity, "ReleaseStock");
-
-            FrozenStockQuantity = Math.Max(0, FrozenStockQuantity - quantity);
-        }
-
-        public void DeductStock(int quantity)
-        {
-            if (quantity <= 0)
-                throw new InvalidQuantityException(quantity, "DeductStock");
-
-            if (StockQuantity < quantity)
-                throw new InsufficientStockException(Id, 0, quantity, StockQuantity);
-
-            StockQuantity -= quantity;
-            FrozenStockQuantity = Math.Max(0, FrozenStockQuantity - quantity);
-        }
-
-        public int GetAvailableStock() => StockQuantity - FrozenStockQuantity;
-
-        public ProductVariant AddVariant(string sku, decimal price, Dictionary<string, string> attributes)
-        {
-            var variant = ProductVariant.Create(this, sku.Trim().ToUpper(), price, 0, attributes);
+            var variant = ProductVariant.Create(this, Sku.Create(sku), price, 0, attributes);
             Variants.Add(variant);
             return variant;
+        }
+
+        // Legacy overload for backward compatibility
+        public ProductVariant AddVariant(string sku, decimal price, Dictionary<string, string> attributes)
+        {
+            return AddVariant(sku, Money.Vnd(price), attributes);
         }
 
         public ProductImage AddImage(string url, bool isMain = false, int sortOrder = 0)
@@ -202,14 +184,52 @@ namespace Domain.Entities.Catalog
             SupplierId = null;
         }
 
-        public decimal GetEffectivePrice(DiscountType discountType, decimal discountValue)
+        public Money GetEffectivePrice(DiscountType discountType, Money discountValue)
         {
             return discountType switch
             {
-                DiscountType.FixedAmount => Math.Max(0, BasePrice - discountValue),
-                DiscountType.Percentage => BasePrice * (1 - discountValue / 100),
+                DiscountType.FixedAmount => BasePrice.Subtract(discountValue),
+                DiscountType.Percentage => BasePrice.ApplyDiscount(discountValue.Amount),
                 _ => BasePrice
             };
         }
+
+        // Legacy overload for backward compatibility
+        public decimal GetEffectivePrice(DiscountType discountType, decimal discountValue)
+        {
+            return GetEffectivePrice(discountType, Money.Vnd(discountValue)).Amount;
+        }
+
+        //kho
+
+        public void AddStockToVariant(string sku, int quantity)
+        {
+            var variant = Variants.FirstOrDefault(v => v.Sku.Value == sku);
+            if (variant == null) throw new DomainException($"Không tìm thấy SKU: {sku}");
+
+            variant.AddStock(quantity);
+
+           
+            SyncTotalStock();
+
+      
+            AddDomainEvent(new ProductStockSynchronizedEvent(Id, variant.Id, StockQuantity));
+        }
+
+        public void ReserveStockForVariant(string sku, int quantity)
+        {
+            var variant = Variants.FirstOrDefault(v => v.Sku.Value == sku);
+            if (variant == null) throw new DomainException($"Không tìm thấy SKU: {sku}");
+
+            variant.ReserveStock(quantity);
+
+            SyncTotalStock();
+        }
+
+     
+        private void SyncTotalStock()
+        {
+            StockQuantity = Variants.Sum(v => v.StockQuantity);
+            FrozenStockQuantity = Variants.Sum(v => v.FrozenStockQuantity);
+        }
     }
-}

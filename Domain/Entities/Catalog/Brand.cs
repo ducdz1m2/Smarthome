@@ -1,9 +1,12 @@
-﻿using Domain.Entities.Common;
+﻿using Domain.Abstractions;
 using Domain.Exceptions;
 
-namespace Domain.Entities.Catalog
-{
-    public class Brand : BaseEntity
+namespace Domain.Entities.Catalog;
+
+/// <summary>
+/// Brand entity - represents a product manufacturer/brand.
+/// </summary>
+public class Brand : Entity
     {
         public string Name { get; private set; } = string.Empty;
         public string? Description { get; private set; }
@@ -17,7 +20,7 @@ namespace Domain.Entities.Catalog
             string? logoUrl = null, string? website = null)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new DomainException("Tên thương hiệu không được trống");
+                throw new ValidationException(nameof(name), "Tên thương hiệu không được trống");
 
             return new Brand
             {
@@ -32,7 +35,7 @@ namespace Domain.Entities.Catalog
         public void Update(string name, string? description, string? logoUrl, string? website)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new DomainException("Tên thương hiệu không được trống");
+                throw new ValidationException(nameof(name), "Tên thương hiệu không được trống");
 
             Name = name.Trim();
             Description = description?.Trim();
@@ -50,4 +53,3 @@ namespace Domain.Entities.Catalog
             IsActive = false;
         }
     }
-}

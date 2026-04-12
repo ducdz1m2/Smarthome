@@ -1,12 +1,16 @@
-namespace Domain.Entities.Inventory
-{
-    using Domain.Entities.Common;
-    using Domain.Enums;
-    using Domain.Events;
-    using Domain.Exceptions;
+namespace Domain.Entities.Inventory;
 
-    public class StockEntry : BaseEntity
-    {
+using Domain.Abstractions;
+using Domain.Enums;
+using Domain.Events;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// StockEntry aggregate root - represents a stock receiving transaction.
+/// </summary>
+public class StockEntry : AggregateRoot
+{
         public DateTime EntryDate { get; private set; }
         public int SupplierId { get; private set; }
         public int WarehouseId { get; private set; }
@@ -44,7 +48,7 @@ namespace Domain.Entities.Inventory
             if (IsCompleted)
                 throw new BusinessRuleViolationException("StockEntryCompleted", "Không thể thêm sản phẩm vào phiếu đã hoàn thành");
 
-            var detail = StockEntryDetail.Create(productId, quantity, unitCost);
+            var detail = StockEntryDetail.Create(productId, quantity, Money.Vnd(unitCost));
             Details.Add(detail);
             RecalculateTotal();
             return detail;
@@ -62,18 +66,19 @@ namespace Domain.Entities.Inventory
 
             foreach (var detail in Details)
             {
-                AddDomainEvent(new StockReceivedEvent(detail.ProductId, WarehouseId, detail.Quantity, Id));
+                AddDomainEvent(new StockReceivedEvent(Id, detail.ProductId, WarehouseId, detail.Quantity));
             }
         }
 
-        public decimal GetTotalCost()
+        public Money GetTotalCost()
         {
-            return Details.Sum(d => d.GetTotalCost());
+            return Details.Aggregate(Money.Zero(), (sum, d) => sum.Add(d.GetTotalCost()));
         }
+
+        public decimal GetTotalCostAmount() => GetTotalCost().Amount;
 
         private void RecalculateTotal()
         {
-            TotalCost = GetTotalCost();
+            TotalCost = GetTotalCostAmount();
         }
     }
-}

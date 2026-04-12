@@ -1,10 +1,13 @@
-namespace Domain.Entities.Sales
-{
-    using Domain.Entities.Common;
-    using Domain.Enums;
-    using Domain.Exceptions;
+namespace Domain.Entities.Sales;
 
-    public class OrderShipment : BaseEntity
+using Domain.Abstractions;
+using Domain.Enums;
+using Domain.Exceptions;
+
+/// <summary>
+/// OrderShipment entity - tracks shipping status for an order.
+/// </summary>
+public class OrderShipment : Entity
     {
         public int OrderId { get; private set; }
         public string Carrier { get; private set; } = string.Empty; // GHN, GHTK, J&T...
@@ -21,7 +24,7 @@ namespace Domain.Entities.Sales
         public static OrderShipment Create(int orderId, string carrier, string trackingNumber)
         {
             if (string.IsNullOrWhiteSpace(carrier))
-                throw new DomainException("Tên đơn vị vận chuyển không được trống");
+                throw new ValidationException(nameof(carrier), "Tên đơn vị vận chuyển không được trống");
 
             return new OrderShipment
             {
@@ -53,4 +56,3 @@ namespace Domain.Entities.Sales
         Delivered = 3,
         Failed = 4
     }
-}

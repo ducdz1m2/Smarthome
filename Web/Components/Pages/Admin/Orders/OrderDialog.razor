@@ -170,14 +170,28 @@
                     Xác nhận
                 </MudButton>
             }
-            
+
+            @if (_order.Status == "AwaitingPickup")
+            {
+                <MudButton Color="Color.Primary" OnClick="StartShipping" StartIcon="@Icons.Material.Filled.LocalShipping">
+                    Bắt đầu giao
+                </MudButton>
+            }
+
+            @if (_order.Status == "Shipping")
+            {
+                <MudButton Color="Color.Success" OnClick="MarkDelivered" StartIcon="@Icons.Material.Filled.Done">
+                    Đã giao
+                </MudButton>
+            }
+
             @if (CanCancel(_order.Status))
             {
                 <MudButton Color="Color.Error" OnClick="CancelOrder" StartIcon="@Icons.Material.Filled.Cancel">
                     Hủy đơn
                 </MudButton>
             }
-            
+
             @if (_order.Status is "Installing" or "Testing" or "Delivered")
             {
                 <MudButton Color="Color.Success" OnClick="CompleteOrder" StartIcon="@Icons.Material.Filled.DoneAll">
@@ -231,6 +245,36 @@
         {
             await OrderService.ConfirmAsync(OrderId);
             Snackbar.Add("Đã xác nhận đơn hàng", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartShipping()
+    {
+        try
+        {
+            await OrderService.StartShippingAsync(OrderId);
+            Snackbar.Add("Đơn hàng bắt đầu giao", Severity.Success);
+            await LoadOrder();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task MarkDelivered()
+    {
+        try
+        {
+            await OrderService.MarkDeliveredAsync(OrderId);
+            Snackbar.Add("Đã đánh dấu đơn hàng đã giao", Severity.Success);
             await LoadOrder();
             MudDialog.Close(DialogResult.Ok(true));
         }

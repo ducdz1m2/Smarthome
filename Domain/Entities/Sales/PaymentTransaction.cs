@@ -1,13 +1,17 @@
-namespace Domain.Entities.Sales
-{
-    using Domain.Entities.Common;
-    using Domain.Enums;
-    using Domain.Exceptions;
+namespace Domain.Entities.Sales;
 
-    public class PaymentTransaction : BaseEntity
+using Domain.Abstractions;
+using Domain.Enums;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// PaymentTransaction entity - tracks payment status for an order.
+/// </summary>
+public class PaymentTransaction : Entity
     {
         public int OrderId { get; private set; }
-        public decimal Amount { get; private set; }
+        public Money Amount { get; private set; } = null!;
         public PaymentMethod Method { get; private set; }
         public PaymentTransactionStatus Status { get; private set; } = PaymentTransactionStatus.Pending;
         public string? TransactionCode { get; private set; }
@@ -16,10 +20,10 @@ namespace Domain.Entities.Sales
 
         private PaymentTransaction() { }
 
-        public static PaymentTransaction Create(int orderId, decimal amount, PaymentMethod method)
+        public static PaymentTransaction Create(int orderId, Money amount, PaymentMethod method)
         {
-            if (amount <= 0)
-                throw new DomainException("Số tiền phải lớn hơn 0");
+            if (amount.IsLessThanOrEqualTo(Money.Zero()))
+                throw new ValidationException(nameof(amount), "Số tiền phải lớn hơn 0");
 
             return new PaymentTransaction
             {
@@ -28,6 +32,12 @@ namespace Domain.Entities.Sales
                 Method = method,
                 Status = PaymentTransactionStatus.Pending
             };
+        }
+
+        // Legacy overload for backward compatibility
+        public static PaymentTransaction Create(int orderId, decimal amount, PaymentMethod method)
+        {
+            return Create(orderId, Money.Vnd(amount), method);
         }
 
         public void MarkSuccess(string transactionCode, string? gatewayResponse = null)
@@ -58,4 +68,3 @@ namespace Domain.Entities.Sales
         Failed = 2,
         Refunded = 3
     }
-}

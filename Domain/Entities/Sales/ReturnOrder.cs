@@ -1,16 +1,20 @@
-namespace Domain.Entities.Sales
-{
-    using Domain.Entities.Common;
-    using Domain.Enums;
-    using Domain.Exceptions;
+namespace Domain.Entities.Sales;
 
-    public class ReturnOrder : BaseEntity
+using Domain.Abstractions;
+using Domain.Enums;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// ReturnOrder aggregate root - represents a product return request.
+/// </summary>
+public class ReturnOrder : AggregateRoot
     {
         public int OriginalOrderId { get; private set; }
         public ReturnType ReturnType { get; private set; }
         public string Reason { get; private set; } = string.Empty;
         public ReturnOrderStatus Status { get; private set; } = ReturnOrderStatus.Pending;
-        public decimal? RefundAmount { get; private set; }
+        public Money? RefundAmount { get; private set; }
         public DateTime? ApprovedAt { get; private set; }
         public DateTime? ReceivedAt { get; private set; }
         public DateTime? CompletedAt { get; private set; }
@@ -42,7 +46,7 @@ namespace Domain.Entities.Sales
             Items.Add(item);
         }
 
-        public void Approve(decimal? refundAmount = null)
+        public void Approve(Money? refundAmount = null)
         {
             if (Status != ReturnOrderStatus.Pending)
                 throw new BusinessRuleViolationException("ReturnOrderStatus", "Chỉ có thể duyệt yêu cầu đang chờ");
@@ -50,6 +54,12 @@ namespace Domain.Entities.Sales
             Status = ReturnOrderStatus.Approved;
             RefundAmount = refundAmount;
             ApprovedAt = DateTime.UtcNow;
+        }
+
+        // Legacy overload for backward compatibility
+        public void Approve(decimal? refundAmount = null)
+        {
+            Approve(refundAmount.HasValue ? Money.Vnd(refundAmount.Value) : null);
         }
 
         public void MarkReceived()
@@ -71,7 +81,7 @@ namespace Domain.Entities.Sales
         }
     }
 
-    public class ReturnOrderItem : BaseEntity
+    public class ReturnOrderItem : Entity
     {
         public int ReturnOrderId { get; private set; }
         public int OrderItemId { get; private set; }
@@ -100,4 +110,3 @@ namespace Domain.Entities.Sales
         Completed = 3,
         Rejected = 4
     }
-}

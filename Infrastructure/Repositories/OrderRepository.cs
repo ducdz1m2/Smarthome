@@ -30,6 +30,14 @@ namespace Infrastructure.Repositories
                 .FirstOrDefaultAsync(o => o.Id == id);
         }
 
+        public async Task<Order?> GetByIdWithDetailsForUpdateAsync(int id)
+        {
+            return await _context.Orders
+                .Include(o => o.Items)
+                .Include(o => o.Shipments)
+                .FirstOrDefaultAsync(o => o.Id == id);
+        }
+
         public async Task<Order?> GetByOrderNumberAsync(string orderNumber)
         {
             return await _context.Orders

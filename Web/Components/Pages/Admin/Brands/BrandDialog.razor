@@ -59,7 +59,7 @@
         {
             try
             {
-                var brand = await BrandService.GetByIdAsync(BrandId.Value);
+                var brand = await BrandService.GetByIdAsync(BrandId!.Value);
                 if (brand != null)
                 {
                     _request = new UpdateBrandRequest
@@ -95,14 +95,14 @@
 
     private async Task Submit()
     {
-        await _form.Validate();
+        await _form.ValidateAsync();
         if (!_isValid) return;
 
         try
         {
             if (_isEdit)
             {
-                await BrandService.UpdateAsync(BrandId.Value, _request);
+                await BrandService.UpdateAsync(BrandId!.Value, _request);
                 Snackbar.Add("Đã cập nhật thương hiệu", Severity.Success);
             }
             else

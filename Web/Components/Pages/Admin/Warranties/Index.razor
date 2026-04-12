@@ -118,7 +118,7 @@
         var dialog = await DialogService.ShowAsync<CreateClaimDialog>("Tạo yêu cầu bảo hành", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadWarranties();
             Snackbar.Add("Đã tạo yêu cầu bảo hành", Severity.Success);

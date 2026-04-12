@@ -1,14 +1,18 @@
-using Domain.Entities.Common;
-using Domain.Exceptions;
+namespace Domain.Entities.Content;
 
-namespace Domain.Entities.Content
-{
-    public class Banner : BaseEntity
+using Domain.Abstractions;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// Banner entity - represents a promotional banner.
+/// </summary>
+public class Banner : Entity
     {
         public string Title { get; private set; } = string.Empty;
         public string? Subtitle { get; private set; }
-        public string ImageUrl { get; private set; } = string.Empty;
-        public string? LinkUrl { get; private set; }
+        public WebsiteUrl ImageUrl { get; private set; } = null!;
+        public WebsiteUrl? LinkUrl { get; private set; }
         public string Position { get; private set; } = "HomeTop"; // HomeTop, HomeMiddle, ProductPage, etc.
         public int SortOrder { get; private set; } = 0;
         public DateTime? StartDate { get; private set; }
@@ -18,21 +22,21 @@ namespace Domain.Entities.Content
 
         private Banner() { }
 
-        public static Banner Create(string title, string imageUrl, string? subtitle = null, string? linkUrl = null,
+        public static Banner Create(string title, WebsiteUrl imageUrl, string? subtitle = null, WebsiteUrl? linkUrl = null,
             string position = "HomeTop", int sortOrder = 0, DateTime? startDate = null, DateTime? endDate = null)
         {
             if (string.IsNullOrWhiteSpace(title))
                 throw new ValidationException(nameof(title), "Tiêu đề không được trống");
 
-            if (string.IsNullOrWhiteSpace(imageUrl))
+            if (string.IsNullOrWhiteSpace(imageUrl?.Value))
                 throw new ValidationException(nameof(imageUrl), "URL hình ảnh không được trống");
 
             return new Banner
             {
                 Title = title.Trim(),
                 Subtitle = subtitle?.Trim(),
-                ImageUrl = imageUrl.Trim(),
-                LinkUrl = linkUrl?.Trim(),
+                ImageUrl = imageUrl,
+                LinkUrl = linkUrl,
                 Position = position.Trim(),
                 SortOrder = sortOrder,
                 StartDate = startDate,
@@ -42,7 +46,7 @@ namespace Domain.Entities.Content
             };
         }
 
-        public void Update(string title, string? subtitle, string? linkUrl, string position, int sortOrder,
+        public void Update(string title, string? subtitle, WebsiteUrl? linkUrl, string position, int sortOrder,
             DateTime? startDate, DateTime? endDate)
         {
             if (string.IsNullOrWhiteSpace(title))
@@ -50,19 +54,19 @@ namespace Domain.Entities.Content
 
             Title = title.Trim();
             Subtitle = subtitle?.Trim();
-            LinkUrl = linkUrl?.Trim();
+            LinkUrl = linkUrl;
             Position = position.Trim();
             SortOrder = sortOrder;
             StartDate = startDate;
             EndDate = endDate;
         }
 
-        public void UpdateImage(string imageUrl)
+        public void UpdateImage(WebsiteUrl imageUrl)
         {
-            if (string.IsNullOrWhiteSpace(imageUrl))
+            if (string.IsNullOrWhiteSpace(imageUrl?.Value))
                 throw new ValidationException(nameof(imageUrl), "URL hình ảnh không được trống");
 
-            ImageUrl = imageUrl.Trim();
+            ImageUrl = imageUrl;
         }
 
         public void Activate()
@@ -89,4 +93,3 @@ namespace Domain.Entities.Content
             return true;
         }
     }
-}

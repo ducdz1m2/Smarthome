@@ -149,7 +149,7 @@
     {
         var parameters = new DialogParameters<OrderDialog>();
         parameters.Add(x => x.OrderId, order.Id);
-        parameters.Add(x => x.IsReadOnly, true);
+        parameters.Add(x => x.IsReadOnly, false);
 
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         var dialog = await DialogService.ShowAsync<OrderDialog>("Chi tiết đơn hàng", parameters, options);

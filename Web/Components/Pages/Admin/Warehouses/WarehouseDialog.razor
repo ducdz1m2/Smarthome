@@ -123,14 +123,14 @@
 
     private async Task Submit()
     {
-        await _form.Validate();
+        await _form.ValidateAsync();
         if (!_isValid) return;
 
         try
         {
             if (_isEdit)
             {
-                await WarehouseService.UpdateAsync(WarehouseId.Value, _request);
+                await WarehouseService.UpdateAsync(WarehouseId!.Value, _request);
                 Snackbar.Add("Đã cập nhật kho", Severity.Success);
             }
             else

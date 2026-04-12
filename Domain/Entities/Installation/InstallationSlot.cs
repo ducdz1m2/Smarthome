@@ -1,9 +1,12 @@
-namespace Domain.Entities.Installation
-{
-    using Domain.Entities.Common;
-    using Domain.Exceptions;
+namespace Domain.Entities.Installation;
 
-    public class InstallationSlot : BaseEntity
+using Domain.Abstractions;
+using Domain.Exceptions;
+
+/// <summary>
+/// InstallationSlot entity - represents a time slot for installation bookings.
+/// </summary>
+public class InstallationSlot : Entity
     {
         public int TechnicianId { get; private set; }
         public DateTime Date { get; private set; }
@@ -19,10 +22,10 @@ namespace Domain.Entities.Installation
         public static InstallationSlot Create(int technicianId, DateTime date, TimeSpan startTime, TimeSpan endTime)
         {
             if (technicianId <= 0)
-                throw new DomainException("TechnicianId không hợp lệ");
+                throw new ValidationException(nameof(technicianId), "TechnicianId không hợp lệ");
 
             if (endTime <= startTime)
-                throw new DomainException("Thời gian kết thúc phải sau thời gian bắt đầu");
+                throw new ValidationException(nameof(endTime), "Thời gian kết thúc phải sau thời gian bắt đầu");
 
             return new InstallationSlot
             {
@@ -37,7 +40,7 @@ namespace Domain.Entities.Installation
         public void Book(int bookingId)
         {
             if (IsBooked)
-                throw new DomainException("Slot đã được đặt");
+                throw new BusinessRuleViolationException("SlotAlreadyBooked", "Slot đã được đặt");
 
             IsBooked = true;
             BookingId = bookingId;
@@ -51,4 +54,3 @@ namespace Domain.Entities.Installation
 
         public bool IsSameDay(DateTime date) => Date.Date == date.Date;
     }
-}

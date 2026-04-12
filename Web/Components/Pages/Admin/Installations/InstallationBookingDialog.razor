@@ -65,14 +65,22 @@
                 {
                     <MudItem xs="12">
                         <MudDivider Class="my-4" />
+                        
+                        @if (_booking.Status == "Assigned")
+                        {
+                            <MudAlert Severity="Severity.Info" Class="mb-3">
+                                <b>Chờ kỹ thuật viên xác nhận:</b> Lịch này đang chờ KT tiếp nhận. Bạn không thể tự cập nhật trạng thái.
+                                Nếu KT từ chối, lịch sẽ tự động chuyển sang "Đã hủy".
+                            </MudAlert>
+                        }
+                        
                         <MudText Typo="Typo.subtitle2" Class="mb-3">Cập nhật trạng thái</MudText>
                         <MudGrid>
                             <MudItem xs="12" md="6">
                                 <MudSelect T="string" @bind-Value="_newStatus" Label="Trạng thái mới"
                                            Variant="Variant.Outlined" Class="mb-3">
-                                    <MudSelectItem T="string" Value="@("Pending")">Chờ xử lý</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("TechnicianAssigned")">Đã phân công</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("Preparing")">Chuẩn bị</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
                                     <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
                                     <MudSelectItem T="string" Value="@("Installing")">Đang lắp</MudSelectItem>
                                     <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
@@ -198,7 +206,7 @@
     {
         try
         {
-            _booking = await InstallationService.GetByIdAsync(BookingId.Value);
+            _booking = await InstallationService.GetByIdAsync(BookingId!.Value);
             if (_booking != null)
             {
                 _request = new CreateInstallationBookingRequest
@@ -301,7 +309,7 @@
 
     private async Task Submit()
     {
-        await _form.Validate();
+        await _form.ValidateAsync();
         if (!_isValid) return;
 
         if (!_scheduledDate.HasValue)
@@ -322,7 +330,7 @@
                     SlotId = _request.SlotId,
                     ScheduledDate = _request.ScheduledDate
                 };
-                await InstallationService.UpdateAsync(BookingId.Value, updateRequest);
+                await InstallationService.UpdateAsync(BookingId!.Value, updateRequest);
                 Snackbar.Add("Đã cập nhật lịch lắp đặt", Severity.Success);
             }
             else

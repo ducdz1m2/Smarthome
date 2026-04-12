@@ -1,17 +1,18 @@
-﻿using Domain.Entities.Common;
+﻿using Domain.Abstractions;
 using Domain.Exceptions;
+using Domain.ValueObjects;
 
-namespace Domain.Entities.Inventory
-{
-    public class Warehouse : BaseEntity
+namespace Domain.Entities.Inventory;
+
+/// <summary>
+/// Warehouse aggregate root - represents a storage location for inventory.
+/// </summary>
+public class Warehouse : AggregateRoot
     {
         public string Name { get; private set; } = string.Empty;
         public string Code { get; private set; } = string.Empty;
-        public string AddressStreet { get; private set; } = null!;
-        public string? AddressWard { get; private set; }
-        public string? AddressDistrict { get; private set; }
-        public string? AddressCity { get; private set; }
-        public string? Phone { get; private set; }
+        public Address Address { get; private set; } = null!;
+        public PhoneNumber? Phone { get; private set; }
         public string? ManagerName { get; private set; }
         public bool IsActive { get; private set; } = true;
 
@@ -20,43 +21,45 @@ namespace Domain.Entities.Inventory
 
         private Warehouse() { } // EF Core
 
-        public static Warehouse Create(string name, string code, string addressStreet, string? addressWard = null, string? addressDistrict = null, string? addressCity = null,
-            string? phone = null, string? managerName = null)
+        public static Warehouse Create(string name, string code, Address address, PhoneNumber? phone = null, string? managerName = null)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new DomainException("Tên kho không được trống");
+                throw new ValidationException(nameof(name), "Tên kho không được trống");
 
             if (string.IsNullOrWhiteSpace(code))
-                throw new DomainException("Mã kho không được trống");
+                throw new ValidationException(nameof(code), "Mã kho không được trống");
 
             if (code.Length < 3 || code.Length > 20)
-                throw new DomainException("Mã kho phải từ 3-20 ký tự");
+                throw new ValidationException(nameof(code), "Mã kho phải từ 3-20 ký tự");
 
             return new Warehouse
             {
                 Name = name.Trim(),
                 Code = code.Trim().ToUpper(),
-                AddressStreet = addressStreet.Trim(),
-                AddressWard = addressWard?.Trim(),
-                AddressDistrict = addressDistrict?.Trim(),
-                AddressCity = addressCity?.Trim(),
-                Phone = phone?.Trim(),
+                Address = address,
+                Phone = phone,
                 ManagerName = managerName?.Trim(),
                 IsActive = true
             };
         }
 
-        public void Update(string name, string addressStreet, string? addressWard, string? addressDistrict, string? addressCity, string? phone, string? managerName)
+        // Legacy overload for backward compatibility
+        public static Warehouse Create(string name, string code, string addressStreet, string? addressWard = null, string? addressDistrict = null, string? addressCity = null,
+            string? phone = null, string? managerName = null)
+        {
+            var address = Address.Create(addressStreet, addressWard, addressDistrict ?? "", addressCity ?? "");
+            var phoneVo = string.IsNullOrWhiteSpace(phone) ? null : PhoneNumber.Create(phone);
+            return Create(name, code, address, phoneVo, managerName);
+        }
+
+        public void Update(string name, Address address, PhoneNumber? phone, string? managerName)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new DomainException("Tên kho không được trống");
+                throw new ValidationException(nameof(name), "Tên kho không được trống");
 
             Name = name.Trim();
-            AddressStreet = addressStreet.Trim();
-            AddressWard = addressWard?.Trim();
-            AddressDistrict = addressDistrict?.Trim();
-            AddressCity = addressCity?.Trim();
-            Phone = phone?.Trim();
+            Address = address;
+            Phone = phone;
             ManagerName = managerName?.Trim();
         }
 
@@ -72,4 +75,3 @@ namespace Domain.Entities.Inventory
 
         public bool HasStock() => ProductWarehouses.Any(pw => pw.Quantity > 0);
     }
-}

@@ -1,9 +1,12 @@
-﻿using Domain.Entities.Common;
+﻿using Domain.Abstractions;
 using Domain.Exceptions;
 
-namespace Domain.Entities.Catalog
-{
-    public class Category : BaseEntity
+namespace Domain.Entities.Catalog;
+
+/// <summary>
+/// Category entity - represents a product category in the catalog.
+/// </summary>
+public class Category : Entity
     {
         public string Name { get; private set; } = string.Empty;
         public string? Description { get; private set; }
@@ -19,7 +22,7 @@ namespace Domain.Entities.Catalog
         public static Category Create(string name, int? parentId = null, int sortOrder = 0, string? description = null)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new DomainException("Tên danh mục không được trống");
+                throw new ValidationException(nameof(name), "Tên danh mục không được trống");
 
             return new Category
             {
@@ -34,11 +37,11 @@ namespace Domain.Entities.Catalog
         public void Update(string name, int? parentId, int sortOrder, string? description = null)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new DomainException("Tên danh mục không được trống");
+                throw new ValidationException(nameof(name), "Tên danh mục không được trống");
 
             // Validate không tự làm con của chính mình
             if (parentId == Id)
-                throw new DomainException("Không thể đặt danh mục làm con của chính nó");
+                throw new BusinessRuleViolationException("CategorySelfReference", "Không thể đặt danh mục làm con của chính nó");
 
             Name = name.Trim();
             Description = description?.Trim();
@@ -49,7 +52,7 @@ namespace Domain.Entities.Catalog
         public void MoveTo(int? newParentId)
         {
             if (newParentId == Id)
-                throw new DomainException("Không thể di chuyển vào chính nó");
+                throw new BusinessRuleViolationException("CategorySelfReference", "Không thể di chuyển vào chính nó");
 
             ParentId = newParentId;
         }
@@ -79,4 +82,3 @@ namespace Domain.Entities.Catalog
             SortOrder = newOrder;
         }
     }
-}

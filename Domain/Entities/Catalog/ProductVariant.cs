@@ -1,56 +1,74 @@
-namespace Domain.Entities.Catalog
+namespace Domain.Entities.Catalog;
+
+using System.Text.Json;
+using Domain.Abstractions;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+public class ProductVariant : Entity
 {
-    using System.Text.Json;
-    using Domain.Entities.Common;
-    using Domain.Exceptions;
+    public int ProductId { get; private set; }
+    public Sku Sku { get; private set; } = null!;
+    public Money Price { get; private set; } = null!;
+    public int StockQuantity { get; private set; }
+    public int FrozenStockQuantity { get; private set; }
+    public string AttributesJson { get; private set; } = "{}";
+    public bool IsActive { get; private set; } = true;
 
-    public class ProductVariant : BaseEntity
+    public virtual Product Product { get; private set; } = null!;
+
+    private ProductVariant() { }
+
+    public static ProductVariant Create(Product product, Sku sku, Money price, int initialStock, Dictionary<string, string> attributes)
     {
-        public int ProductId { get; private set; }
-        public string Sku { get; private set; } = null!;
-        public decimal Price { get; private set; }
-        public int StockQuantity { get; private set; }
-        public string AttributesJson { get; private set; } = "{}";
-        public bool IsActive { get; private set; } = true;
-
-        public virtual Product Product { get; private set; } = null!;
-
-        private ProductVariant() { }
-
-        public static ProductVariant Create(Product product, string sku, decimal price, int initialStock, Dictionary<string, string> attributes)
+        var variant = new ProductVariant
         {
-            var variant = new ProductVariant
-            {
-                ProductId = product.Id,
-                Sku = sku.Trim().ToUpper(),
-                Price = price,
-                StockQuantity = initialStock,
-                AttributesJson = JsonSerializer.Serialize(attributes),
-                IsActive = true
-            };
+            ProductId = product.Id,
+            Sku = sku,
+            Price = price,
+            StockQuantity = initialStock,
+            AttributesJson = JsonSerializer.Serialize(attributes),
+            IsActive = true
+        };
 
-            return variant;
-        }
+        return variant;
+    }
 
-        public static ProductVariant Create(int productId, string sku, decimal price, int initialStock, Dictionary<string, string> attributes)
+    public static ProductVariant Create(int productId, Sku sku, Money price, int initialStock, Dictionary<string, string> attributes)
+    {
+        var variant = new ProductVariant
         {
-            var variant = new ProductVariant
-            {
-                ProductId = productId,
-                Sku = sku.Trim().ToUpper(),
-                Price = price,
-                StockQuantity = initialStock,
-                AttributesJson = JsonSerializer.Serialize(attributes),
-                IsActive = true
-            };
+            ProductId = productId,
+            Sku = sku,
+            Price = price,
+            StockQuantity = initialStock,
+            AttributesJson = JsonSerializer.Serialize(attributes),
+            IsActive = true
+        };
 
-            return variant;
-        }
+        return variant;
+    }
 
-        public void UpdatePrice(decimal newPrice)
-        {
-            Price = newPrice;
-        }
+    // Legacy overloads for backward compatibility
+    public static ProductVariant Create(Product product, string sku, decimal price, int initialStock, Dictionary<string, string> attributes)
+    {
+        return Create(product, Sku.Create(sku), Money.Vnd(price), initialStock, attributes);
+    }
+
+    public static ProductVariant Create(int productId, string sku, decimal price, int initialStock, Dictionary<string, string> attributes)
+    {
+        return Create(productId, Sku.Create(sku), Money.Vnd(price), initialStock, attributes);
+    }
+
+    public void UpdatePrice(Money newPrice)
+    {
+        Price = newPrice;
+    }
+
+    public void UpdatePrice(decimal newPrice)
+    {
+        UpdatePrice(Money.Vnd(newPrice));
+    }
 
         public void UpdateAttributes(Dictionary<string, string> attributes)
         {
@@ -61,25 +79,47 @@ namespace Domain.Entities.Catalog
         {
             return JsonSerializer.Deserialize<Dictionary<string, string>>(AttributesJson) ?? new();
         }
-
         public void AddStock(int quantity)
         {
             if (quantity <= 0)
-                throw new DomainException("Số lượng thêm phải lớn hơn 0");
+                throw new InvalidQuantityException(quantity, "AddStock");
 
             StockQuantity += quantity;
+        }
+
+        public void ReserveStock(int quantity)
+        {
+            if (quantity <= 0)
+                throw new InvalidQuantityException(quantity, "ReserveStock");
+
+            if (GetAvailableStock() < quantity)
+                throw new InsufficientStockException(Id, 0, quantity, GetAvailableStock());
+
+            FrozenStockQuantity += quantity;
+        }
+
+        public void ReleaseStock(int quantity)
+        {
+            if (quantity <= 0)
+                throw new InvalidQuantityException(quantity, "ReleaseStock");
+
+            FrozenStockQuantity = Math.Max(0, FrozenStockQuantity - quantity);
         }
 
         public void DeductStock(int quantity)
         {
             if (quantity <= 0)
-                throw new DomainException("Số lượng trừ phải lớn hơn 0");
+                throw new InvalidQuantityException(quantity, "DeductStock");
 
             if (StockQuantity < quantity)
-                throw new DomainException($"Không đủ tồn kho cho variant. Tồn kho: {StockQuantity}, Yêu cầu: {quantity}");
+                throw new InsufficientStockException(Id, 0, quantity, StockQuantity);
 
             StockQuantity -= quantity;
+            FrozenStockQuantity = Math.Max(0, FrozenStockQuantity - quantity);
         }
+
+        public int GetAvailableStock() => StockQuantity - FrozenStockQuantity;
+
 
         public void Activate()
         {
@@ -91,9 +131,13 @@ namespace Domain.Entities.Catalog
             IsActive = false;
         }
 
-        public decimal GetEffectivePrice(decimal? productBasePrice)
+        public Money GetEffectivePrice(Money? productBasePrice)
         {
-            return Price > 0 ? Price : (productBasePrice ?? 0);
+            return Price.Amount > 0 ? Price : (productBasePrice ?? Money.Zero());
+        }
+
+        public decimal GetEffectivePriceAmount(decimal? productBasePrice)
+        {
+            return GetEffectivePrice(productBasePrice.HasValue ? Money.Vnd(productBasePrice.Value) : null).Amount;
         }
     }
-}

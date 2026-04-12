@@ -1,14 +1,18 @@
-﻿using Domain.Entities.Common;
-using Domain.Exceptions;
+﻿namespace Domain.Entities.Inventory;
 
-namespace Domain.Entities.Inventory
-{
-    public class StockEntryDetail : BaseEntity
+using Domain.Abstractions;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// StockEntryDetail entity - represents a line item in a stock entry.
+/// </summary>
+public class StockEntryDetail : Entity
     {
         public int StockEntryId { get; private set; }
         public int ProductId { get; private set; }
         public int Quantity { get; private set; }
-        public decimal UnitCost { get; private set; }
+        public Money UnitCost { get; private set; } = null!;
         public string? Notes { get; private set; }
 
         // Navigation
@@ -17,16 +21,16 @@ namespace Domain.Entities.Inventory
 
         private StockEntryDetail() { } // EF Core
 
-        public static StockEntryDetail Create(int productId, int quantity, decimal unitCost, int? stockEntryId = null, string? notes = null)
+        public static StockEntryDetail Create(int productId, int quantity, Money unitCost, int? stockEntryId = null, string? notes = null)
         {
             if (productId <= 0)
-                throw new DomainException("ProductId không hợp lệ");
+                throw new ValidationException(nameof(productId), "ProductId không hợp lệ");
 
             if (quantity <= 0)
-                throw new DomainException("Số lượng phải lớn hơn 0");
+                throw new ValidationException(nameof(quantity), "Số lượng phải lớn hơn 0");
 
-            if (unitCost < 0)
-                throw new DomainException("Đơn giá không thể âm");
+            if (unitCost.IsLessThan(Money.Zero()))
+                throw new ValidationException(nameof(unitCost), "Đơn giá không thể âm");
 
             return new StockEntryDetail
             {
@@ -38,6 +42,7 @@ namespace Domain.Entities.Inventory
             };
         }
 
-        public decimal GetTotalCost() => UnitCost * Quantity;
+        public Money GetTotalCost() => UnitCost.Multiply(Quantity);
+
+        public decimal GetTotalCostAmount() => GetTotalCost().Amount;
     }
-}

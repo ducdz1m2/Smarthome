@@ -1,16 +1,20 @@
-namespace Domain.Entities.Promotions
-{
-    using Domain.Entities.Common;
-    using Domain.Exceptions;
+namespace Domain.Entities.Promotions;
 
-    public class Promotion : BaseEntity
+using Domain.Abstractions;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// Promotion aggregate root - represents a sales promotion/discount campaign.
+/// </summary>
+public class Promotion : AggregateRoot
     {
         public string Name { get; private set; } = string.Empty;
         public string? Description { get; private set; }
-        public decimal DiscountPercent { get; private set; }
+        public Percentage DiscountPercent { get; private set; } = null!;
         public DateTime StartDate { get; private set; }
         public DateTime EndDate { get; private set; }
-        public decimal? MinOrderAmount { get; private set; }
+        public Money? MinOrderAmount { get; private set; }
         public bool IsActive { get; private set; } = true;
         public int Priority { get; private set; } = 0;
 
@@ -18,16 +22,13 @@ namespace Domain.Entities.Promotions
 
         private Promotion() { }
 
-        public static Promotion Create(string name, decimal discountPercent, DateTime startDate, DateTime endDate)
+        public static Promotion Create(string name, Percentage discountPercent, DateTime startDate, DateTime endDate, Money? minOrderAmount = null)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new DomainException("Tên chương trình không được trống");
+                throw new ValidationException(nameof(name), "Tên chương trình không được trống");
 
             if (endDate <= startDate)
-                throw new DomainException("Ngày kết thúc phải sau ngày bắt đầu");
-
-            if (discountPercent < 0 || discountPercent > 100)
-                throw new DomainException("Phần trăm giảm giá phải từ 0-100");
+                throw new ValidationException(nameof(endDate), "Ngày kết thúc phải sau ngày bắt đầu");
 
             return new Promotion
             {
@@ -35,12 +36,19 @@ namespace Domain.Entities.Promotions
                 DiscountPercent = discountPercent,
                 StartDate = startDate,
                 EndDate = endDate,
+                MinOrderAmount = minOrderAmount,
                 IsActive = true,
                 Priority = 0
             };
         }
 
-        public void AddProduct(int productId, decimal? customDiscount = null)
+        // Legacy overload for backward compatibility
+        public static Promotion Create(string name, decimal discountPercent, DateTime startDate, DateTime endDate)
+        {
+            return Create(name, Percentage.Create(discountPercent), startDate, endDate);
+        }
+
+        public void AddProduct(int productId, Percentage? customDiscount = null)
         {
             var pp = PromotionProduct.Create(Id, productId, customDiscount);
             PromotionProducts.Add(pp);
@@ -57,15 +65,18 @@ namespace Domain.Entities.Promotions
             return !PromotionProducts.Any() || PromotionProducts.Any(pp => pp.ProductId == productId);
         }
 
-        public decimal CalculateDiscount(decimal originalPrice, int? productId = null)
+        public Money CalculateDiscount(Money originalPrice, int? productId = null)
         {
             if (!IsActiveNow())
-                return 0;
+                return Money.Zero();
+
+            if (MinOrderAmount != null && originalPrice.IsLessThan(MinOrderAmount))
+                return Money.Zero();
 
             if (productId.HasValue && !AppliesTo(productId.Value))
-                return 0;
+                return Money.Zero();
 
-            decimal effectiveDiscount;
+            Percentage effectiveDiscount;
 
             if (productId.HasValue)
             {
@@ -77,13 +88,19 @@ namespace Domain.Entities.Promotions
                 effectiveDiscount = DiscountPercent;
             }
 
-            return originalPrice * effectiveDiscount / 100;
+            return originalPrice.ApplyDiscount(effectiveDiscount);
+        }
+
+        // Legacy overload for backward compatibility
+        public decimal CalculateDiscount(decimal originalPrice, int? productId = null)
+        {
+            return CalculateDiscount(Money.Vnd(originalPrice), productId).Amount;
         }
 
         public void UpdatePeriod(DateTime start, DateTime end)
         {
             if (end <= start)
-                throw new DomainException("Ngày kết thúc phải sau ngày bắt đầu");
+                throw new ValidationException(nameof(end), "Ngày kết thúc phải sau ngày bắt đầu");
 
             StartDate = start;
             EndDate = end;
@@ -94,4 +111,3 @@ namespace Domain.Entities.Promotions
             IsActive = false;
         }
     }
-}

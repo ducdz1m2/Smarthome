@@ -1,12 +1,15 @@
-namespace Domain.Entities.Installation
-{
-    using Domain.Entities.Common;
-    using Domain.Enums;
-    using Domain.Events;
-    using Domain.Exceptions;
+namespace Domain.Entities.Installation;
 
-    public class InstallationBooking : BaseEntity
-    {
+using Domain.Abstractions;
+using Domain.Enums;
+using Domain.Events;
+using Domain.Exceptions;
+
+/// <summary>
+/// InstallationBooking aggregate root - represents an installation appointment.
+/// </summary>
+public class InstallationBooking : AggregateRoot
+{
         public int OrderId { get; private set; }
         public int TechnicianId { get; private set; }
         public int SlotId { get; private set; }
@@ -36,15 +39,18 @@ namespace Domain.Entities.Installation
             if (technicianId <= 0)
                 throw new ValidationException(nameof(technicianId), "TechnicianId không hợp lệ");
 
-            return new InstallationBooking
+            var booking = new InstallationBooking
             {
                 OrderId = orderId,
                 TechnicianId = technicianId,
                 SlotId = slotId,
                 ScheduledDate = scheduledDate,
-                Status = InstallationStatus.Pending,
+                Status = InstallationStatus.Assigned,
                 MaterialsPrepared = false
             };
+
+            booking.AddDomainEvent(new InstallationBookingCreatedEvent(booking.Id, orderId, technicianId, scheduledDate));
+            return booking;
         }
 
         public void AssignTechnician(int technicianId, int slotId)
@@ -92,7 +98,7 @@ namespace Domain.Entities.Installation
             CustomerRating = customerRating;
             Notes = notes;
 
-            AddDomainEvent(new InstallationCompletedEvent(Id, OrderId, TechnicianId, customerRating));
+            AddDomainEvent(new InstallationCompletedEvent(Id, CompletedAt.Value, Notes));
         }
 
         public void Reschedule(int newSlotId, DateTime newDate)
@@ -114,10 +120,34 @@ namespace Domain.Entities.Installation
             Notes = reason;
         }
 
+        public void Accept()
+        {
+            if (Status != InstallationStatus.Assigned)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể tiếp nhận lịch ở trạng thái đã phân công");
+
+            Status = InstallationStatus.Preparing;
+            MaterialsPrepared = true;
+
+            AddDomainEvent(new InstallationBookingConfirmedEvent(Id, DateTime.UtcNow));
+        }
+
+        public void Reject(string reason)
+        {
+            if (Status != InstallationStatus.Assigned)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể từ chối lịch ở trạng thái đã phân công");
+
+            if (string.IsNullOrWhiteSpace(reason))
+                throw new ValidationException(nameof(reason), "Vui lòng nhập lý do từ chối");
+
+            Status = InstallationStatus.Cancelled;
+            Notes = reason;
+
+            AddDomainEvent(new InstallationCancelledEvent(Id, reason ?? "Rejected by technician"));
+        }
+
         public void AddMaterial(int productId, int quantityTaken)
         {
             var material = InstallationMaterial.Create(Id, productId, quantityTaken);
             Materials.Add(material);
         }
     }
-}

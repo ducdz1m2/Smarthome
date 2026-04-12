@@ -111,7 +111,7 @@
         var dialog = await DialogService.ShowAsync<UserDialog>("Thêm người dùng mới", options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadUsers();
         }
@@ -126,7 +126,7 @@
         var dialog = await DialogService.ShowAsync<UserDialog>("Chỉnh sửa người dùng", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadUsers();
         }

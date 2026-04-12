@@ -94,12 +94,31 @@ namespace Application.Services
 
         public async Task ConfirmAsync(int id)
         {
-            var order = await _orderRepository.GetByIdWithDetailsAsync(id);
+            var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
             order.Confirm();
-            _orderRepository.Update(order);
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task StartShippingAsync(int id)
+        {
+            var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.StartShipping();
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task MarkDeliveredAsync(int id)
+        {
+            var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            order.MarkDelivered();
             await _orderRepository.SaveChangesAsync();
         }
 
@@ -116,12 +135,11 @@ namespace Application.Services
 
         public async Task CompleteAsync(int id)
         {
-            var order = await _orderRepository.GetByIdWithDetailsAsync(id);
+            var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
             order.Complete();
-            _orderRepository.Update(order);
             await _orderRepository.SaveChangesAsync();
         }
 

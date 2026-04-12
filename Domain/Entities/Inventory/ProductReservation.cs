@@ -1,9 +1,12 @@
-﻿using Domain.Entities.Common;
+﻿namespace Domain.Entities.Inventory;
+
+using Domain.Abstractions;
 using Domain.Exceptions;
 
-namespace Domain.Entities.Inventory
-{
-    public class ProductReservation : BaseEntity
+/// <summary>
+/// ProductReservation entity - represents a temporary stock reservation for an order.
+/// </summary>
+public class ProductReservation : Entity
     {
         public int ProductId { get; private set; }
         public int WarehouseId { get; private set; }
@@ -17,13 +20,13 @@ namespace Domain.Entities.Inventory
         public static ProductReservation Create(int productId, int warehouseId, int quantity, int? orderId = null, int expiresInMinutes = 30)
         {
             if (productId <= 0)
-                throw new DomainException("ProductId không hợp lệ");
+                throw new ValidationException(nameof(productId), "ProductId không hợp lệ");
 
             if (warehouseId <= 0)
-                throw new DomainException("WarehouseId không hợp lệ");
+                throw new ValidationException(nameof(warehouseId), "WarehouseId không hợp lệ");
 
             if (quantity <= 0)
-                throw new DomainException("Số lượng phải lớn hơn 0");
+                throw new ValidationException(nameof(quantity), "Số lượng phải lớn hơn 0");
 
             return new ProductReservation
             {
@@ -50,4 +53,3 @@ namespace Domain.Entities.Inventory
 
         public bool IsValid() => IsActive && !IsExpired();
     }
-}

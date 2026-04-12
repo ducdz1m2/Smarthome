@@ -7,6 +7,11 @@ namespace Application.DTOs.Responses
         public string? OrderNumber { get; set; }
         public int? TechnicianId { get; set; }
         public string? TechnicianName { get; set; }
+        
+        // Thông tin khách hàng
+        public string CustomerName { get; set; } = string.Empty;
+        public string CustomerPhone { get; set; } = string.Empty;
+        
         public DateTime ScheduledDate { get; set; }
         public TimeSpan? StartTime { get; set; }
         public TimeSpan? EndTime { get; set; }

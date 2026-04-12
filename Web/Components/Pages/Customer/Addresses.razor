@@ -263,7 +263,7 @@
 
     private async Task AddAddress()
     {
-        await _form.Validate();
+        await _form.ValidateAsync();
         if (!_isValid) return;
 
         _isSaving = true;
@@ -303,7 +303,7 @@
 
     private async Task SaveEditAddress()
     {
-        await _editForm.Validate();
+        await _editForm.ValidateAsync();
         if (!_isEditValid) return;
 
         try
@@ -354,7 +354,7 @@
         var dialog = await DialogService.ShowAsync<Web.Components.Shared.ConfirmDialog>("Xác nhận xóa", parameters, options);
         var result = await dialog.Result;
         
-        if (!result.Canceled && (bool)result.Data)
+        if (result is { Canceled: false, Data: true })
         {
             try
             {

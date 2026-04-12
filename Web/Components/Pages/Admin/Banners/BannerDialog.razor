@@ -248,7 +248,7 @@
 
     private async Task Submit()
     {
-        await _form.Validate();
+        await _form.ValidateAsync();
         if (!_isValid) return;
 
         if (string.IsNullOrWhiteSpace(_previewImageUrl))
@@ -264,7 +264,7 @@
 
             if (_isEdit)
             {
-                await BannerService.UpdateAsync(BannerId.Value, _request);
+                await BannerService.UpdateAsync(BannerId!.Value, _request);
                 Snackbar.Add("Đã cập nhật banner", Severity.Success);
             }
             else

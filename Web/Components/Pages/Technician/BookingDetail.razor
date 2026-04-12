@@ -1,0 +1,348 @@
+@page "/technician/bookings/{Id:int}"
+@using Application.DTOs.Responses
+@using Application.DTOs.Requests
+@using Application.Interfaces.Services
+@using Domain.Enums
+@inject IInstallationService InstallationService
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else if (_booking == null)
+{
+    <MudAlert Severity="Severity.Error">Không tìm thấy lịch lắp đặt.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        <!-- Header -->
+        <MudItem xs="12">
+            <MudPaper Class="pa-4 mb-4" Elevation="2">
+                <div class="d-flex justify-space-between align-center">
+                    <div>
+                        <MudText Typo="Typo.h5">Lịch lắp đặt #@_booking.Id</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_booking.OrderNumber</MudText>
+                    </div>
+                    <MudChip T="string" Color="GetStatusColor(_booking.Status)" Size="Size.Large">@GetStatusText(_booking.Status)</MudChip>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Customer Info -->
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <MudText Typo="Typo.h6">Thông tin khách hàng</MudText>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText><b>Họ tên:</b> @_booking.CustomerName</MudText>
+                    <MudText><b>SĐT:</b> @_booking.CustomerPhone</MudText>
+                    <MudText><b>Địa chỉ:</b> @_booking.ShippingAddress</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Schedule Info -->
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <MudText Typo="Typo.h6">Thông tin lịch hẹn</MudText>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText><b>Ngày lắp:</b> @_booking.ScheduledDate.ToString("dd/MM/yyyy")</MudText>
+                    <MudText><b>Khung giờ:</b> @_booking.StartTime?.ToString("hh\\:mm") - @_booking.EndTime?.ToString("hh\\:mm")</MudText>
+                    <MudText><b>Thời gian dự kiến:</b> @_booking.EstimatedDuration.TotalHours giờ</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Products -->
+        <MudItem xs="12">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <MudText Typo="Typo.h6">Sản phẩm cần lắp</MudText>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="InstallationProductItem">
+                        @foreach (var product in _booking.Products)
+                        {
+                            <MudListItem T="InstallationProductItem">
+                                <div class="d-flex align-center">
+                                    @if (!string.IsNullOrEmpty(product.ProductImage))
+                                    {
+                                        <MudAvatar Size="Size.Medium" Class="mr-3">
+                                            <MudImage Src="@product.ProductImage" />
+                                        </MudAvatar>
+                                    }
+                                    <div>
+                                        <MudText Typo="Typo.body1">@product.ProductName</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">SL: @product.Quantity - Đơn giá: @product.UnitPrice.ToString("N0")đ</MudText>
+                                    </div>
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Action Buttons -->
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Cập nhật trạng thái</MudText>
+                
+                @if (_booking.Status == "Assigned")
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mb-3">
+                        Lịch này đang chờ bạn xác nhận. Vui lòng tiếp nhận hoặc từ chối.
+                    </MudAlert>
+                    <div class="d-flex gap-2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.CheckCircle"
+                                   OnClick="AcceptBooking">Tiếp nhận lịch</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel"
+                                   OnClick="OpenRejectDialog">Từ chối lịch</MudButton>
+                    </div>
+                }
+                else if (_booking.Status == "Preparing")
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
+                               OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                }
+                else if (_booking.Status == "OnTheWay")
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Build"
+                               OnClick="StartInstallation">Bắt đầu lắp đặt</MudButton>
+                }
+                else if (_booking.Status == "Installing")
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Done"
+                               OnClick="OpenCompleteDialog">Hoàn thành</MudButton>
+                }
+                else if (_booking.Status == "Completed")
+                {
+                    <MudAlert Severity="Severity.Success">
+                        Đã hoàn thành lúc @_booking.CompletedAt?.ToString("dd/MM/yyyy HH:mm")<br />
+                        Đánh giá: @_booking.CustomerRating ⭐
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+<!-- Reject Dialog -->
+<MudDialog @bind-IsVisible="_showRejectDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Từ chối lịch lắp đặt</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_rejectForm" @bind-IsValid="_isRejectFormValid">
+            <MudTextField @bind-Value="_rejectReason" Label="Lý do từ chối *"
+                          Required="true" RequiredError="Vui lòng nhập lý do"
+                          Variant="Variant.Outlined" Lines="3" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showRejectDialog = false">Hủy</MudButton>
+        <MudButton Color="Color.Error" OnClick="ConfirmReject" Disabled="!_isRejectFormValid">Từ chối</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Complete Dialog -->
+<MudDialog @bind-IsVisible="_showCompleteDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Hoàn thành lắp đặt</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_completeForm" @bind-IsValid="_isCompleteFormValid">
+            <MudTextField @bind-Value="_customerSignature" Label="Chữ ký khách hàng *"
+                          Required="true" RequiredError="Vui lòng nhập chữ ký"
+                          Variant="Variant.Outlined" />
+            <MudNumericField T="int" @bind-Value="_customerRating" Label="Đánh giá (1-5) *"
+                             Min="1" Max="5" Required="true"
+                             Variant="Variant.Outlined" Class="mt-3" />
+            <MudTextField @bind-Value="_completionNotes" Label="Ghi chú"
+                          Variant="Variant.Outlined" Lines="2" Class="mt-3" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showCompleteDialog = false">Hủy</MudButton>
+        <MudButton Color="Color.Success" OnClick="ConfirmComplete" Disabled="!_isCompleteFormValid">Hoàn thành</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private InstallationBookingResponse? _booking;
+    private bool _loading = true;
+
+    private bool _showRejectDialog = false;
+    private MudForm _rejectForm = null!;
+    private bool _isRejectFormValid = false;
+    private string _rejectReason = "";
+
+    private bool _showCompleteDialog = false;
+    private MudForm _completeForm = null!;
+    private bool _isCompleteFormValid = false;
+    private string _customerSignature = "";
+    private int _customerRating = 5;
+    private string _completionNotes = "";
+
+    private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBooking();
+    }
+
+    private async Task LoadBooking()
+    {
+        try
+        {
+            _loading = true;
+            _booking = await InstallationService.GetByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task<int> GetCurrentTechnicianId()
+    {
+        return 1;
+    }
+
+    private async Task AcceptBooking()
+    {
+        try
+        {
+            var technicianId = await GetCurrentTechnicianId();
+            await InstallationService.AcceptBookingAsync(Id, technicianId);
+            Snackbar.Add("Đã tiếp nhận lịch lắp đặt", Severity.Success);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenRejectDialog()
+    {
+        _rejectReason = "";
+        _showRejectDialog = true;
+    }
+
+    private async Task ConfirmReject()
+    {
+        try
+        {
+            var technicianId = await GetCurrentTechnicianId();
+            var request = new RejectBookingRequest { Reason = _rejectReason };
+            await InstallationService.RejectBookingAsync(Id, technicianId, request);
+            _showRejectDialog = false;
+            Snackbar.Add("Đã từ chối lịch lắp đặt", Severity.Info);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartTravel()
+    {
+        try
+        {
+            await InstallationService.StartTravelAsync(Id);
+            Snackbar.Add("Đã bắt đầu di chuyển", Severity.Success);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartInstallation()
+    {
+        try
+        {
+            await InstallationService.StartInstallationAsync(Id);
+            Snackbar.Add("Đã bắt đầu lắp đặt", Severity.Success);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenCompleteDialog()
+    {
+        _customerSignature = "";
+        _customerRating = 5;
+        _completionNotes = "";
+        _showCompleteDialog = true;
+    }
+
+    private async Task ConfirmComplete()
+    {
+        try
+        {
+            var request = new CompleteInstallationRequest
+            {
+                CustomerSignature = _customerSignature,
+                CustomerRating = _customerRating,
+                Notes = _completionNotes
+            };
+            await InstallationService.CompleteAsync(Id, request);
+            _showCompleteDialog = false;
+            Snackbar.Add("Đã hoàn thành lắp đặt", Severity.Success);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Assigned" => Color.Warning,
+            "Preparing" => Color.Info,
+            "OnTheWay" => Color.Primary,
+            "Installing" => Color.Secondary,
+            "Completed" => Color.Success,
+            "Cancelled" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetStatusText(string status)
+    {
+        return status switch
+        {
+            "Assigned" => "Chờ xác nhận",
+            "Preparing" => "Chuẩn bị",
+            "OnTheWay" => "Đang đi",
+            "Installing" => "Đang lắp",
+            "Completed" => "Hoàn thành",
+            "Cancelled" => "Đã hủy",
+            _ => status
+        };
+    }
+}

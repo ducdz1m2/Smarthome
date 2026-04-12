@@ -7,6 +7,7 @@ namespace Application.Interfaces.Repositories
     {
         Task<Order?> GetByIdAsync(int id);
         Task<Order?> GetByIdWithDetailsAsync(int id);
+        Task<Order?> GetByIdWithDetailsForUpdateAsync(int id);
         Task<Order?> GetByOrderNumberAsync(string orderNumber);
         Task<List<Order>> GetAllAsync();
         Task<List<Order>> GetByStatusAsync(OrderStatus status);

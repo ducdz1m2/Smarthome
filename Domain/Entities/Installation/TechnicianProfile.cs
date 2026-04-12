@@ -1,24 +1,28 @@
-namespace Domain.Entities.Installation
-{
-    using Domain.Entities.Common;
-    using Domain.Exceptions;
+namespace Domain.Entities.Installation;
 
-    public class TechnicianProfile : BaseEntity
+using Domain.Abstractions;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// TechnicianProfile aggregate root - represents a technician's profile and capabilities.
+/// </summary>
+public class TechnicianProfile : AggregateRoot
     {
         public int? UserId { get; private set; }
         
-        // Thông tin cá nhân
+        // Personal info
         public string FullName { get; private set; } = string.Empty;
-        public string PhoneNumber { get; private set; } = string.Empty;
-        public string? Email { get; private set; }
+        public PhoneNumber PhoneNumber { get; private set; } = null!;
+        public Email? Email { get; private set; }
         public string? IdentityCard { get; private set; } // CCCD
-        public string? Address { get; private set; }
+        public Address? Address { get; private set; }
         public DateTime? DateOfBirth { get; private set; }
-        
-        // Thông tin công việc
-        public string EmployeeCode { get; private set; } = string.Empty; // Mã nhân viên
+
+        // Work info
+        public string EmployeeCode { get; private set; } = string.Empty;
         public DateTime HireDate { get; private set; }
-        public decimal BaseSalary { get; private set; }
+        public Money BaseSalary { get; private set; } = null!;
         
         // Phân công & năng lực
         public string City { get; private set; } = string.Empty; // Hà Nội, TP.HCM...
@@ -37,43 +41,40 @@ namespace Domain.Entities.Installation
         private TechnicianProfile() { }
 
         public static TechnicianProfile Create(
-            string fullName, 
-            string phoneNumber, 
+            string fullName,
+            PhoneNumber phoneNumber,
             string employeeCode,
             string city,
             List<string> districts,
-            string? email = null,
+            Email? email = null,
             string? identityCard = null,
-            string? address = null,
+            Address? address = null,
             DateTime? dateOfBirth = null,
-            decimal baseSalary = 0)
+            Money? baseSalary = null)
         {
             if (string.IsNullOrWhiteSpace(fullName))
-                throw new DomainException("Họ tên không được trống");
-
-            if (string.IsNullOrWhiteSpace(phoneNumber))
-                throw new DomainException("Số điện thoại không được trống");
+                throw new ValidationException(nameof(fullName), "Họ tên không được trống");
 
             if (string.IsNullOrWhiteSpace(employeeCode))
-                throw new DomainException("Mã nhân viên không được trống");
+                throw new ValidationException(nameof(employeeCode), "Mã nhân viên không được trống");
 
             if (string.IsNullOrWhiteSpace(city))
-                throw new DomainException("Thành phố không được trống");
+                throw new ValidationException(nameof(city), "Thành phố không được trống");
 
             if (!districts.Any())
-                throw new DomainException("Phải có ít nhất một khu vực phục vụ");
+                throw new ValidationException(nameof(districts), "Phải có ít nhất một khu vực phục vụ");
 
             return new TechnicianProfile
             {
                 FullName = fullName.Trim(),
-                PhoneNumber = phoneNumber.Trim(),
-                Email = email?.Trim().ToLower(),
+                PhoneNumber = phoneNumber,
+                Email = email,
                 IdentityCard = identityCard?.Trim(),
-                Address = address?.Trim(),
+                Address = address,
                 DateOfBirth = dateOfBirth,
                 EmployeeCode = employeeCode.Trim().ToUpper(),
                 HireDate = DateTime.UtcNow,
-                BaseSalary = baseSalary,
+                BaseSalary = baseSalary ?? Money.Zero(),
                 City = city.Trim(),
                 Districts = System.Text.Json.JsonSerializer.Serialize(districts),
                 SkillsJson = "[]",
@@ -85,27 +86,27 @@ namespace Domain.Entities.Installation
         }
 
         public void UpdateInfo(
-            string fullName, 
-            string phoneNumber,
-            string? email = null,
+            string fullName,
+            PhoneNumber phoneNumber,
+            Email? email = null,
             string? identityCard = null,
-            string? address = null,
+            Address? address = null,
             DateTime? dateOfBirth = null)
         {
             if (string.IsNullOrWhiteSpace(fullName))
-                throw new DomainException("Họ tên không được trống");
+                throw new ValidationException(nameof(fullName), "Họ tên không được trống");
 
             FullName = fullName.Trim();
-            PhoneNumber = phoneNumber.Trim();
-            Email = email?.Trim().ToLower();
+            PhoneNumber = phoneNumber;
+            Email = email;
             IdentityCard = identityCard?.Trim();
-            Address = address?.Trim();
+            Address = address;
             DateOfBirth = dateOfBirth;
         }
 
-        public void UpdateWorkInfo(decimal baseSalary, string city, List<string> districts)
+        public void UpdateWorkInfo(Money baseSalary, string city, List<string> districts)
         {
-            BaseSalary = baseSalary;
+            BaseSalary = baseSalary ?? Money.Zero();
             if (!string.IsNullOrWhiteSpace(city))
                 City = city.Trim();
             if (districts.Any())
@@ -176,4 +177,3 @@ namespace Domain.Entities.Installation
             IsAvailable = available;
         }
     }
-}

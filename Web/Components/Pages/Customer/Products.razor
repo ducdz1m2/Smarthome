@@ -41,7 +41,7 @@
                                   Adornment="Adornment.End"
                                   AdornmentIcon="@Icons.Material.Filled.Search"
                                   OnAdornmentClick="ApplyFilters"
-                                  OnKeyDown="@((e) => { if (e.Key == "Enter") ApplyFilters(); })"
+                                  OnKeyDown="@((e) => { if (e.Key == "Enter") _ = ApplyFilters(); })"
                                   Class="mb-4"
                                   Clearable="true"
                                   Immediate="true"/>

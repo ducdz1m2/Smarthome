@@ -6,6 +6,10 @@ using Web.Services;
 using Infrastructure.Data;
 using Application.Interfaces.Services;
 using Application.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Server.Circuits;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,10 +29,39 @@ builder.Services.AddControllers();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Add authentication & authorization
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.AccessDeniedPath = "/access-denied";
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("TechnicianOnly", policy =>
+        policy.RequireRole("Technician"));
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireRole("Admin"));
+});
+
 // Register custom services
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddHttpContextAccessor();
+
+// Add HttpClient for API calls
+builder.Services.AddScoped(sp => 
+{
+    var navigationManager = sp.GetRequiredService<NavigationManager>();
+    return new HttpClient { BaseAddress = new Uri(navigationManager.BaseUri) };
+});
+
+// Add authentication state provider
+builder.Services.AddScoped<AuthenticationStateProvider, ServerAuthStateProvider>();
+builder.Services.AddScoped<ServerAuthStateProvider>(sp => (ServerAuthStateProvider)sp.GetRequiredService<AuthenticationStateProvider>());
+builder.Services.AddScoped<CircuitHandler, CircuitAccessor>();
 
 var app = builder.Build();
 
@@ -49,6 +82,8 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseAntiforgery();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

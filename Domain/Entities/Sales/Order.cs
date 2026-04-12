@@ -1,64 +1,100 @@
-namespace Domain.Entities.Sales
+namespace Domain.Entities.Sales;
+
+using System.Text.Json;
+using Domain.Abstractions;
+using Domain.Enums;
+using Domain.Events;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// Order aggregate root - represents a customer order in the system.
+/// </summary>
+public class Order : AggregateRoot
 {
-    using System.Text.Json;
-    using Domain.Entities.Common;
-    using Domain.Enums;
-    using Domain.Events;
-    using Domain.Exceptions;
+    // Core properties
+    public string OrderNumber { get; private set; } = string.Empty;
+    public OrderStatus Status { get; private set; } = OrderStatus.Pending;
+    public int UserId { get; private set; }
 
-    public class Order : BaseEntity
+    // Value Objects
+    public string ReceiverName { get; private set; } = string.Empty;
+    public PhoneNumber ReceiverPhone { get; private set; } = null!;
+    public Address ShippingAddress { get; private set; } = null!;
+
+    // Money Value Objects
+    public Money TotalAmount { get; private set; } = Money.Zero();
+    public Money ShippingFee { get; private set; } = Money.Zero();
+    public Money DiscountAmount { get; private set; } = Money.Zero();
+
+    // Payment & Shipping
+    public PaymentMethod PaymentMethod { get; private set; }
+    public ShippingMethod ShippingMethod { get; private set; }
+
+    // Status tracking
+    public string StatusHistoryJson { get; private set; } = "[]";
+    public string? CancelReason { get; private set; }
+
+    // Navigation properties
+    public virtual ICollection<OrderItem> Items { get; private set; } = new List<OrderItem>();
+    public virtual ICollection<OrderShipment> Shipments { get; private set; } = new List<OrderShipment>();
+
+    private Order() { } // EF Core constructor
+
+    public static Order Create(
+        int userId,
+        string receiverName,
+        string receiverPhone,
+        Address shippingAddress)
     {
-        public string OrderNumber { get; private set; } = string.Empty;
-        public decimal TotalAmount { get; private set; }
-        public OrderStatus Status { get; private set; } = OrderStatus.Pending;
-        public int UserId { get; private set; }
-        public string ReceiverName { get; private set; } = string.Empty;
-        public string ReceiverPhone { get; private set; } = null!;
-        public string ShippingAddressStreet { get; private set; } = null!;
-        public string? ShippingAddressWard { get; private set; }
-        public string? ShippingAddressDistrict { get; private set; }
-        public string? ShippingAddressCity { get; private set; }
-        public PaymentMethod PaymentMethod { get; private set; }
-        public ShippingMethod ShippingMethod { get; private set; }
-        public string StatusHistoryJson { get; private set; } = "[]";
-        public string? CancelReason { get; private set; }
-        public decimal ShippingFee { get; private set; }
-        public decimal DiscountAmount { get; private set; }
+        if (string.IsNullOrWhiteSpace(receiverName))
+            throw new ValidationException(nameof(receiverName), "Tên người nhận không được trống");
 
-        public virtual ICollection<OrderItem> Items { get; private set; } = new List<OrderItem>();
-        public virtual ICollection<OrderShipment> Shipments { get; private set; } = new List<OrderShipment>();
-
-        private Order() { }
-
-        public static Order Create(int userId, string receiverName, string receiverPhone, string shippingAddressStreet, string? shippingAddressWard, string? shippingAddressDistrict, string? shippingAddressCity)
+        var order = new Order
         {
-            if (string.IsNullOrWhiteSpace(receiverName))
-                throw new ValidationException(nameof(receiverName), "Tên người nhận không được trống");
+            OrderNumber = GenerateOrderNumber(),
+            UserId = userId,
+            ReceiverName = receiverName.Trim(),
+            ReceiverPhone = PhoneNumber.Create(receiverPhone),
+            ShippingAddress = shippingAddress,
+            Status = OrderStatus.Pending,
+            TotalAmount = Money.Zero(),
+            ShippingFee = Money.Zero(),
+            DiscountAmount = Money.Zero(),
+            PaymentMethod = PaymentMethod.COD,
+            ShippingMethod = ShippingMethod.Standard,
+            StatusHistoryJson = "[]"
+        };
 
-            var order = new Order
-            {
-                OrderNumber = GenerateOrderNumber(),
-                UserId = userId,
-                ReceiverName = receiverName.Trim(),
-                ReceiverPhone = receiverPhone.Trim(),
-                ShippingAddressStreet = shippingAddressStreet.Trim(),
-                ShippingAddressWard = shippingAddressWard?.Trim(),
-                ShippingAddressDistrict = shippingAddressDistrict?.Trim(),
-                ShippingAddressCity = shippingAddressCity?.Trim(),
-                Status = OrderStatus.Pending,
-                TotalAmount = 0,
-                ShippingFee = 0,
-                DiscountAmount = 0,
-                PaymentMethod = PaymentMethod.COD,
-                ShippingMethod = ShippingMethod.Standard,
-                StatusHistoryJson = "[]"
-            };
+        order.AddDomainEvent(new OrderCreatedEvent(
+            order.Id,
+            userId,
+            order.OrderNumber,
+            order.TotalAmount.Amount));
 
-            order.AddDomainEvent(new OrderCreatedEvent(order.Id, userId, 0));
-            return order;
-        }
+        return order;
+    }
 
-        public OrderItem AddItem(int productId, int? variantId, int quantity, decimal unitPrice, bool requiresInstallation = false)
+    // Legacy factory method for backward compatibility
+    public static Order Create(
+        int userId,
+        string receiverName,
+        string receiverPhone,
+        string shippingAddressStreet,
+        string? shippingAddressWard,
+        string shippingAddressDistrict,
+        string shippingAddressCity)
+    {
+        var address = Address.Create(
+            shippingAddressStreet,
+            shippingAddressWard,
+            shippingAddressDistrict,
+            shippingAddressCity);
+
+        return Create(userId, receiverName, receiverPhone, address);
+    }
+
+        public OrderItem AddItem(int productId, int? variantId, int quantity, Money unitPrice, bool requiresInstallation = false)
         {
             if (Status != OrderStatus.Pending)
                 throw new InvalidOrderStateException(Status.ToString(), "thêm sản phẩm");
@@ -69,6 +105,14 @@ namespace Domain.Entities.Sales
             var item = OrderItem.Create(Id, productId, variantId, quantity, unitPrice, requiresInstallation);
             Items.Add(item);
             RecalculateTotal();
+
+            AddDomainEvent(new OrderItemAddedEvent(
+                Id,
+                item.Id,
+                productId,
+                quantity,
+                unitPrice.Amount));
+
             return item;
         }
 
@@ -94,15 +138,15 @@ namespace Domain.Entities.Sales
             AddDomainEvent(new OrderConfirmedEvent(Id, DateTime.UtcNow));
         }
 
-        public void ApplyShippingFee(decimal fee)
+        public void ApplyShippingFee(Money fee)
         {
             ShippingFee = fee;
             RecalculateTotal();
         }
 
-        public void ApplyDiscount(decimal discount)
+        public void ApplyDiscount(Money discount)
         {
-            if (discount < 0)
+            if (discount.IsLessThan(Money.Zero()))
                 throw new ValidationException(nameof(discount), "Giảm giá không thể âm");
 
             DiscountAmount = discount;
@@ -142,6 +186,26 @@ namespace Domain.Entities.Sales
             AddDomainEvent(new OrderCompletedEvent(Id, DateTime.UtcNow));
         }
 
+        public void StartShipping()
+        {
+            if (Status != OrderStatus.AwaitingPickup)
+                throw new InvalidOrderStateException(Status.ToString(), "bắt đầu giao hàng");
+
+            Status = OrderStatus.Shipping;
+            AddStatusHistory(Status, "Đơn hàng bắt đầu được giao");
+            AddDomainEvent(new OrderShippingStartedEvent(Id, string.Empty));
+        }
+
+        public void MarkDelivered()
+        {
+            if (Status != OrderStatus.Shipping)
+                throw new InvalidOrderStateException(Status.ToString(), "đánh dấu đã giao");
+
+            Status = OrderStatus.Delivered;
+            AddStatusHistory(Status, "Đơn hàng đã được giao thành công");
+            AddDomainEvent(new OrderDeliveredEvent(Id, DateTime.UtcNow));
+        }
+
         public void Cancel(string reason)
         {
             if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
@@ -154,6 +218,8 @@ namespace Domain.Entities.Sales
             {
                 item.ReleaseReservation();
             }
+
+            AddDomainEvent(new OrderCancelledEvent(Id, reason, DateTime.UtcNow));
         }
 
         private void UpdateOverallStatus()
@@ -174,9 +240,9 @@ namespace Domain.Entities.Sales
 
         private void RecalculateTotal()
         {
-            var itemsTotal = Items.Sum(i => i.GetSubtotal());
-            TotalAmount = itemsTotal + ShippingFee - DiscountAmount;
-            if (TotalAmount < 0) TotalAmount = 0;
+            var itemsTotal = Items.Aggregate(Money.Zero(), (sum, item) => sum.Add(item.GetSubtotalMoney()));
+            var total = itemsTotal.Add(ShippingFee).Subtract(DiscountAmount);
+            TotalAmount = total.IsLessThan(Money.Zero()) ? Money.Zero() : total;
         }
 
         private void AddStatusHistory(OrderStatus status, string note)
@@ -196,4 +262,3 @@ namespace Domain.Entities.Sales
             return $"ORD{DateTime.UtcNow:yyyyMMdd}{Guid.NewGuid().ToString()[..6].ToUpper()}";
         }
     }
-}

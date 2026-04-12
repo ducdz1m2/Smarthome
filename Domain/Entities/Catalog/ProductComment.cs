@@ -1,11 +1,13 @@
-﻿
-
-using Domain.Entities.Common;
+﻿using Domain.Abstractions;
+using Domain.Events;
 using Domain.Exceptions;
 
-namespace Domain.Entities.Catalog
-{
-    public class ProductComment : BaseEntity
+namespace Domain.Entities.Catalog;
+
+/// <summary>
+/// ProductComment entity - represents a customer review/comment on a product.
+/// </summary>
+public class ProductComment : Entity
     {
         public int ProductId { get; private set; }
         public int UserId { get; private set; }
@@ -39,7 +41,7 @@ namespace Domain.Entities.Catalog
             if (rating < 1 || rating > 5)
                 throw new ValidationException(nameof(rating), "Đánh giá phải từ 1-5 sao");
 
-            return new ProductComment
+             var comment = new ProductComment
             {
                 ProductId = productId,
                 UserId = userId,
@@ -49,6 +51,15 @@ namespace Domain.Entities.Catalog
                 ParentCommentId = parentCommentId,
                 IsApproved = false // Chờ admin duyệt
             };
+            comment.AddDomainEvent(new ProductCommentCreatedEvent(
+                comment.Id,
+                comment.ProductId,
+                comment.UserId,
+                comment.Content.Trim(),
+                comment.Rating
+                ));
+
+            return comment;
         }
 
         public void Approve()
@@ -86,4 +97,3 @@ namespace Domain.Entities.Catalog
             Replies.Add(reply);
         }
     }
-}

@@ -1,10 +1,13 @@
-namespace Domain.Entities.Sales
-{
-    using Domain.Entities.Common;
-    using Domain.Enums;
-    using Domain.Exceptions;
+namespace Domain.Entities.Sales;
 
-    public class Warranty : BaseEntity
+using Domain.Abstractions;
+using Domain.Enums;
+using Domain.Exceptions;
+
+/// <summary>
+/// Warranty aggregate root - represents a product warranty.
+/// </summary>
+public class Warranty : AggregateRoot
     {
         public int OrderItemId { get; private set; }
         public int ProductId { get; private set; }
@@ -19,7 +22,7 @@ namespace Domain.Entities.Sales
         public static Warranty Create(int orderItemId, int productId, int durationInMonths)
         {
             if (durationInMonths <= 0)
-                throw new DomainException("Thời hạn bảo hành phải lớn hơn 0");
+                throw new ValidationException(nameof(durationInMonths), "Thời hạn bảo hành phải lớn hơn 0");
 
             var startDate = DateTime.UtcNow;
 
@@ -49,7 +52,7 @@ namespace Domain.Entities.Sales
         public WarrantyClaim CreateClaim(string issue)
         {
             if (!IsValid(DateTime.UtcNow))
-                throw new DomainException("Bảo hành đã hết hạn");
+                throw new BusinessRuleViolationException("WarrantyExpired", "Bảo hành đã hết hạn");
 
             var claim = WarrantyClaim.Create(Id, issue);
             Claims.Add(claim);
@@ -63,4 +66,3 @@ namespace Domain.Entities.Sales
         Expired = 1,
         Void = 2
     }
-}

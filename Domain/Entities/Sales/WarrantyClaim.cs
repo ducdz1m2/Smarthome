@@ -1,10 +1,13 @@
-namespace Domain.Entities.Sales
-{
-    using Domain.Entities.Common;
-    using Domain.Enums;
-    using Domain.Exceptions;
+namespace Domain.Entities.Sales;
 
-    public class WarrantyClaim : BaseEntity
+using Domain.Abstractions;
+using Domain.Enums;
+using Domain.Exceptions;
+
+/// <summary>
+/// WarrantyClaim entity - represents a warranty claim for a product.
+/// </summary>
+public class WarrantyClaim : Entity
     {
         public int WarrantyId { get; private set; }
         public DateTime ClaimDate { get; private set; }
@@ -20,7 +23,7 @@ namespace Domain.Entities.Sales
         public static WarrantyClaim Create(int warrantyId, string issue)
         {
             if (string.IsNullOrWhiteSpace(issue))
-                throw new DomainException("Mô tả lỗi không được trống");
+                throw new ValidationException(nameof(issue), "Mô tả lỗi không được trống");
 
             return new WarrantyClaim
             {
@@ -59,4 +62,3 @@ namespace Domain.Entities.Sales
         Rejected = 4,
         ReplacementApproved = 5
     }
-}

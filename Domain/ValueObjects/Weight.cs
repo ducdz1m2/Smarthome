@@ -1,10 +1,11 @@
 using Domain.Exceptions;
 
-namespace Smarthome.Domain.ValueObjects;
+namespace Domain.ValueObjects;
 
 public sealed record Weight
 {
     public decimal Value { get; }
+    public decimal ValueInKg => Value;
     public string Unit { get; } = "kg";
 
     private Weight(decimal value)
@@ -16,6 +17,7 @@ public sealed record Weight
     }
 
     public static Weight Create(decimal kg) => new(kg);
+    public static Weight FromKilograms(decimal kg) => new(kg);
     public static Weight FromGrams(int grams) => new(grams / 1000m);
 
     public bool IsHeavierThan(Weight other) => Value > other.Value;

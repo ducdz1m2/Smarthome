@@ -1,30 +1,34 @@
-using Domain.Entities.Common;
-using Domain.Exceptions;
+namespace Domain.Entities.Shipping;
 
-namespace Domain.Entities.Shipping
-{
-    public class ShippingRate : BaseEntity
+using Domain.Abstractions;
+using Domain.Exceptions;
+using Domain.ValueObjects;
+
+/// <summary>
+/// ShippingRate entity - represents a shipping rate based on weight range.
+/// </summary>
+public class ShippingRate : Entity
     {
         public int ZoneId { get; private set; }
-        public decimal WeightFrom { get; private set; }
-        public decimal WeightTo { get; private set; }
-        public decimal Price { get; private set; }
+        public Weight WeightFrom { get; private set; } = null!;
+        public Weight WeightTo { get; private set; } = null!;
+        public Money Price { get; private set; } = null!;
         public bool IsActive { get; private set; } = true;
 
         public virtual ShippingZone Zone { get; private set; } = null!;
 
         private ShippingRate() { }
 
-        public static ShippingRate Create(int zoneId, decimal from, decimal to, decimal price)
+        public static ShippingRate Create(int zoneId, Weight from, Weight to, Money price)
         {
             if (zoneId <= 0)
-                throw new DomainException("ZoneId không hợp lệ");
+                throw new ValidationException(nameof(zoneId), "ZoneId không hợp lệ");
 
-            if (from > to)
-                throw new DomainException("Cân nặng bắt đầu phải nhỏ hơn kết thúc");
+            if (from.ValueInKg > to.ValueInKg)
+                throw new ValidationException(nameof(from), "Cân nặng bắt đầu phải nhỏ hơn kết thúc");
 
-            if (price < 0)
-                throw new DomainException("Giá ship không thể âm");
+            if (price.IsLessThan(Money.Zero()))
+                throw new ValidationException(nameof(price), "Giá ship không thể âm");
 
             return new ShippingRate
             {
@@ -36,18 +40,25 @@ namespace Domain.Entities.Shipping
             };
         }
 
-        public void UpdatePrice(decimal newPrice)
+        // Legacy overload for backward compatibility
+        public static ShippingRate Create(int zoneId, decimal from, decimal to, decimal price)
         {
-            if (newPrice < 0)
-                throw new DomainException("Giá không thể âm");
+            return Create(zoneId, Weight.FromKilograms(from), Weight.FromKilograms(to), Money.Vnd(price));
+        }
+
+        public void UpdatePrice(Money newPrice)
+        {
+            if (newPrice.IsLessThan(Money.Zero()))
+                throw new ValidationException(nameof(newPrice), "Giá không thể âm");
 
             Price = newPrice;
         }
 
         public bool Matches(decimal weight) =>
-            weight >= WeightFrom && weight <= WeightTo;
+            weight >= WeightFrom.ValueInKg && weight <= WeightTo.ValueInKg;
+
+        public Money GetPrice() => Price;
 
         public void Activate() => IsActive = true;
         public void Deactivate() => IsActive = false;
     }
-}

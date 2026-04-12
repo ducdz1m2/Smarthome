@@ -77,10 +77,21 @@ namespace Domain.ValueObjects
         public bool IsGreaterThan(Money other) =>
             Currency == other.Currency && Amount > other.Amount;
 
+        public bool IsGreaterThanOrEqualTo(Money other) =>
+            Currency == other.Currency && Amount >= other.Amount;
+
         public bool IsLessThan(Money other) =>
             Currency == other.Currency && Amount < other.Amount;
 
-       
+        public bool IsLessThanOrEqualTo(Money other) =>
+            Currency == other.Currency && Amount <= other.Amount;
+
+        public bool Equals(Money? other) =>
+            other != null && Currency == other.Currency && Amount == other.Amount;
+
+        public override int GetHashCode() =>
+            HashCode.Combine(Amount, Currency);
+
         // Formatting
         public string ToVndString() =>
             $"{Amount:N0} ₫";

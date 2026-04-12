@@ -28,9 +28,8 @@
         <MudSelect T="string" @bind-Value="_statusFilter" Label="Trạng thái" 
                    Clearable="true" Dense="true" Class="mr-2" Style="width: 150px;"
                    AnchorOrigin="Origin.BottomCenter">
-            <MudSelectItem T="string" Value="@("Pending")">Chờ xử lý</MudSelectItem>
-            <MudSelectItem T="string" Value="@("TechnicianAssigned")">Đã phân công</MudSelectItem>
-            <MudSelectItem T="string" Value="@("Preparing")">Đang chuẩn bị</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
             <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
             <MudSelectItem T="string" Value="@("Installing")">Đang lắp</MudSelectItem>
             <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
@@ -201,13 +200,15 @@
     {
         return status switch
         {
-            "Pending" => Color.Default,
-            "TechnicianAssigned" => Color.Info,
-            "Preparing" => Color.Warning,
+            "Assigned" => Color.Warning,
+            "Preparing" => Color.Info,
             "OnTheWay" => Color.Primary,
             "Installing" => Color.Secondary,
             "Completed" => Color.Success,
             "Cancelled" => Color.Error,
+            // Legacy statuses
+            "Pending" => Color.Default,
+            "TechnicianAssigned" => Color.Info,
             _ => Color.Default
         };
     }
@@ -216,13 +217,15 @@
     {
         return status switch
         {
-            "Pending" => "Chờ xử lý",
-            "TechnicianAssigned" => "Đã phân công",
-            "Preparing" => "Chuẩn bị",
+            "Assigned" => "Chờ KT xác nhận",
+            "Preparing" => "KT chuẩn bị",
             "OnTheWay" => "Đang đi",
             "Installing" => "Đang lắp",
             "Completed" => "Hoàn thành",
             "Cancelled" => "Đã hủy",
+            // Legacy statuses
+            "Pending" => "Chờ xử lý",
+            "TechnicianAssigned" => "Đã phân công",
             _ => status
         };
     }
