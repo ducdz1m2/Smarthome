@@ -76,7 +76,7 @@ namespace Application.Services
                 throw new DomainException("Không tìm thấy phân loại sản phẩm");
 
             // Check SKU uniqueness if changed
-            if (variant.Sku != request.Sku.ToUpper())
+            if (variant.Sku.Value != request.Sku.ToUpper())
             {
                 if (await _variantRepository.ExistsAsync(request.Sku, id))
                     throw new DomainException("SKU đã tồn tại");
@@ -149,8 +149,8 @@ namespace Application.Services
             return new ProductVariantListResponse
             {
                 Id = variant.Id,
-                Sku = variant.Sku,
-                Price = variant.Price,
+                Sku = variant.Sku.Value,
+                Price = variant.Price.Amount,
                 StockQuantity = variant.StockQuantity,
                 Attributes = variant.GetAttributes(),
                 IsActive = variant.IsActive
@@ -164,8 +164,8 @@ namespace Application.Services
                 Id = variant.Id,
                 ProductId = variant.ProductId,
                 ProductName = variant.Product?.Name ?? "",
-                Sku = variant.Sku,
-                Price = variant.Price,
+                Sku = variant.Sku.Value,
+                Price = variant.Price.Amount,
                 StockQuantity = variant.StockQuantity,
                 Attributes = variant.GetAttributes(),
                 IsActive = variant.IsActive,

@@ -1,0 +1,138 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Entities.Catalog
+@inject IProductService ProductService
+@inject IProductCommentService CommentService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Đánh giá sản phẩm</MudText>
+        
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            @foreach (var item in Items)
+            {
+                <MudCard Class="mb-4" Elevation="0" Outlined="true">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.subtitle1" Class="fw-bold">@item.ProductName</MudText>
+                            <MudText Typo="Typo.caption">SKU: @item.Sku</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <div class="d-flex align-center gap-2 mb-3">
+                            <MudText Typo="Typo.body2">Đánh giá:</MudText>
+                            <MudRating @bind-SelectedValue="_ratings[item.Id]" MaxValue="5" Size="Size.Medium" />
+                            <MudText Typo="Typo.caption" Color="Color.Primary">@GetRatingText(_ratings[item.Id])</MudText>
+                        </div>
+                        
+                        <MudTextField @bind-Value="_comments[item.Id]" 
+                                      Label="Nhận xét của bạn"
+                                      Lines="3"
+                                      Placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm..."
+                                      HelperText="Tối đa 1000 ký tự"
+                                      Counter="1000" />
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid || !HasAllRatings()">
+            Gửi đánh giá
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .fw-bold {
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int OrderId { get; set; }
+
+    [Parameter] 
+    public List<OrderItemResponse> Items { get; set; } = new();
+
+    [Parameter] 
+    public int UserId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private Dictionary<int, int> _ratings = new();
+    private Dictionary<int, string> _comments = new();
+
+    protected override void OnInitialized()
+    {
+        // Initialize ratings to 0 and comments to empty
+        foreach (var item in Items)
+        {
+            _ratings[item.Id] = 0;
+            _comments[item.Id] = "";
+        }
+    }
+
+    private bool HasAllRatings()
+    {
+        return _ratings.Values.All(r => r > 0);
+    }
+
+    private string GetRatingText(int rating)
+    {
+        return rating switch
+        {
+            1 => "Rất tệ",
+            2 => "Tệ",
+            3 => "Bình thường",
+            4 => "Tốt",
+            5 => "Rất tốt",
+            _ => ""
+        };
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid || !HasAllRatings())
+        {
+            Snackbar.Add("Vui lòng đánh giá tất cả sản phẩm", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            // Submit review for each product
+            foreach (var item in Items)
+            {
+                var request = new CreateProductCommentRequest
+                {
+                    ProductId = item.ProductId,
+                    UserId = UserId,
+                    OrderId = OrderId,
+                    Content = _comments[item.Id] ?? "",
+                    Rating = _ratings[item.Id],
+                    IsVerifiedPurchase = true
+                };
+
+                await CommentService.CreateAsync(request);
+            }
+
+            Snackbar.Add("Đánh giá đã được gửi thành công!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

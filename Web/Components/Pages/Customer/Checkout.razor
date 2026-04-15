@@ -2,8 +2,14 @@
 @using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Domain.Services
+@using Domain.Entities.Installation
 
-@inject IOrderService OrderService
+@inject Application.Interfaces.Services.IOrderService OrderService
+@inject IUserAddressService UserAddressService
+@inject IInstallationSlotService InstallationSlotService
+@inject ITechnicianProfileService TechnicianProfileService
+@inject Domain.Services.IShippingService ShippingService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
@@ -29,6 +35,42 @@
         <MudGrid>
             <!-- Shipping Information -->
             <MudItem xs="12" md="7">
+                <!-- Saved Addresses -->
+                @if (_userAddresses.Any())
+                {
+                    <MudCard Elevation="2" Class="mb-4">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Địa chỉ đã lưu</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudRadioGroup T="int" @bind-Value="_selectedAddressId" SelectedChanged="OnAddressSelected">
+                                @foreach (var address in _userAddresses)
+                                {
+                                    <MudRadio Value="@address.Id" Class="mb-2">
+                                        <MudCard Elevation="0" Outlined="true" Class="w-100">
+                                            <MudCardContent Class="pa-3">
+                                                <div class="d-flex justify-space-between align-center">
+                                                    <div>
+                                                        <MudText Typo="Typo.subtitle2" Class="fw-bold">@address.Label</MudText>
+                                                        @if (address.IsDefault)
+                                                        {
+                                                            <MudChip T="string" Color="Color.Primary" Size="Size.Small" Class="ml-2">Mặc định</MudChip>
+                                                        }
+                                                    </div>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@address.ReceiverName - @address.ReceiverPhone</MudText>
+                                                </div>
+                                                <MudText Typo="Typo.body2" Class="mt-1">@address.FullAddress</MudText>
+                                            </MudCardContent>
+                                        </MudCard>
+                                    </MudRadio>
+                                }
+                            </MudRadioGroup>
+                        </MudCardContent>
+                    </MudCard>
+                }
+
                 <MudCard Elevation="2" Class="mb-4">
                     <MudCardHeader>
                         <CardHeaderContent>
@@ -71,7 +113,8 @@
                                                  Label="Quận/Huyện *" 
                                                  Required="true"
                                                  RequiredError="Nhập quận/huyện"
-                                                 Variant="Variant.Outlined" />
+                                                 Variant="Variant.Outlined"
+                                                 OnBlur="OnDistrictChanged" />
                                 </MudItem>
                                 <MudItem xs="12" md="4">
                                     <MudTextField @bind-Value="_request.ShippingCity" 
@@ -120,6 +163,55 @@
                         </MudRadioGroup>
                     </MudCardContent>
                 </MudCard>
+
+                <!-- Installation Scheduling -->
+                @if (_requiresInstallation)
+                {
+                    <MudCard Elevation="2" Class="mt-4">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Lịch lắp đặt</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudGrid>
+                                <MudItem xs="12" md="6">
+                                    <MudDatePicker Label="Ngày lắp đặt" 
+                                                   @bind-Date="_request.InstallationDate"
+                                                   @bind-Date:after="OnInstallationDateChanged"
+                                                   Required="true"
+                                                   RequiredError="Chọn ngày lắp đặt"
+                                                   Variant="Variant.Outlined"
+                                                   MinDate="@DateTime.Today"
+                                                   MaxDate="@DateTime.Today.AddDays(30)" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudSelect T="int?" Label="Khung giờ" 
+                                               @bind-Value="_request.InstallationSlotId"
+                                               Required="true"
+                                               RequiredError="Chọn khung giờ"
+                                               Variant="Variant.Outlined">
+                                        @if (!_installationSlots.Any())
+                                        {
+                                            <MudSelectItem T="int?" Value="@null">
+                                                Không có khung giờ khả dụng
+                                            </MudSelectItem>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var slot in _installationSlots.Where(s => !s.IsBooked))
+                                            {
+                                                <MudSelectItem T="int?" Value="@slot.Id">
+                                                    @slot.StartTime.ToString(@"hh\:mm") - @slot.EndTime.ToString(@"hh\:mm")
+                                                </MudSelectItem>
+                                            }
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                            </MudGrid>
+                        </MudCardContent>
+                    </MudCard>
+                }
             </MudItem>
 
             <!-- Order Summary -->
@@ -225,6 +317,11 @@
     private string _paymentMethod = "COD";
 
     private List<CartItem> _cartItems = new();
+    private List<UserAddressResponse> _userAddresses = new();
+    private List<InstallationSlotResponse> _installationSlots = new();
+    private int _selectedAddressId = 0;
+    private int _currentUserId = 0;
+
     private CreateOrderRequest _request = new()
     {
         ReceiverName = "",
@@ -236,10 +333,6 @@
         Items = new()
     };
 
-    private decimal _subTotal => _cartItems.Sum(i => i.TotalPrice);
-    private decimal _shippingFee => _subTotal >= 500000 ? 0 : 30000;
-    private decimal _total => _subTotal + _shippingFee;
-
     public class CartItem
     {
         public int Id { get; set; }
@@ -249,15 +342,173 @@
         public string? ImageUrl { get; set; }
         public decimal UnitPrice { get; set; }
         public int Quantity { get; set; }
+        public decimal Weight { get; set; } // Weight in kg
+        public bool RequiresInstallation { get; set; }
         public decimal TotalPrice => UnitPrice * Quantity;
     }
+
+    private decimal _totalWeight => _cartItems.Sum(i => i.Weight * i.Quantity);
+    private decimal _subTotal => _cartItems.Sum(i => i.TotalPrice);
+    private bool _requiresInstallation => _cartItems.Any(i => i.RequiresInstallation);
+    private decimal _shippingFee;
+    private decimal _total => _subTotal + _shippingFee;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadCartAsync();
-        
-        // TODO: Load user info if logged in
-        // For now, leave form empty for user to fill
+        await LoadUserAddressesAsync();
+        await LoadInstallationSlotsAsync();
+        await CalculateShippingFeeAsync();
+    }
+
+    private async Task LoadInstallationSlotsAsync()
+    {
+        if (!_requiresInstallation)
+            return;
+
+        try
+        {
+            var targetDate = _request.InstallationDate ?? DateTime.Today;
+
+            // Get technicians by district
+            var technicians = await TechnicianProfileService.GetByDistrictAsync(_request.ShippingDistrict);
+
+            // Fallback to city if no technician found for the district
+            if (!technicians.Any())
+            {
+                technicians = await TechnicianProfileService.GetByCityAsync(_request.ShippingCity);
+            }
+
+            if (!technicians.Any())
+            {
+                _installationSlots = new List<InstallationSlotResponse>();
+                Snackbar.Add($"Không tìm thấy kỹ thuật viên cho khu vực {_request.ShippingDistrict} hoặc thành phố {_request.ShippingCity}", Severity.Warning);
+                return;
+            }
+
+            Console.WriteLine($"[LoadInstallationSlotsAsync] Found {technicians.Count} technicians for {_request.ShippingDistrict}/{_request.ShippingCity}");
+
+            // Load slots from ALL technicians in the area
+            var allSlots = new List<InstallationSlotResponse>();
+            foreach (var technician in technicians)
+            {
+                var slots = await InstallationSlotService.GetAvailableSlotsAsync(technician.Id, targetDate);
+                Console.WriteLine($"[LoadInstallationSlotsAsync] Technician {technician.Id} ({technician.FullName}) has {slots.Count} slots for {targetDate:dd/MM/yyyy}");
+                allSlots.AddRange(slots);
+            }
+
+            // Sort slots by time
+            _installationSlots = allSlots.OrderBy(s => s.StartTime).ToList();
+
+            Console.WriteLine($"[LoadInstallationSlotsAsync] Total slots loaded: {_installationSlots.Count}");
+
+            if (!_installationSlots.Any())
+            {
+                Snackbar.Add($"Không có khung giờ khả dụng cho ngày {targetDate:dd/MM/yyyy}", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LoadInstallationSlotsAsync] Error: {ex.Message}");
+            _installationSlots = new List<InstallationSlotResponse>();
+        }
+    }
+
+    private async Task OnInstallationDateChanged()
+    {
+        _request.InstallationSlotId = null; // Reset slot selection when date changes
+        await LoadInstallationSlotsAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnDistrictChanged()
+    {
+        if (_requiresInstallation)
+        {
+            _request.InstallationSlotId = null; // Reset slot selection when district changes
+            await LoadInstallationSlotsAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadUserAddressesAsync()
+    {
+        try
+        {
+            // TODO: Get current user ID from authentication
+            _currentUserId = 1; // Temporary hardcoded value
+            _userAddresses = await UserAddressService.GetByUserIdAsync(_currentUserId);
+
+            // Auto-select default address if exists
+            var defaultAddress = _userAddresses.FirstOrDefault(a => a.IsDefault);
+            if (defaultAddress != null)
+            {
+                _selectedAddressId = defaultAddress.Id;
+                PopulateFormFromAddress(defaultAddress);
+            }
+        }
+        catch
+        {
+            // Ignore errors when loading addresses
+            _userAddresses = new List<UserAddressResponse>();
+        }
+    }
+
+    private void PopulateFormFromAddress(UserAddressResponse address)
+    {
+        _request.ReceiverName = address.ReceiverName;
+        _request.ReceiverPhone = address.ReceiverPhone ?? "";
+        _request.ShippingStreet = address.Street;
+        _request.ShippingWard = address.Ward;
+        _request.ShippingDistrict = address.District;
+        _request.ShippingCity = address.City;
+    }
+
+    private void OnAddressSelected(int addressId)
+    {
+        if (addressId > 0)
+        {
+            var selectedAddress = _userAddresses.FirstOrDefault(a => a.Id == addressId);
+            if (selectedAddress != null)
+            {
+                PopulateFormFromAddress(selectedAddress);
+                _ = CalculateShippingFeeAsync();
+            }
+        }
+    }
+
+    private async Task CalculateShippingFeeAsync()
+    {
+        if (!_cartItems.Any())
+        {
+            _shippingFee = 0;
+            return;
+        }
+
+        try
+        {
+            var city = _request.ShippingCity;
+            var district = _request.ShippingDistrict;
+            var weight = _totalWeight;
+            var amount = _subTotal;
+
+            var fee = await ShippingService.CalculateShippingFeeAsync(city, district, weight, amount, _requiresInstallation);
+            _shippingFee = fee.Amount;
+        }
+        catch
+        {
+            // Fallback to simple logic if service fails
+            if (_requiresInstallation)
+            {
+                _shippingFee = 0;
+            }
+            else
+            {
+                _shippingFee = _subTotal >= 500000 ? 0 : 30000;
+            }
+        }
+
+        StateHasChanged();
     }
 
     private async Task LoadCartAsync()
@@ -296,12 +547,16 @@
             {
                 ProductId = i.ProductId,
                 VariantId = null, // TODO: Add variant support
-                Quantity = i.Quantity
+                Quantity = i.Quantity,
+                RequiresInstallation = i.RequiresInstallation
             }).ToList();
 
             // TODO: Get current user ID from auth service
             // For now, use a default user ID
             _request.UserId = 1;
+
+            // Set shipping fee
+            _request.ShippingFee = _shippingFee;
 
             // Create order
             var orderId = await OrderService.CreateAsync(_request);

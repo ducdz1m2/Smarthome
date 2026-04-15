@@ -1,5 +1,7 @@
 using Application.Interfaces.Repositories;
+using Domain.Abstractions;
 using Domain.Entities.Inventory;
+using Domain.Events;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,10 +10,12 @@ namespace Infrastructure.Repositories
     public class WarehouseRepository : IWarehouseRepository
     {
         private readonly AppDbContext _context;
+        private readonly IDomainEventDispatcher _eventDispatcher;
 
-        public WarehouseRepository(AppDbContext context)
+        public WarehouseRepository(AppDbContext context, IDomainEventDispatcher eventDispatcher)
         {
             _context = context;
+            _eventDispatcher = eventDispatcher;
         }
 
         public async Task<Warehouse?> GetByIdAsync(int id)
@@ -74,7 +78,32 @@ namespace Infrastructure.Repositories
 
         public async Task SaveChangesAsync()
         {
+            // Get all aggregate roots with domain events before saving
+            var aggregatesWithEvents = _context.ChangeTracker.Entries<AggregateRoot>()
+                .Where(e => e.Entity.DomainEvents.Any())
+                .Select(e => e.Entity)
+                .ToList();
+
+            // Collect all domain events (cast from INotification to DomainEvent)
+            var domainEvents = aggregatesWithEvents
+                .SelectMany(a => a.DomainEvents)
+                .OfType<DomainEvent>()
+                .ToList();
+
+            // Clear domain events from aggregates
+            foreach (var aggregate in aggregatesWithEvents)
+            {
+                aggregate.ClearDomainEvents();
+            }
+
+            // Save changes to database
             await _context.SaveChangesAsync();
+
+            // Dispatch domain events after saving
+            foreach (var domainEvent in domainEvents)
+            {
+                await _eventDispatcher.DispatchAsync(domainEvent);
+            }
         }
     }
 }

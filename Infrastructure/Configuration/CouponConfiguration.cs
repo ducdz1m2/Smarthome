@@ -11,9 +11,16 @@ namespace Infrastructure.Configuration
             builder.ToTable("Coupons");
             builder.HasKey(c => c.Id);
             builder.Property(c => c.Code).IsRequired().HasMaxLength(50);
-            builder.Property(c => c.DiscountValue).HasPrecision(18, 2);
-            builder.Property(c => c.MinOrderAmount).HasPrecision(18, 2);
-            builder.Property(c => c.MaxDiscountAmount).HasPrecision(18, 2);
+            
+            builder.Property(c => c.DiscountValue).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
+            builder.Property(c => c.MinOrderAmount).HasConversion(
+                money => money != null ? money.Amount : (decimal?)null,
+                value => value.HasValue ? Domain.ValueObjects.Money.Vnd(value.Value) : null);
+            builder.Property(c => c.MaxDiscountAmount).HasConversion(
+                money => money != null ? money.Amount : (decimal?)null,
+                value => value.HasValue ? Domain.ValueObjects.Money.Vnd(value.Value) : null);
             builder.Property(c => c.IsActive).HasDefaultValue(true);
             builder.HasIndex(c => c.Code).IsUnique();
             builder.HasIndex(c => c.ExpiryDate);

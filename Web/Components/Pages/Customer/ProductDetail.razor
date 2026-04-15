@@ -628,7 +628,8 @@ else
                     VariantName = _selectedVariant != null ? GetVariantDisplayText(_selectedVariant) : null,
                     ImageUrl = imageUrl,
                     UnitPrice = price,
-                    Quantity = _quantity
+                    Quantity = _quantity,
+                    RequiresInstallation = _product.RequiresInstallation
                 };
                 cartItems.Add(newItem);
             }
@@ -654,6 +655,7 @@ else
         public string? ImageUrl { get; set; }
         public decimal UnitPrice { get; set; }
         public int Quantity { get; set; }
+        public bool RequiresInstallation { get; set; }
     }
 
     private async Task BuyNow()

@@ -45,7 +45,8 @@ public class Order : AggregateRoot
         int userId,
         string receiverName,
         string receiverPhone,
-        Address shippingAddress)
+        Address shippingAddress,
+        decimal shippingFee = 0)
     {
         if (string.IsNullOrWhiteSpace(receiverName))
             throw new ValidationException(nameof(receiverName), "Tên người nhận không được trống");
@@ -59,7 +60,7 @@ public class Order : AggregateRoot
             ShippingAddress = shippingAddress,
             Status = OrderStatus.Pending,
             TotalAmount = Money.Zero(),
-            ShippingFee = Money.Zero(),
+            ShippingFee = Money.Vnd(shippingFee),
             DiscountAmount = Money.Zero(),
             PaymentMethod = PaymentMethod.COD,
             ShippingMethod = ShippingMethod.Standard,
@@ -83,7 +84,8 @@ public class Order : AggregateRoot
         string shippingAddressStreet,
         string? shippingAddressWard,
         string shippingAddressDistrict,
-        string shippingAddressCity)
+        string shippingAddressCity,
+        decimal shippingFee = 0)
     {
         var address = Address.Create(
             shippingAddressStreet,
@@ -91,13 +93,13 @@ public class Order : AggregateRoot
             shippingAddressDistrict,
             shippingAddressCity);
 
-        return Create(userId, receiverName, receiverPhone, address);
+        return Create(userId, receiverName, receiverPhone, address, shippingFee);
     }
 
-        public OrderItem AddItem(int productId, int? variantId, int quantity, Money unitPrice, bool requiresInstallation = false)
-        {
-            if (Status != OrderStatus.Pending)
-                throw new InvalidOrderStateException(Status.ToString(), "thêm sản phẩm");
+    public OrderItem AddItem(int productId, int? variantId, int quantity, Money unitPrice, bool requiresInstallation = false)
+    {
+        if (Status != OrderStatus.Pending)
+            throw new InvalidOrderStateException(Status.ToString(), "thêm sản phẩm");
 
             if (quantity <= 0)
                 throw new InvalidQuantityException(quantity, "AddItem");
@@ -135,7 +137,7 @@ public class Order : AggregateRoot
                 Status = OrderStatus.AwaitingPickup;
 
             AddStatusHistory(Status, "Đơn hàng đã được xác nhận");
-            AddDomainEvent(new OrderConfirmedEvent(Id, DateTime.UtcNow));
+            AddDomainEvent(new OrderConfirmedEvent(Id, UserId, DateTime.UtcNow));
         }
 
         public void ApplyShippingFee(Money fee)
@@ -196,17 +198,24 @@ public class Order : AggregateRoot
             AddDomainEvent(new OrderShippingStartedEvent(Id, string.Empty));
         }
 
-        public void MarkDelivered()
+        public void MarkDelivered(int userId)
         {
             if (Status != OrderStatus.Shipping)
                 throw new InvalidOrderStateException(Status.ToString(), "đánh dấu đã giao");
 
             Status = OrderStatus.Delivered;
             AddStatusHistory(Status, "Đơn hàng đã được giao thành công");
-            AddDomainEvent(new OrderDeliveredEvent(Id, DateTime.UtcNow));
+
+            // Mark all non-installation items as shipped
+            foreach (var item in Items.Where(i => !i.RequiresInstallation && !i.IsShipped))
+            {
+                item.MarkAsShipped();
+            }
+
+            AddDomainEvent(new OrderDeliveredEvent(Id, userId, DateTime.UtcNow));
         }
 
-        public void Cancel(string reason)
+        public void Cancel(string reason, int cancelledByUserId)
         {
             if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
                 throw new InvalidOrderStateException(Status.ToString(), "hủy");
@@ -219,7 +228,19 @@ public class Order : AggregateRoot
                 item.ReleaseReservation();
             }
 
-            AddDomainEvent(new OrderCancelledEvent(Id, reason, DateTime.UtcNow));
+            AddDomainEvent(new OrderCancelledEvent(Id, cancelledByUserId, reason, DateTime.UtcNow));
+        }
+
+        public void UpdateStatusFromInstallation(OrderStatus newStatus)
+        {
+            // Only allow status changes related to installation
+            if (newStatus != OrderStatus.Installing && newStatus != OrderStatus.Completed)
+            {
+                throw new BusinessRuleViolationException("InvalidStatusChange", "Chỉ có thể cập nhật trạng thái lắp đặt");
+            }
+
+            Status = newStatus;
+            AddStatusHistory(Status, newStatus == OrderStatus.Installing ? "Đang lắp đặt" : "Hoàn thành lắp đặt");
         }
 
         private void UpdateOverallStatus()

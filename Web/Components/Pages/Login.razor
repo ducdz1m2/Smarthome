@@ -2,10 +2,12 @@
 @layout EmptyLayout
 @using Application.DTOs.Requests
 @using Application.Interfaces.Services
+@using Web.Services
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Authentication.Cookies
 @inject IIdentityService IdentityService
+@inject IAuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject IHttpContextAccessor HttpContextAccessor
@@ -84,43 +86,25 @@
         {
             // Validate credentials
             var response = await IdentityService.LoginAsync(_request);
-            
-            // Set cookie using HttpContext (only works during initial request)
-            var httpContext = HttpContextAccessor.HttpContext;
-            if (httpContext != null && !httpContext.Response.HasStarted)
-            {
-                var claims = new List<Claim>
-                {
-                    new(ClaimTypes.NameIdentifier, response.User.Id.ToString()),
-                    new(ClaimTypes.Name, response.User.UserName),
-                    new(ClaimTypes.Email, response.User.Email),
-                    new(ClaimTypes.GivenName, response.User.FullName)
-                };
 
-                foreach (var role in response.User.Roles)
-                {
-                    claims.Add(new Claim(ClaimTypes.Role, role));
-                }
+            // Store user info in CurrentUserService and set cookie
+            await AuthService.SignInAsync(
+                response.User!.Id.ToString(),
+                response.User.UserName,
+                response.User.Email,
+                response.User.FullName,
+                response.User.Roles,
+                _request.RememberMe);
 
-                var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-                var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
-
-                var authProperties = new AuthenticationProperties
-                {
-                    IsPersistent = _request.RememberMe,
-                    ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
-                };
-
-                await httpContext.SignInAsync(
-                    CookieAuthenticationDefaults.AuthenticationScheme,
-                    claimsPrincipal,
-                    authProperties);
-            }
-            
             Snackbar.Add("Đăng nhập thành công!", Severity.Success);
-            
+
             // Redirect based on role
-            var redirectUrl = response.User.Roles.Contains("Admin") ? "/admin" : "/";
+            string redirectUrl = "/";
+            if (response.User!.Roles.Contains("Admin"))
+                redirectUrl = "/admin";
+            else if (response.User!.Roles.Contains("Technician"))
+                redirectUrl = "/technician";
+
             NavigationManager.NavigateTo(redirectUrl, forceLoad: true);
         }
         catch (Exception ex)

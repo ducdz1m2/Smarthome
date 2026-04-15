@@ -10,7 +10,9 @@ namespace Infrastructure.Configuration
         {
             builder.ToTable("PaymentTransactions");
             builder.HasKey(pt => pt.Id);
-            builder.Property(pt => pt.Amount).HasPrecision(18, 2);
+            builder.Property(pt => pt.Amount).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
             builder.Property(pt => pt.TransactionCode).HasMaxLength(100);
             builder.HasIndex(pt => pt.OrderId);
             builder.HasIndex(pt => pt.TransactionCode).IsUnique();

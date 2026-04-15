@@ -153,7 +153,7 @@
         var dialog = await DialogService.ShowAsync<CategoryDialog>(category == null ? "Thêm danh mục" : "Sửa danh mục", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is not null && !result.Canceled)
         {
             await LoadCategories();
         }
@@ -202,7 +202,7 @@
         var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is true)
+        if (result is not null && !result.Canceled && result.Data is true)
         {
             try
             {

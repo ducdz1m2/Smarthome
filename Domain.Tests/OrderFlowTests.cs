@@ -100,13 +100,14 @@ public class OrderFlowTests
     {
         // Arrange
         var order = CreateTestOrder();
-        order.AddItem(1, null, 1, Money.Vnd(100000), false);
+        var item = order.AddItem(1, null, 1, Money.Vnd(100000), false);
         order.Confirm();
+        order.StartShipping();
 
-        // Act
-        order.Complete();
+        // Act - MarkItemShipped triggers UpdateOverallStatus which auto-completes order
+        order.MarkItemShipped(item.Id);
 
-        // Assert
+        // Assert - order should be auto-completed when all items shipped
         order.Status.Should().Be(OrderStatus.Completed);
     }
 

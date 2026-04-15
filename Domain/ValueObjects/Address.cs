@@ -43,11 +43,14 @@ namespace Domain.ValueObjects
         {
             var parts = new List<string> { Street };
 
-            if (!string.IsNullOrWhiteSpace(Ward))
+            if (!string.IsNullOrWhiteSpace(Ward) && Ward != "N/A")
                 parts.Add(Ward);
 
-            parts.Add(District);
-            parts.Add(City);
+            if (!string.IsNullOrWhiteSpace(District) && District != "N/A")
+                parts.Add(District);
+
+            if (!string.IsNullOrWhiteSpace(City) && City != "N/A")
+                parts.Add(City);
 
             if (!string.IsNullOrWhiteSpace(Country) && Country != "Việt Nam")
                 parts.Add(Country);
@@ -55,7 +58,18 @@ namespace Domain.ValueObjects
             return string.Join(", ", parts);
         }
 
-        public string ToShortString() => $"{Street}, {District}, {City}";
+        public string ToShortString()
+        {
+            var parts = new List<string> { Street };
+
+            if (!string.IsNullOrWhiteSpace(District) && District != "N/A")
+                parts.Add(District);
+
+            if (!string.IsNullOrWhiteSpace(City) && City != "N/A")
+                parts.Add(City);
+
+            return string.Join(", ", parts);
+        }
 
         public override string ToString() => ToFullString();
 

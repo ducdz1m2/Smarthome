@@ -1,7 +1,9 @@
-﻿using Application.Interfaces.Repositories;
+﻿using Application.EventHandlers;
+using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Application.Mappings;
 using Application.Services;
+using Domain.Events;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application
@@ -34,6 +36,19 @@ namespace Application
             // Warranty services
             services.AddScoped<IWarrantyService, WarrantyService>();
 
+            // Return Order services
+            services.AddScoped<IReturnOrderService, ReturnOrderService>();
+
+            // Product Comment/Review services
+            services.AddScoped<IProductCommentService, ProductCommentService>();
+
+            // Shipment services
+            services.AddScoped<IShipmentService, ShipmentService>();
+
+            // Chat & Notification services
+            services.AddScoped<IChatService, ChatService>();
+            services.AddScoped<INotificationService, NotificationService>();
+
             // Identity services (User, Role, Auth combined)
             // Note: IIdentityService and IdentityService are registered in Web/Program.cs
             // to ensure proper dependency injection order with UserManager/RoleManager
@@ -43,6 +58,30 @@ namespace Application
 
             // User Address service
             services.AddScoped<IUserAddressService, UserAddressService>();
+
+            // Shipping service (registered in Infrastructure DI)
+            // services.AddScoped<Domain.Services.IShippingService, Infrastructure.Services.ShippingService>();
+
+            // Register Domain Event Handlers - Order Notifications
+            services.AddScoped<IDomainEventHandler<OrderCreatedEvent>, OrderNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<OrderConfirmedEvent>, OrderNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<OrderShippedEvent>, OrderNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<OrderDeliveredEvent>, OrderNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<OrderCancelledEvent>, OrderNotificationHandler>();
+
+            // Register Domain Event Handlers - Order Inventory Management
+            services.AddScoped<IDomainEventHandler<OrderConfirmedEvent>, OrderInventoryHandler>();
+            services.AddScoped<IDomainEventHandler<OrderCancelledEvent>, OrderInventoryHandler>();
+            services.AddScoped<IDomainEventHandler<OrderShippingStartedEvent>, OrderInventoryHandler>();
+
+            services.AddScoped<IDomainEventHandler<InstallationBookedEvent>, InstallationNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<InstallationAssignedEvent>, InstallationNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<InstallationCompletedEvent>, InstallationNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<WarrantyClaimCreatedEvent>, WarrantyNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<WarrantyClaimApprovedEvent>, WarrantyNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<WarrantyClaimResolvedEvent>, WarrantyNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<ChatMessageSentEvent>, ChatNotificationHandler>();
+            services.AddScoped<IDomainEventHandler<ChatRoomCreatedEvent>, ChatNotificationHandler>();
 
             return services;
         }

@@ -18,6 +18,7 @@ public record InstallationStartedEvent(
 
 public record InstallationCompletedEvent(
     int BookingId,
+    int CustomerId,
     DateTime CompletedAt,
     string? Notes) : DomainEvent(BookingId, nameof(Entities.Installation.InstallationBooking));
 
@@ -27,5 +28,17 @@ public record InstallationCancelledEvent(
 
 public record TechnicianAssignedEvent(
     int BookingId,
+    int TechnicianId,
+    DateTime AssignedAt) : DomainEvent(BookingId, nameof(Entities.Installation.InstallationBooking));
+
+// Aliases for notification handlers
+public record InstallationBookedEvent(
+    int BookingId,
+    int CustomerId,
+    DateTime ScheduledDate) : DomainEvent(BookingId, nameof(Entities.Installation.InstallationBooking));
+
+public record InstallationAssignedEvent(
+    int BookingId,
+    int CustomerId,
     int TechnicianId,
     DateTime AssignedAt) : DomainEvent(BookingId, nameof(Entities.Installation.InstallationBooking));

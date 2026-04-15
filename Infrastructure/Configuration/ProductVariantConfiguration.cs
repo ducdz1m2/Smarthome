@@ -11,8 +11,12 @@ namespace Infrastructure.Configuration
             builder.ToTable("ProductVariants");
             builder.HasKey(v => v.Id);
             
-            builder.Property(v => v.Sku).IsRequired().HasMaxLength(50);
-            builder.Property(v => v.Price).HasPrecision(18, 2);
+            builder.Property(v => v.Sku).HasConversion(
+                sku => sku.Value,
+                value => Domain.ValueObjects.Sku.Create(value));
+            builder.Property(v => v.Price).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
             builder.Property(v => v.AttributesJson).HasColumnType("nvarchar(max)");
             builder.Property(v => v.IsActive).HasDefaultValue(true);
             

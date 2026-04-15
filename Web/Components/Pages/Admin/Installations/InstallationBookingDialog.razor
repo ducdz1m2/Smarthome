@@ -5,6 +5,7 @@
 @inject IInstallationService InstallationService
 @inject ITechnicianProfileService TechnicianService
 @inject IInstallationSlotService SlotService
+@inject IOrderService OrderService
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -12,11 +13,18 @@
         <MudForm @ref="_form" @bind-IsValid="_isValid">
             <MudGrid>
                 <MudItem xs="12" md="6">
-                    <MudNumericField T="int" @bind-Value="_request.OrderId" 
-                                     Label="Mã đơn hàng *" 
-                                     Required="true" RequiredError="Nhập mã đơn hàng"
-                                     Variant="Variant.Outlined" Class="mb-3"
-                                     Disabled="_isEdit" Min="1" />
+                    <MudSelect T="int" @bind-Value="_request.OrderId"
+                             Label="Đơn hàng *"
+                             Required="true" RequiredError="Chọn đơn hàng"
+                             Variant="Variant.Outlined" Class="mb-3"
+                             Disabled="_isEdit">
+                        @foreach (var order in _orders)
+                        {
+                            <MudSelectItem T="int" Value="@order.Id">
+                                #@order.OrderNumber - @order.ReceiverName (@order.Status)
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
                 </MudItem>
                 
                 <MudItem xs="12" md="6">
@@ -66,65 +74,10 @@
                     <MudItem xs="12">
                         <MudDivider Class="my-4" />
                         
-                        @if (_booking.Status == "Assigned")
-                        {
-                            <MudAlert Severity="Severity.Info" Class="mb-3">
-                                <b>Chờ kỹ thuật viên xác nhận:</b> Lịch này đang chờ KT tiếp nhận. Bạn không thể tự cập nhật trạng thái.
-                                Nếu KT từ chối, lịch sẽ tự động chuyển sang "Đã hủy".
-                            </MudAlert>
-                        }
-                        
-                        <MudText Typo="Typo.subtitle2" Class="mb-3">Cập nhật trạng thái</MudText>
-                        <MudGrid>
-                            <MudItem xs="12" md="6">
-                                <MudSelect T="string" @bind-Value="_newStatus" Label="Trạng thái mới"
-                                           Variant="Variant.Outlined" Class="mb-3">
-                                    <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("Installing")">Đang lắp</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
-                                </MudSelect>
-                            </MudItem>
-                            <MudItem xs="12" md="6">
-                                <MudButton Variant="Variant.Filled" Color="Color.Primary" 
-                                           OnClick="UpdateStatus" Class="mt-4">
-                                    Cập nhật trạng thái
-                                </MudButton>
-                            </MudItem>
-                        </MudGrid>
-                        
-                        @if (_newStatus == "Completed")
-                        {
-                            <MudGrid Class="mt-2">
-                                <MudItem xs="12" md="4">
-                                    <MudNumericField T="int" @bind-Value="_customerRating" 
-                                                     Label="Đánh giá (1-5)" Min="1" Max="5"
-                                                     Variant="Variant.Outlined" />
-                                </MudItem>
-                                <MudItem xs="12" md="8">
-                                    <MudTextField @bind-Value="_customerSignature" 
-                                                  Label="Chữ ký khách hàng"
-                                                  Variant="Variant.Outlined" />
-                                </MudItem>
-                                <MudItem xs="12">
-                                    <MudTextField @bind-Value="_completionNotes" 
-                                                  Label="Ghi chú" Lines="2"
-                                                  Variant="Variant.Outlined" />
-                                </MudItem>
-                            </MudGrid>
-                        }
-                        
-                        @if (_newStatus == "Cancelled")
-                        {
-                            <MudItem xs="12" Class="mt-2">
-                                <MudTextField @bind-Value="_cancelReason" 
-                                              Label="Lý do hủy" Required="true"
-                                              RequiredError="Nhập lý do hủy"
-                                              Variant="Variant.Outlined" />
-                            </MudItem>
-                        }
+                        <MudAlert Severity="Severity.Info" Class="mb-3">
+                            <b>Thông tin:</b> Bạn có thể thay đổi kỹ thuật viên hoặc khung giờ lắp đặt. 
+                            Trạng thái lắp đặt sẽ được kỹ thuật viên tự cập nhật.
+                        </MudAlert>
                     </MudItem>
                 }
             </MudGrid>
@@ -151,8 +104,9 @@
     
     private List<TechnicianResponse> _technicians = new();
     private List<InstallationSlotResponse> _availableSlots = new();
+    private List<OrderResponse> _orders = new();
     private InstallationBookingResponse? _booking;
-    
+
     private CreateInstallationBookingRequest _request = new()
     {
         OrderId = 0,
@@ -160,19 +114,14 @@
         SlotId = 0,
         ScheduledDate = DateTime.Today
     };
-    
+
     private DateTime? _scheduledDate = DateTime.Today;
     private int? _selectedTechnicianId;
-    
-    private string? _newStatus;
-    private int _customerRating = 5;
-    private string _customerSignature = "";
-    private string _completionNotes = "";
-    private string _cancelReason = "";
 
     protected override async Task OnInitializedAsync()
     {
         await LoadTechnicians();
+        await LoadOrders();
         if (_isEdit)
         {
             await LoadBooking();
@@ -202,6 +151,23 @@
         }
     }
 
+    private async Task LoadOrders()
+    {
+        try
+        {
+            _orders = await OrderService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải đơn hàng: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OnOrderChanged(int orderId)
+    {
+        _request.OrderId = orderId;
+    }
+
     private async Task LoadBooking()
     {
         try
@@ -218,8 +184,7 @@
                 };
                 _scheduledDate = _booking.ScheduledDate;
                 _selectedTechnicianId = _booking.TechnicianId;
-                _newStatus = _booking.Status;
-                
+
                 await LoadAvailableSlots();
             }
         }
@@ -245,63 +210,25 @@
 
         try
         {
-            var allSlots = await SlotService.GetByTechnicianAndDateAsync(_selectedTechnicianId.Value, _scheduledDate.Value);
-            // Filter available slots or slots belonging to this booking (for edit mode)
-            _availableSlots = allSlots.Where(s => !s.IsBooked || (_isEdit && s.Id == _booking?.SlotId)).ToList();
+            // Use GetAvailableSlotsAsync to trigger auto-generation of slots if needed
+            var availableSlots = await SlotService.GetAvailableSlotsAsync(_selectedTechnicianId.Value, _scheduledDate.Value);
+            
+            // In edit mode, also include the current booking's slot even if it's booked
+            if (_isEdit && _booking?.SlotId > 0)
+            {
+                var allSlots = await SlotService.GetByTechnicianAndDateAsync(_selectedTechnicianId.Value, _scheduledDate.Value);
+                var currentSlot = allSlots.FirstOrDefault(s => s.Id == _booking.SlotId);
+                if (currentSlot != null && !availableSlots.Any(s => s.Id == currentSlot.Id))
+                {
+                    availableSlots.Add(currentSlot);
+                }
+            }
+            
+            _availableSlots = availableSlots;
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Lỗi tải slots: {ex.Message}", Severity.Error);
-        }
-    }
-
-    private async Task UpdateStatus()
-    {
-        if (_booking == null || string.IsNullOrEmpty(_newStatus)) return;
-
-        try
-        {
-            switch (_newStatus)
-            {
-                case "Preparing":
-                    await InstallationService.StartPreparationAsync(_booking.Id);
-                    break;
-                case "OnTheWay":
-                    await InstallationService.StartTravelAsync(_booking.Id);
-                    break;
-                case "Installing":
-                    await InstallationService.StartInstallationAsync(_booking.Id);
-                    break;
-                case "Completed":
-                    var completeRequest = new CompleteInstallationRequest
-                    {
-                        CustomerSignature = _customerSignature,
-                        CustomerRating = _customerRating,
-                        Notes = _completionNotes
-                    };
-                    await InstallationService.CompleteAsync(_booking.Id, completeRequest);
-                    break;
-                case "Cancelled":
-                    if (string.IsNullOrWhiteSpace(_cancelReason))
-                    {
-                        Snackbar.Add("Vui lòng nhập lý do hủy", Severity.Warning);
-                        return;
-                    }
-                    var cancelRequest = new CancelInstallationRequest { Reason = _cancelReason };
-                    await InstallationService.CancelAsync(_booking.Id, cancelRequest);
-                    break;
-                default:
-                    // For other status changes, just update the booking
-                    await InstallationService.UpdateAsync(_booking.Id, new UpdateInstallationBookingRequest());
-                    break;
-            }
-            
-            Snackbar.Add("Đã cập nhật trạng thái", Severity.Success);
-            await LoadBooking();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }
 

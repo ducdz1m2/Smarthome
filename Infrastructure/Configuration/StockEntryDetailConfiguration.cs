@@ -10,7 +10,9 @@ namespace Infrastructure.Configuration
         {
             builder.ToTable("StockEntryDetails");
             builder.HasKey(sed => sed.Id);
-            builder.Property(sed => sed.UnitCost).HasPrecision(18, 2);
+            builder.Property(sed => sed.UnitCost).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
             builder.HasIndex(sed => sed.StockEntryId);
             builder.HasIndex(sed => sed.ProductId);
             builder.Ignore(sed => sed.DomainEvents);

@@ -190,7 +190,8 @@ public class TechnicianBookingFlowTests
         order.Confirm();
 
         var installItem = order.Items.First(i => i.RequiresInstallation);
-        var booking = InstallationBooking.Create(order.Id, 1, 1, DateTime.UtcNow.AddDays(1));
+        // Use orderId = 1 since order.Id is 0 (not saved to DB)
+        var booking = InstallationBooking.Create(1, 1, 1, DateTime.UtcNow.AddDays(1));
         
         // Flow: Assign → Prepare → Travel → Install → Complete
         booking.AssignTechnician(1, 1);

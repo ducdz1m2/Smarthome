@@ -65,7 +65,11 @@ namespace Application.Services
             if (await _supplierRepository.ExistsAsync(request.Name, id))
                 throw new DomainException("Tên nhà cung cấp đã tồn tại");
 
-            supplier.Update(request.Name, request.ContactName, request.Phone, request.Email);
+            supplier.Update(
+                request.Name, 
+                request.ContactName, 
+                request.Phone != null ? Domain.ValueObjects.PhoneNumber.Create(request.Phone) : null,
+                request.Email != null ? Domain.ValueObjects.Email.Create(request.Email) : null);
 
             if (request.IsActive && !supplier.IsActive)
                 supplier.Activate();
@@ -115,10 +119,10 @@ namespace Application.Services
         {
             var address = string.Join(", ", new[]
             {
-                supplier.AddressStreet,
-                supplier.AddressWard,
-                supplier.AddressDistrict,
-                supplier.AddressCity
+                supplier.Address?.Street,
+                supplier.Address?.Ward,
+                supplier.Address?.District,
+                supplier.Address?.City
             }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
             return new SupplierResponse
@@ -128,8 +132,8 @@ namespace Application.Services
                 TaxCode = supplier.TaxCode,
                 Address = address,
                 ContactName = supplier.ContactName,
-                Phone = supplier.Phone,
-                Email = supplier.Email,
+                Phone = supplier.Phone?.ToString(),
+                Email = supplier.Email?.ToString(),
                 BankAccount = supplier.BankAccount,
                 BankName = supplier.BankName,
                 IsActive = supplier.IsActive,

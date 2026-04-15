@@ -13,16 +13,30 @@ namespace Infrastructure.Configuration
             
             builder.Property(o => o.OrderNumber).IsRequired().HasMaxLength(50);
             builder.Property(o => o.ReceiverName).IsRequired().HasMaxLength(100);
-            builder.Property(o => o.ReceiverPhone).IsRequired().HasMaxLength(20);
-            builder.Property(o => o.ShippingAddressStreet).IsRequired().HasMaxLength(200);
-            builder.Property(o => o.ShippingAddressWard).HasMaxLength(50);
-            builder.Property(o => o.ShippingAddressDistrict).HasMaxLength(50);
-            builder.Property(o => o.ShippingAddressCity).HasMaxLength(50);
+            builder.Property(o => o.ReceiverPhone).HasConversion(
+                phone => phone.ToString(),
+                value => Domain.ValueObjects.PhoneNumber.Create(value));
+            builder.OwnsOne(o => o.ShippingAddress, address =>
+            {
+                address.Property(a => a.Street).HasColumnName("ShippingAddressStreet").HasMaxLength(200);
+                address.Property(a => a.Ward).HasColumnName("ShippingAddressWard").HasMaxLength(50);
+                address.Property(a => a.District).HasColumnName("ShippingAddressDistrict").HasMaxLength(50);
+                address.Property(a => a.City).HasColumnName("ShippingAddressCity").HasMaxLength(50);
+                address.Property(a => a.Country).HasColumnName("ShippingAddressCountry").HasMaxLength(50);
+                address.Property(a => a.PostalCode).HasColumnName("ShippingAddressPostalCode").HasMaxLength(10);
+            });
             builder.Property(o => o.StatusHistoryJson).HasColumnType("nvarchar(max)");
             builder.Property(o => o.CancelReason).HasMaxLength(500);
-            builder.Property(o => o.TotalAmount).HasPrecision(18, 2);
-            builder.Property(o => o.ShippingFee).HasPrecision(18, 2);
-            builder.Property(o => o.DiscountAmount).HasPrecision(18, 2);
+            
+            builder.Property(o => o.TotalAmount).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
+            builder.Property(o => o.ShippingFee).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
+            builder.Property(o => o.DiscountAmount).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
             
             builder.HasIndex(o => o.OrderNumber).IsUnique();
             builder.HasIndex(o => o.UserId);

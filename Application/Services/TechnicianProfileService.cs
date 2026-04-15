@@ -10,10 +10,12 @@ namespace Application.Services
     public class TechnicianProfileService : ITechnicianProfileService
     {
         private readonly ITechnicianProfileRepository _technicianRepository;
+        private readonly IIdentityService _identityService;
 
-        public TechnicianProfileService(ITechnicianProfileRepository technicianRepository)
+        public TechnicianProfileService(ITechnicianProfileRepository technicianRepository, IIdentityService identityService)
         {
             _technicianRepository = technicianRepository;
+            _identityService = identityService;
         }
 
         public async Task<List<TechnicianListResponse>> GetAllAsync()
@@ -55,36 +57,60 @@ namespace Application.Services
             return technicians.Select(MapToResponse).ToList();
         }
 
+        public async Task<List<TechnicianResponse>> GetByCityAsync(string city)
+        {
+            var technicians = await _technicianRepository.GetByCityAsync(city);
+            return technicians.Select(MapToResponse).ToList();
+        }
+
         public async Task<int> CreateAsync(CreateTechnicianProfileRequest request)
         {
             // Check if employee code already exists
             if (await _technicianRepository.ExistsByEmployeeCodeAsync(request.EmployeeCode))
                 throw new DomainException("Mã nhân viên đã tồn tại");
 
-            /* TODO: Create User account for technician
-             * This requires IUserRepository and user creation logic
-             * For now, create technician without user link (UserId = null)
-             * The user can be linked later via LinkToUser method
-             */
+            Console.WriteLine($"[TechnicianProfileService] Creating user account for technician: {request.Username}");
+
+            // Create User account for technician
+            var createUserRequest = new CreateUserRequest
+            {
+                UserName = request.Username,
+                Password = request.Password,
+                Email = request.Email ?? string.Empty,
+                FullName = request.FullName,
+                Roles = new List<string> { "Technician" }
+            };
+
+            var (result, userId) = await _identityService.CreateUserAsync(createUserRequest);
+            if (!result.Succeeded)
+            {
+                Console.WriteLine($"[TechnicianProfileService] User creation failed: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                throw new DomainException($"Không thể tạo tài khoản: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+            }
+
+            Console.WriteLine($"[TechnicianProfileService] User created successfully with ID: {userId}");
 
             // Create Technician Profile
+            // For address, use a simple format: street only (no ward/district validation)
+            var address = !string.IsNullOrWhiteSpace(request.Address)
+                ? Domain.ValueObjects.Address.Create(request.Address, null, "N/A", "N/A")
+                : null;
+
             var technician = TechnicianProfile.Create(
                 request.FullName,
-                request.PhoneNumber,
+                Domain.ValueObjects.PhoneNumber.Create(request.PhoneNumber),
                 request.EmployeeCode,
                 request.City,
                 request.Districts,
-                request.Email,
+                request.Email != null ? Domain.ValueObjects.Email.Create(request.Email) : null,
                 request.IdentityCard,
-                request.Address,
+                address,
                 request.DateOfBirth,
-                request.BaseSalary
+                request.BaseSalary > 0 ? Domain.ValueObjects.Money.Vnd(request.BaseSalary) : null
             );
-            
-            // Note: For now, UserId remains null. To complete user creation:
-            // Note: User creation is handled through IIdentityService
-            // Inject IIdentityService and create user account if needed
-            // Link technician to user: technician.LinkToUser(userId);
+
+            // Link technician to user
+            technician.LinkToUser(userId);
 
             // Add skills if provided
             foreach (var skill in request.Skills)
@@ -107,12 +133,16 @@ namespace Application.Services
             // Update personal info
             if (request.FullName != null || request.PhoneNumber != null)
             {
+                var address = request.Address != null
+                    ? Domain.ValueObjects.Address.Create(request.Address, null, "N/A", "N/A")
+                    : technician.Address;
+
                 technician.UpdateInfo(
                     request.FullName ?? technician.FullName,
-                    request.PhoneNumber ?? technician.PhoneNumber,
-                    request.Email ?? technician.Email,
+                    request.PhoneNumber != null ? Domain.ValueObjects.PhoneNumber.Create(request.PhoneNumber) : technician.PhoneNumber,
+                    request.Email != null ? Domain.ValueObjects.Email.Create(request.Email) : technician.Email,
                     request.IdentityCard ?? technician.IdentityCard,
-                    request.Address ?? technician.Address,
+                    address,
                     request.DateOfBirth ?? technician.DateOfBirth
                 );
             }
@@ -121,7 +151,7 @@ namespace Application.Services
             if (request.BaseSalary.HasValue || request.City != null || request.Districts != null)
             {
                 technician.UpdateWorkInfo(
-                    request.BaseSalary ?? technician.BaseSalary,
+                    request.BaseSalary.HasValue ? Domain.ValueObjects.Money.Vnd(request.BaseSalary.Value) : technician.BaseSalary,
                     request.City ?? technician.City,
                     request.Districts ?? technician.GetDistricts()
                 );
@@ -173,14 +203,14 @@ namespace Application.Services
                 Id = technician.Id,
                 UserId = technician.UserId,
                 FullName = technician.FullName,
-                PhoneNumber = technician.PhoneNumber,
-                Email = technician.Email,
+                PhoneNumber = technician.PhoneNumber.ToString(),
+                Email = technician.Email?.ToString(),
                 IdentityCard = technician.IdentityCard,
-                Address = technician.Address,
+                Address = technician.Address?.ToString(),
                 DateOfBirth = technician.DateOfBirth,
                 EmployeeCode = technician.EmployeeCode,
                 HireDate = technician.HireDate,
-                BaseSalary = technician.BaseSalary,
+                BaseSalary = technician.BaseSalary.Amount,
                 City = technician.City,
                 Districts = technician.GetDistricts(),
                 Skills = technician.GetSkills(),
@@ -198,8 +228,8 @@ namespace Application.Services
                 Id = technician.Id,
                 EmployeeCode = technician.EmployeeCode,
                 FullName = technician.FullName,
-                PhoneNumber = technician.PhoneNumber,
-                Email = technician.Email,
+                PhoneNumber = technician.PhoneNumber.ToString(),
+                Email = technician.Email?.ToString(),
                 City = technician.City,
                 Districts = technician.GetDistricts(),
                 Rating = technician.Rating,

@@ -1,6 +1,8 @@
 ﻿using Application.Interfaces.Repositories;
 using Domain.Entities.Identity;
+using Domain.Events;
 using Infrastructure.Data;
+using Infrastructure.Events;
 using Infrastructure.Repositories;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +18,9 @@ namespace Infrastructure
             // Cấu hình DbContext
             services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+
+            // Đăng ký Domain Event Dispatcher
+            services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
             // Đăng ký Identity
             services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -45,7 +50,8 @@ namespace Infrastructure
             services.AddScoped<IProductWarehouseRepository, ProductWarehouseRepository>();
 
             // Installation repositories
-            services.AddScoped<IInstallationBookingRepository, InstallationBookingRepository>();
+            services.AddScoped<Infrastructure.Repositories.Interfaces.IInstallationBookingRepository, InstallationBookingRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IInstallationBookingRepository, InstallationBookingRepository>();
             services.AddScoped<ITechnicianProfileRepository, TechnicianProfileRepository>();
             services.AddScoped<IInstallationSlotRepository, InstallationSlotRepository>();
 
@@ -55,6 +61,21 @@ namespace Infrastructure
 
             // User Address repository
             services.AddScoped<IUserAddressRepository, UserAddressRepository>();
+
+            // Return Order & Shipment repositories
+            services.AddScoped<IReturnOrderRepository, ReturnOrderRepository>();
+            services.AddScoped<IOrderShipmentRepository, OrderShipmentRepository>();
+
+            // Product Comment repository
+            services.AddScoped<IProductCommentRepository, ProductCommentRepository>();
+
+            // Chat & Notification repositories
+            services.AddScoped<IChatRoomRepository, ChatRoomRepository>();
+            services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
+            services.AddScoped<INotificationRepository, NotificationRepository>();
+
+            // Shipping service
+            services.AddScoped<Domain.Services.IShippingService, Services.ShippingService>();
 
             return services;
         }

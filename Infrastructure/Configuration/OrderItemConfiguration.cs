@@ -10,7 +10,9 @@ namespace Infrastructure.Configuration
         {
             builder.ToTable("OrderItems");
             builder.HasKey(oi => oi.Id);
-            builder.Property(oi => oi.UnitPrice).HasPrecision(18, 2);
+            builder.Property(oi => oi.UnitPrice).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
             builder.HasIndex(oi => oi.OrderId);
             builder.HasIndex(oi => oi.ProductId);
             builder.Ignore(oi => oi.DomainEvents);

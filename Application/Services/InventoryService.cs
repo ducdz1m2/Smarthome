@@ -45,7 +45,7 @@ namespace Application.Services
             if (!string.IsNullOrWhiteSpace(filter?.SearchTerm))
                 products = products.Where(p => 
                     p.Name.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase) || 
-                    p.Sku.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+                    p.Sku.Value.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
 
             var productIds = products.Select(p => p.Id).ToList();
             var warehouseStocks = productIds.Any() 
@@ -64,8 +64,8 @@ namespace Application.Services
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
-                    Sku = product.Sku,
-                    BasePrice = product.BasePrice,
+                    Sku = product.Sku.Value,
+                    BasePrice = product.BasePrice.Amount,
                     CategoryId = product.CategoryId,
                     CategoryName = product.Category?.Name ?? "",
                     BrandId = product.BrandId,
@@ -128,8 +128,8 @@ namespace Application.Services
             {
                 ProductId = product.Id,
                 ProductName = product.Name,
-                Sku = product.Sku,
-                BasePrice = product.BasePrice,
+                Sku = product.Sku.Value,
+                BasePrice = product.BasePrice.Amount,
                 CategoryId = product.CategoryId,
                 CategoryName = product.Category?.Name ?? "",
                 BrandId = product.BrandId,
@@ -197,7 +197,7 @@ namespace Application.Services
                     TotalProducts = categoryProducts.Count,
                     TotalStockQuantity = categoryStocks.Sum(pw => pw.Quantity),
                     TotalStockValue = categoryProducts.Sum(p => 
-                        categoryStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity) * p.BasePrice),
+                        categoryStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity) * p.BasePrice.Amount),
                     LowStockProducts = categoryProducts.Count(p => 
                     {
                         var stock = categoryStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity - pw.ReservedQuantity);
@@ -253,7 +253,7 @@ namespace Application.Services
                 ParentCategoryName = category.Parent?.Name,
                 TotalProducts = products.Count,
                 TotalStockQuantity = stocks.Sum(s => s.Quantity),
-                TotalStockValue = products.Sum(p => stocks.Where(s => s.ProductId == p.Id).Sum(s => s.Quantity) * p.BasePrice),
+                TotalStockValue = products.Sum(p => stocks.Where(s => s.ProductId == p.Id).Sum(s => s.Quantity) * p.BasePrice.Amount),
                 LowStockProducts = products.Count(p =>
                 {
                     var productStock = stocks.Where(s => s.ProductId == p.Id).Sum(s => s.Quantity - s.ReservedQuantity);
@@ -301,7 +301,7 @@ namespace Application.Services
                     TotalQuantity = totalQty,
                     TotalReserved = totalReserved,
                     TotalStockValue = products.Sum(p => 
-                        warehouseStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity) * p.BasePrice),
+                        warehouseStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity) * p.BasePrice.Amount),
                     LowStockCount = warehouseStocks.Count(pw => pw.IsLowStock()),
                     CategoryBreakdown = products
                         .GroupBy(p => p.CategoryId)
@@ -343,7 +343,7 @@ namespace Application.Services
                 TotalQuantity = warehouseStocks.Sum(pw => pw.Quantity),
                 TotalReserved = warehouseStocks.Sum(pw => pw.ReservedQuantity),
                 TotalStockValue = products.Sum(p => 
-                    warehouseStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity) * p.BasePrice),
+                    warehouseStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity) * p.BasePrice.Amount),
                 LowStockCount = warehouseStocks.Count(pw => pw.IsLowStock()),
                 CategoryBreakdown = products
                     .GroupBy(p => p.CategoryId)
@@ -402,9 +402,9 @@ namespace Application.Services
                     Id = d.Id,
                     ProductId = d.ProductId,
                     ProductName = d.Product?.Name ?? "",
-                    Sku = d.Product?.Sku ?? "",
+                    Sku = d.Product?.Sku.Value ?? "",
                     Quantity = d.Quantity,
-                    UnitCost = d.UnitCost,
+                    UnitCost = d.UnitCost.Amount,
                     CategoryName = d.Product?.Category?.Name
                 }).ToList() ?? new List<StockEntryDetailItemResponse>()
             };
@@ -458,7 +458,7 @@ namespace Application.Services
                 }
 
                 productWarehouse.Receive(detail.Quantity);
-                
+
                 if (productWarehouse.Id > 0)
                 {
                     _productWarehouseRepository.Update(productWarehouse);
@@ -468,6 +468,31 @@ namespace Application.Services
             entry.Complete();
             // Không cần gọi Update vì entry đã được tracked từ GetByIdWithDetailsAsync
             await _stockEntryRepository.SaveChangesAsync();
+
+            // Đồng bộ Product.StockQuantity cho tất cả sản phẩm trong phiếu nhập
+            foreach (var detail in entry.Details)
+            {
+                await SyncProductStockFromWarehouses(detail.ProductId);
+            }
+        }
+
+        /// <summary>
+        /// Đồng bộ Product.StockQuantity từ tổng tồn kho của tất cả các kho
+        /// </summary>
+        private async Task SyncProductStockFromWarehouses(int productId)
+        {
+            var product = await _productRepository.GetByIdAsync(productId);
+            if (product == null) return;
+
+            var warehouseStocks = await _productWarehouseRepository.GetByProductAsync(productId);
+            var totalStock = warehouseStocks.Sum(pw => pw.Quantity);
+            var totalReserved = warehouseStocks.Sum(pw => pw.ReservedQuantity);
+
+            product.SetStockQuantity(totalStock);
+            // FrozenStockQuantity cũng cần được đồng bộ từ ReservedQuantity
+            // Note: Product không có method SetFrozenStockQuantity, nên cần cập nhật trực tiếp qua EF
+            _productRepository.Update(product);
+            await _productRepository.SaveChangesAsync();
         }
 
         public async Task CancelStockEntryAsync(int stockEntryId)
@@ -522,6 +547,9 @@ namespace Application.Services
             }
 
             await _productWarehouseRepository.SaveChangesAsync();
+
+            // Đồng bộ Product.StockQuantity sau khi điều chỉnh
+            await SyncProductStockFromWarehouses(request.ProductId);
         }
 
         public async Task TransferStockAsync(TransferStockRequest request)
@@ -557,6 +585,10 @@ namespace Application.Services
             _productWarehouseRepository.Update(destStock);
 
             await _productWarehouseRepository.SaveChangesAsync();
+
+            // Đồng bộ Product.StockQuantity sau khi chuyển kho
+            // Tổng tồn kho không đổi khi chuyển kho, nhưng vẫn đồng bộ để đảm bảo
+            await SyncProductStockFromWarehouses(request.ProductId);
         }
 
         #endregion
@@ -575,7 +607,7 @@ namespace Application.Services
             foreach (var product in allProducts)
             {
                 var productStocks = allStocks.Where(s => s.ProductId == product.Id).Sum(s => s.Quantity);
-                totalValue += productStocks * product.BasePrice;
+                totalValue += productStocks * product.BasePrice.Amount;
             }
 
             var lowStockCount = allStocks.Count(s => s.IsLowStock());
@@ -615,11 +647,11 @@ namespace Application.Services
                         MovementType = "IN",
                         ProductId = detail.ProductId,
                         ProductName = allProducts.FirstOrDefault(p => p.Id == detail.ProductId)?.Name ?? "",
-                        Sku = allProducts.FirstOrDefault(p => p.Id == detail.ProductId)?.Sku ?? "",
+                        Sku = allProducts.FirstOrDefault(p => p.Id == detail.ProductId)?.Sku.Value ?? "",
                         WarehouseId = entry.WarehouseId,
                         WarehouseName = allWarehouses.FirstOrDefault(w => w.Id == entry.WarehouseId)?.Name ?? "",
                         Quantity = detail.Quantity,
-                        UnitCost = detail.UnitCost,
+                        UnitCost = detail.UnitCost.Amount,
                         ReferenceNumber = $"NK-{entry.Id:D5}",
                         Note = entry.Note
                     });
@@ -627,6 +659,146 @@ namespace Application.Services
             }
 
             return movements.OrderByDescending(m => m.MovementDate).ToList();
+        }
+
+        #endregion
+
+        #region Order Stock Management
+
+        public async Task ReserveStockForOrderAsync(int productId, int quantity, int orderId, int? warehouseId = null)
+        {
+            var warehouses = await _warehouseRepository.GetAllAsync();
+            if (!warehouses.Any())
+                throw new DomainException("Chưa có kho nào trong hệ thống");
+
+            int targetWarehouseId;
+            if (warehouseId.HasValue)
+            {
+                targetWarehouseId = warehouseId.Value;
+            }
+            else
+            {
+                // Tìm kho có đủ tồn kho
+                var allStocks = await _productWarehouseRepository.GetByProductAsync(productId);
+                var availableWarehouse = allStocks
+                    .Where(s => s.GetAvailableStock() >= quantity)
+                    .OrderByDescending(s => s.GetAvailableStock())
+                    .FirstOrDefault();
+
+                if (availableWarehouse == null)
+                    throw new InsufficientStockException(productId, 0, quantity,
+                        allStocks.Sum(s => s.GetAvailableStock()));
+
+                targetWarehouseId = availableWarehouse.WarehouseId;
+            }
+
+            var productWarehouse = await _productWarehouseRepository
+                .GetByProductAndWarehouseAsync(productId, targetWarehouseId);
+
+            if (productWarehouse == null || productWarehouse.GetAvailableStock() < quantity)
+                throw new InsufficientStockException(productId, targetWarehouseId, quantity,
+                    productWarehouse?.GetAvailableStock() ?? 0);
+
+            // Reserve stock in ProductWarehouse
+            productWarehouse.Reserve(quantity);
+            _productWarehouseRepository.Update(productWarehouse);
+            await _productWarehouseRepository.SaveChangesAsync();
+
+            // Đồng bộ Product.StockQuantity và FrozenStockQuantity
+            await SyncProductStockFromWarehouses(productId);
+        }
+
+        public async Task ReleaseStockForOrderAsync(int productId, int quantity, int orderId, int? warehouseId = null)
+        {
+            var warehouses = await _warehouseRepository.GetAllAsync();
+            if (!warehouses.Any()) return; // No warehouses, nothing to release
+
+            int targetWarehouseId;
+            if (warehouseId.HasValue)
+            {
+                targetWarehouseId = warehouseId.Value;
+            }
+            else
+            {
+                // Find warehouse with reserved stock for this product
+                var allStocks = await _productWarehouseRepository.GetByProductAsync(productId);
+                var warehouseWithReserve = allStocks
+                    .Where(s => s.ReservedQuantity > 0)
+                    .OrderByDescending(s => s.ReservedQuantity)
+                    .FirstOrDefault();
+
+                if (warehouseWithReserve == null) return; // No reserved stock to release
+                targetWarehouseId = warehouseWithReserve.WarehouseId;
+            }
+
+            var productWarehouse = await _productWarehouseRepository
+                .GetByProductAndWarehouseAsync(productId, targetWarehouseId);
+
+            if (productWarehouse == null) return;
+
+            // Release reserved stock
+            productWarehouse.Release(quantity);
+            _productWarehouseRepository.Update(productWarehouse);
+            await _productWarehouseRepository.SaveChangesAsync();
+
+            // Đồng bộ Product.StockQuantity và FrozenStockQuantity
+            await SyncProductStockFromWarehouses(productId);
+        }
+
+        public async Task DeductStockForOrderAsync(int productId, int quantity, int orderId, int? warehouseId = null)
+        {
+            var warehouses = await _warehouseRepository.GetAllAsync();
+            if (!warehouses.Any())
+                throw new DomainException("Chưa có kho nào trong hệ thống");
+
+            int targetWarehouseId;
+            if (warehouseId.HasValue)
+            {
+                targetWarehouseId = warehouseId.Value;
+            }
+            else
+            {
+                // Tìm kho có đủ tồn kho đã được giữ chỗ
+                var allStocks = await _productWarehouseRepository.GetByProductAsync(productId);
+                var warehouseWithReserve = allStocks
+                    .Where(s => s.ReservedQuantity >= quantity)
+                    .OrderByDescending(s => s.ReservedQuantity)
+                    .FirstOrDefault();
+
+                if (warehouseWithReserve == null)
+                {
+                    // Nếu không có reserved, tìm kho có đủ available stock
+                    var availableWarehouse = allStocks
+                        .Where(s => s.GetAvailableStock() >= quantity)
+                        .OrderByDescending(s => s.GetAvailableStock())
+                        .FirstOrDefault();
+
+                    if (availableWarehouse == null)
+                        throw new InsufficientStockException(productId, 0, quantity,
+                            allStocks.Sum(s => s.GetAvailableStock()));
+
+                    targetWarehouseId = availableWarehouse.WarehouseId;
+                }
+                else
+                {
+                    targetWarehouseId = warehouseWithReserve.WarehouseId;
+                }
+            }
+
+            var productWarehouse = await _productWarehouseRepository
+                .GetByProductAndWarehouseAsync(productId, targetWarehouseId);
+
+            if (productWarehouse == null)
+                throw new DomainException($"Không tìm thấy tồn kho sản phẩm {productId} trong kho {targetWarehouseId}");
+
+            // Dispatch (deduct) stock from warehouse
+            // Note: Dispatch will reduce both Quantity and ReservedQuantity
+            productWarehouse.Dispatch(quantity);
+            _productWarehouseRepository.Update(productWarehouse);
+            await _productWarehouseRepository.SaveChangesAsync();
+
+            // Đồng bộ Product.StockQuantity
+            await SyncProductStockFromWarehouses(productId);
         }
 
         #endregion

@@ -16,6 +16,7 @@ public interface IShippingService
         string district,
         decimal totalWeight,
         decimal totalAmount,
+        bool requiresInstallation = false,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -9,6 +9,9 @@
         public string ShippingWard { get; set; } = string.Empty;
         public string ShippingDistrict { get; set; } = string.Empty;
         public string ShippingCity { get; set; } = string.Empty;
+        public decimal ShippingFee { get; set; }
+        public DateTime? InstallationDate { get; set; }
+        public int? InstallationSlotId { get; set; }
         public List<CreateOrderItemRequest> Items { get; set; } = new();
     }
 
@@ -17,5 +20,6 @@
         public int ProductId { get; set; }
         public int Quantity { get; set; }
         public int? VariantId { get; set; }
+        public bool RequiresInstallation { get; set; }
     }
 }

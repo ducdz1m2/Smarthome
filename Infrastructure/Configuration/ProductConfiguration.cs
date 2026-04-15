@@ -14,9 +14,16 @@ namespace Infrastructure.Configuration
             builder.Property(p => p.Name).IsRequired().HasMaxLength(200);
             builder.Property(p => p.Description).HasMaxLength(4000);
             builder.Property(p => p.SpecsJson).HasColumnType("nvarchar(max)");
-            builder.Property(p => p.Sku).IsRequired().HasMaxLength(50);
-            builder.Property(p => p.BasePrice).HasPrecision(18, 2);
-           
+            
+            // Value Object Converters
+            builder.Property(p => p.Sku).HasConversion(
+                sku => sku.Value,
+                value => Domain.ValueObjects.Sku.Create(value));
+            
+            builder.Property(p => p.BasePrice).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
+            
             builder.Property(p => p.IsActive).HasDefaultValue(true);
             builder.Property(p => p.RequiresInstallation).HasDefaultValue(false);
             

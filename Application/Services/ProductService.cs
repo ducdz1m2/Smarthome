@@ -3,6 +3,7 @@ using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Catalog;
+using Domain.Entities.Inventory;
 using Domain.Exceptions;
 
 namespace Application.Services
@@ -10,10 +11,17 @@ namespace Application.Services
     public class ProductService : IProductService
     {
         private readonly IProductRepository _productRepository;
+        private readonly IProductWarehouseRepository _productWarehouseRepository;
+        private readonly IWarehouseRepository _warehouseRepository;
 
-        public ProductService(IProductRepository productRepository)
+        public ProductService(
+            IProductRepository productRepository,
+            IProductWarehouseRepository productWarehouseRepository,
+            IWarehouseRepository warehouseRepository)
         {
             _productRepository = productRepository;
+            _productWarehouseRepository = productWarehouseRepository;
+            _warehouseRepository = warehouseRepository;
         }
 
         public async Task<List<ProductListResponse>> GetAllAsync()
@@ -83,9 +91,6 @@ namespace Application.Services
                 request.RequiresInstallation
             );
 
-            if (request.StockQuantity > 0)
-                product.AddStock(request.StockQuantity);
-
             if (!string.IsNullOrEmpty(request.Description))
                 product.Update(request.Name, request.BasePrice, request.Description);
 
@@ -102,6 +107,25 @@ namespace Application.Services
 
             await _productRepository.AddAsync(product);
             await _productRepository.SaveChangesAsync();
+
+            // Nếu có tồn kho ban đầu, thêm vào kho mặc định
+            if (request.StockQuantity > 0)
+            {
+                var warehouses = await _warehouseRepository.GetAllAsync();
+                var defaultWarehouse = warehouses.FirstOrDefault();
+                if (defaultWarehouse != null)
+                {
+                    var productWarehouse = ProductWarehouse.Create(product.Id, defaultWarehouse.Id, request.StockQuantity);
+                    await _productWarehouseRepository.AddAsync(productWarehouse);
+                    await _productWarehouseRepository.SaveChangesAsync();
+
+                    // Đồng bộ Product.StockQuantity
+                    product.SetStockQuantity(request.StockQuantity);
+                    _productRepository.Update(product);
+                    await _productRepository.SaveChangesAsync();
+                }
+            }
+
             return product.Id;
         }
 
@@ -112,19 +136,19 @@ namespace Application.Services
                 throw new DomainException("Không tìm thấy sản phẩm");
 
             product.Update(request.Name, request.BasePrice, request.Description);
-            
-            // Update additional fields
-            if (product.StockQuantity != request.StockQuantity)
-                product.SetStockQuantity(request.StockQuantity);
-            
+
+            // Không cập nhật StockQuantity trực tiếp từ đây
+            // Tồn kho phải được quản lý thông qua hệ thống kho (InventoryService)
+            // để đảm bảo đồng nhất giữa ProductWarehouse và Product.StockQuantity
+
             if (product.RequiresInstallation != request.RequiresInstallation)
                 product.SetRequiresInstallation(request.RequiresInstallation);
-            
+
             if (request.SupplierId.HasValue && product.SupplierId != request.SupplierId)
                 product.ChangeSupplier(request.SupplierId.Value);
             else if (!request.SupplierId.HasValue && product.SupplierId.HasValue)
                 product.RemoveSupplier();
-            
+
             if (request.Specs != null)
                 product.UpdateSpecs(request.Specs);
 
@@ -144,7 +168,7 @@ namespace Application.Services
                 {
                     product.Images.Remove(oldImage);
                 }
-                
+
                 for (int i = 0; i < request.ImageUrls.Count; i++)
                 {
                     product.AddImage(request.ImageUrls[i], i == 0, i);
@@ -192,7 +216,55 @@ namespace Application.Services
             if (product == null)
                 throw new DomainException("Không tìm thấy sản phẩm");
 
-            product.AddStock(request.Quantity);
+            // Xác định kho để nhập
+            int warehouseId;
+            if (request.WarehouseId.HasValue && request.WarehouseId.Value > 0)
+            {
+                warehouseId = request.WarehouseId.Value;
+                var warehouse = await _warehouseRepository.GetByIdAsync(warehouseId);
+                if (warehouse == null)
+                    throw new DomainException("Không tìm thấy kho");
+            }
+            else
+            {
+                // Nếu không chỉ định kho, lấy kho đầu tiên
+                var warehouses = await _warehouseRepository.GetAllAsync();
+                var firstWarehouse = warehouses.FirstOrDefault();
+                if (firstWarehouse == null)
+                    throw new DomainException("Chưa có kho nào. Vui lòng tạo kho trước khi nhập hàng.");
+                warehouseId = firstWarehouse.Id;
+            }
+
+            // Cập nhật tồn kho trong ProductWarehouse
+            var productWarehouse = await _productWarehouseRepository
+                .GetByProductAndWarehouseAsync(id, warehouseId);
+
+            if (productWarehouse == null)
+            {
+                productWarehouse = ProductWarehouse.Create(id, warehouseId, 0);
+                await _productWarehouseRepository.AddAsync(productWarehouse);
+            }
+
+            productWarehouse.Receive(request.Quantity);
+            _productWarehouseRepository.Update(productWarehouse);
+            await _productWarehouseRepository.SaveChangesAsync();
+
+            // Đồng bộ Product.StockQuantity từ tổng tồn kho các kho
+            await SyncProductStockFromWarehouses(id);
+        }
+
+        /// <summary>
+        /// Đồng bộ Product.StockQuantity từ tổng tồn kho của tất cả các kho
+        /// </summary>
+        private async Task SyncProductStockFromWarehouses(int productId)
+        {
+            var product = await _productRepository.GetByIdAsync(productId);
+            if (product == null) return;
+
+            var warehouseStocks = await _productWarehouseRepository.GetByProductAsync(productId);
+            var totalStock = warehouseStocks.Sum(pw => pw.Quantity);
+
+            product.SetStockQuantity(totalStock);
             _productRepository.Update(product);
             await _productRepository.SaveChangesAsync();
         }
@@ -202,18 +274,15 @@ namespace Application.Services
             var product = await _productRepository.GetByIdAsync(productId);
             if (product == null) return false;
 
-            if (quantity > 0)
-                product.AddStock(quantity);
-            else if (quantity < 0)
+            try
             {
-                try
-                {
-                    product.DeductStock(Math.Abs(quantity));
-                }
-                catch
-                {
-                    return false;
-                }
+                var newQuantity = product.StockQuantity + quantity;
+                if (newQuantity < 0) return false;
+                product.SetStockQuantity(newQuantity);
+            }
+            catch
+            {
+                return false;
             }
 
             _productRepository.Update(product);
@@ -227,8 +296,8 @@ namespace Application.Services
             {
                 Id = product.Id,
                 Name = product.Name,
-                Sku = product.Sku,
-                BasePrice = product.BasePrice,
+                Sku = product.Sku.Value,
+                BasePrice = product.BasePrice.Amount,
                 StockQuantity = product.StockQuantity,
                 FrozenStockQuantity = product.FrozenStockQuantity,
                 Description = product.Description,
@@ -244,8 +313,8 @@ namespace Application.Services
                 Variants = product.Variants?.Select(v => new ProductVariantResponse
                 {
                     Id = v.Id,
-                    Sku = v.Sku,
-                    Price = v.Price,
+                    Sku = v.Sku.Value,
+                    Price = v.Price.Amount,
                     StockQuantity = v.StockQuantity,
                     Attributes = v.GetAttributes(),
                     IsActive = v.IsActive
@@ -281,8 +350,8 @@ namespace Application.Services
             {
                 Id = product.Id,
                 Name = product.Name,
-                Sku = product.Sku,
-                BasePrice = product.BasePrice,
+                Sku = product.Sku.Value,
+                BasePrice = product.BasePrice.Amount,
                 StockQuantity = product.StockQuantity,
                 IsActive = product.IsActive,
                 CategoryName = product.Category?.Name ?? "",

@@ -84,11 +84,8 @@ namespace Application.Services
             address.Update(
                 request.Label,
                 request.ReceiverName,
-                request.ReceiverPhone ?? "",
-                request.Street,
-                request.Ward,
-                request.District,
-                request.City
+                Domain.ValueObjects.PhoneNumber.Create(request.ReceiverPhone ?? ""),
+                Domain.ValueObjects.Address.Create(request.Street, request.Ward, request.District, request.City)
             );
 
             if (request.IsDefault)
@@ -133,11 +130,11 @@ namespace Application.Services
                 Id = address.Id,
                 Label = address.Label,
                 ReceiverName = address.ReceiverName,
-                ReceiverPhone = address.ReceiverPhone,
-                Street = address.Street,
-                Ward = address.Ward ?? "",
-                District = address.District ?? "",
-                City = address.City ?? "",
+                ReceiverPhone = address.ReceiverPhone?.ToString(),
+                Street = address.Address?.Street ?? "",
+                Ward = address.Address?.Ward ?? "",
+                District = address.Address?.District ?? "",
+                City = address.Address?.City ?? "",
                 IsDefault = address.IsDefault
             };
         }

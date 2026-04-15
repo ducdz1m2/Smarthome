@@ -81,8 +81,9 @@ public class WarrantyFlowTests
     {
         // Arrange
         var warranty = Warranty.Create(1, 1, 6); // 6 tháng bảo hành
-        // Simulate expired
-        var pastDate = DateTime.UtcNow.AddMonths(7);
+        // Simulate expired by setting EndDate to past using reflection
+        var endDateProperty = typeof(Warranty).GetProperty("EndDate");
+        endDateProperty?.SetValue(warranty, DateTime.UtcNow.AddMonths(-1));
 
         // Act & Assert
         Action act = () => warranty.CreateClaim("Issue after expired");
@@ -176,7 +177,7 @@ public class WarrantyFlowTests
         order.AddItem(product.Id, null, 1, product.BasePrice, true);
 
         // Act - khi order có sản phẩm cần lắp đặt
-        var requiresInstallation = order.Items.Any(i => i.Product.RequiresInstallation);
+        var requiresInstallation = order.Items.Any(i => i.RequiresInstallation);
 
         // Assert
         requiresInstallation.Should().BeTrue();

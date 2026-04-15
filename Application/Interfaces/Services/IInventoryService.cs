@@ -29,7 +29,12 @@ namespace Application.Interfaces.Services
         // Điều chỉnh tồn kho
         Task AdjustStockAsync(AdjustStockRequest request);
         Task TransferStockAsync(TransferStockRequest request);
-        
+
+        // Quản lý tồn kho đơn hàng
+        Task ReserveStockForOrderAsync(int productId, int quantity, int orderId, int? warehouseId = null);
+        Task ReleaseStockForOrderAsync(int productId, int quantity, int orderId, int? warehouseId = null);
+        Task DeductStockForOrderAsync(int productId, int quantity, int orderId, int? warehouseId = null);
+
         // Báo cáo tổng hợp
         Task<InventoryReportResponse> GetInventoryReportAsync();
         Task<List<StockMovementResponse>> GetStockMovementsAsync(int? productId = null, int? warehouseId = null, DateTime? fromDate = null, DateTime? toDate = null);

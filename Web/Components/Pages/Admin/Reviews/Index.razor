@@ -1,0 +1,230 @@
+@page "/admin/reviews"
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using MudBlazor
+@layout AdminLayout
+@inject IProductCommentService CommentService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý đánh giá</MudText>
+
+<MudCard Elevation="2" Class="mb-4">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <div class="d-flex align-center justify-space-between">
+                <MudText Typo="Typo.h6">Danh sách đánh giá</MudText>
+                <div class="d-flex gap-2">
+                    <MudBadge Content="_pendingCount" Color="Color.Error" Overlap="true" Visible="_pendingCount > 0">
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadPending">
+                            Chờ duyệt
+                        </MudButton>
+                    </MudBadge>
+                    <MudButton Color="Color.Default" Variant="Variant.Outlined" OnClick="LoadAll">
+                        Tất cả
+                    </MudButton>
+                </div>
+            </div>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="my-4" />
+        }
+        else if (_comments?.Any() != true)
+        {
+            <MudAlert Severity="Severity.Info">Chưa có đánh giá nào</MudAlert>
+        }
+        else
+        {
+            <MudTable Items="_comments" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Sản phẩm</MudTh>
+                    <MudTh>Khách hàng</MudTh>
+                    <MudTh>Đánh giá</MudTh>
+                    <MudTh>Nội dung</MudTh>
+                    <MudTh>Trạng thái</MudTh>
+                    <MudTh>Ngày tạo</MudTh>
+                    <MudTh>Thao tác</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <div class="d-flex align-center">
+                            <MudAvatar Size="Size.Small" Color="Color.Primary" Class="mr-2">
+                                @context.ProductName[0]
+                            </MudAvatar>
+                            <div>
+                                <MudText Typo="Typo.body2" Class="fw-bold">@context.ProductName</MudText>
+                                <MudText Typo="Typo.caption">ID: @context.ProductId</MudText>
+                            </div>
+                        </div>
+                    </MudTd>
+                    <MudTd>@context.UserName</MudTd>
+                    <MudTd>
+                        <div class="d-flex align-center">
+                            <MudRating SelectedValue="context.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
+                            <MudText Typo="Typo.body2" Class="ml-2">@context.Rating/5</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd>
+                        <div>
+                            <MudText Typo="Typo.body2" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                                @context.Content
+                            </MudText>
+                            @if (context.Replies?.Any() == true)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                    @context.Replies.Count phản hồi
+                                </MudText>
+                                @foreach (var reply in context.Replies)
+                                {
+                                    <MudCard Class="mt-1" Elevation="0" Outlined="true" Style="background-color: #f5f5f5;">
+                                        <MudCardContent Class="pa-2">
+                                            <MudText Typo="Typo.caption" Class="fw-bold">@reply.UserName</MudText>
+                                            <MudText Typo="Typo.caption">@reply.Content</MudText>
+                                        </MudCardContent>
+                                    </MudCard>
+                                }
+                            }
+                        </div>
+                    </MudTd>
+                    <MudTd>
+                        @if (context.IsApproved)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Đã duyệt</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                    <MudTd>
+                        <div class="d-flex gap-1">
+                            <MudIconButton Icon="@Icons.Material.Filled.Reply" 
+                                         Color="Color.Primary" 
+                                         Size="Size.Small"
+                                         OnClick="() => OpenReplyDialog(context)"
+                                         Title="Phản hồi" />
+                            @if (!context.IsApproved)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Check" 
+                                             Color="Color.Success" 
+                                             Size="Size.Small"
+                                             OnClick="() => Approve(context.Id)"
+                                             Title="Duyệt" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                             Color="Color.Error" 
+                                             Size="Size.Small"
+                                             OnClick="() => Reject(context.Id)"
+                                             Title="Từ chối" />
+                            }
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .fw-bold {
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    private List<ProductCommentResponse>? _comments;
+    private bool _loading = true;
+    private int _pendingCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAll();
+    }
+
+    private async Task LoadAll()
+    {
+        _loading = true;
+        try
+        {
+            _comments = await CommentService.GetAllAsync();
+            _pendingCount = await CommentService.CountPendingAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadPending()
+    {
+        _loading = true;
+        try
+        {
+            _comments = await CommentService.GetPendingApprovalAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Approve(int id)
+    {
+        try
+        {
+            await CommentService.ApproveAsync(id);
+            Snackbar.Add("Đã duyệt đánh giá", Severity.Success);
+            await LoadAll();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Reject(int id)
+    {
+        try
+        {
+            await CommentService.RejectAsync(id);
+            Snackbar.Add("Đã từ chối đánh giá", Severity.Success);
+            await LoadAll();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenReplyDialog(ProductCommentResponse comment)
+    {
+        var parameters = new DialogParameters
+        {
+            { "ParentCommentId", comment.Id },
+            { "ProductId", comment.ProductId },
+            { "OrderId", 0 }, // Admin reply doesn't need order context
+            { "UserId", 1 }, // TODO: Get current admin user ID
+            { "OriginalComment", comment.Content }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ReplyDialog>("Phản hồi đánh giá", parameters, options);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+        {
+            await LoadAll();
+        }
+    }
+}

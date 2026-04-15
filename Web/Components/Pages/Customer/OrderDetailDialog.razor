@@ -1,6 +1,10 @@
+@using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @inject IOrderService OrderService
+@inject IReturnOrderService ReturnOrderService
+@inject IProductCommentService CommentService
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -142,7 +146,7 @@
                                 <MudCardContent>
                                     <div class="d-flex align-center justify-space-between">
                                         <div>
-                                            <MudText Typo="Typo.body2" Class="fw-bold">Vận đơn: @shipment.ShipmentNumber</MudText>
+                                            <MudText Typo="Typo.body2" Class="fw-bold">Mã vận đơn: @shipment.TrackingNumber</MudText>
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">
                                                 @if (!string.IsNullOrEmpty(shipment.Carrier))
                                                 {
@@ -158,10 +162,10 @@
                                             @GetShipmentStatusText(shipment.Status)
                                         </MudChip>
                                     </div>
-                                    @if (shipment.ShippedAt.HasValue)
+                                    @if (shipment.PickedUpAt.HasValue)
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                                            Giao ngày: @shipment.ShippedAt.Value.ToString("dd/MM/yyyy")
+                                            Lấy hàng ngày: @shipment.PickedUpAt.Value.ToString("dd/MM/yyyy")
                                         </MudText>
                                     }
                                 </MudCardContent>
@@ -174,10 +178,56 @@
                 @if (!string.IsNullOrEmpty(_order.CancelReason))
                 {
                     <MudItem xs="12">
-                        <MudAlert Severity="Severity.Warning">
+                        <MudAlert Severity="Severity.Info">
                             <MudText Typo="Typo.body2" Class="fw-bold">Lý do hủy:</MudText>
                             <MudText Typo="Typo.body2">@_order.CancelReason</MudText>
                         </MudAlert>
+                    </MudItem>
+                }
+
+                <!-- Reviews -->
+                @if (_reviews?.Any() == true)
+                {
+                    <MudItem xs="12" Class="mt-4">
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Đánh giá của bạn</MudText>
+                        @foreach (var review in _reviews)
+                        {
+                            <MudCard Class="mb-2" Elevation="0" Outlined="true">
+                                <MudCardContent>
+                                    <div class="d-flex align-center gap-2">
+                                        <MudRating SelectedValue="review.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
+                                        <MudText Typo="Typo.caption" Color="Color.Primary">@review.Rating/5</MudText>
+                                        @if (review.IsApproved)
+                                        {
+                                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Đã duyệt</MudChip>
+                                        }
+                                        else
+                                        {
+                                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
+                                        }
+                                    </div>
+                                    <MudText Typo="Typo.body2" Class="mt-2">@review.Content</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@review.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudText>
+                                    @if (review.Replies?.Any() == true)
+                                    {
+                                        <div class="mt-2 ml-4">
+                                            @foreach (var reply in review.Replies)
+                                            {
+                                                <MudCard Class="mb-1" Elevation="0" Outlined="true" Style="background-color: #f5f5f5;">
+                                                    <MudCardContent Class="pa-2">
+                                                        <MudText Typo="Typo.caption" Class="fw-bold">@reply.UserName</MudText>
+                                                        <MudRating SelectedValue="reply.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
+                                                        <MudText Typo="Typo.caption">@reply.Content</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@reply.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudText>
+                                                    </MudCardContent>
+                                                </MudCard>
+                                            }
+                                        </div>
+                                    }
+                                </MudCardContent>
+                            </MudCard>
+                        }
                     </MudItem>
                 }
             </MudGrid>
@@ -185,10 +235,28 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Close">Đóng</MudButton>
+        
+        @* Nút Hủy đơn - chỉ hiển thị khi đơn hàng đang chờ xác nhận *@
         @if (_order != null && _order.Status == "Pending")
         {
             <MudButton Color="Color.Error" OnClick="CancelOrder" StartIcon="@Icons.Material.Filled.Cancel">
                 Hủy đơn hàng
+            </MudButton>
+        }
+        
+        @* Nút Hoàn hàng - hiển thị khi đơn hàng đã giao hoặc hoàn thành *@
+        @if (_order != null && (_order.Status == "Delivered" || _order.Status == "Completed") && !_hasReturnOrder)
+        {
+            <MudButton Color="Color.Warning" OnClick="OpenReturnDialog" StartIcon="@Icons.Material.Filled.AssignmentReturn">
+                Hoàn hàng
+            </MudButton>
+        }
+        
+        @* Nút Đánh giá - hiển thị khi đơn hàng hoàn thành *@
+        @if (_order != null && _order.Status == "Completed" && !_hasReviewed)
+        {
+            <MudButton Color="Color.Primary" OnClick="OpenReviewDialog" StartIcon="@Icons.Material.Filled.RateReview">
+                Đánh giá
             </MudButton>
         }
     </DialogActions>
@@ -212,6 +280,9 @@
 
     private OrderResponse? _order;
     private bool _isLoading = true;
+    private bool _hasReturnOrder = false;
+    private bool _hasReviewed = false;
+    private List<ProductCommentResponse>? _reviews;
 
     protected override async Task OnInitializedAsync()
     {
@@ -224,6 +295,16 @@
         try
         {
             _order = await OrderService.GetByIdAsync(OrderId);
+            
+            // Check if order has return order
+            if (_order != null)
+            {
+                var returnOrders = await ReturnOrderService.GetByOrderIdAsync(OrderId);
+                _hasReturnOrder = returnOrders.Any();
+
+                // Load reviews for this order's products
+                await LoadReviewsAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -251,6 +332,66 @@
         catch (Exception ex)
         {
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenReturnDialog()
+    {
+        if (_order == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "OrderId", OrderId },
+            { "OrderNumber", _order.OrderNumber },
+            { "Items", _order.Items }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ReturnOrderDialog>("Yêu cầu hoàn hàng", parameters, options);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+        {
+            Snackbar.Add("Đã gửi yêu cầu hoàn hàng thành công", Severity.Success);
+            _hasReturnOrder = true;
+            await LoadOrderAsync();
+        }
+    }
+
+    private async Task LoadReviewsAsync()
+    {
+        try
+        {
+            // Load reviews for this specific order
+            _reviews = await CommentService.GetByOrderAsync(OrderId);
+            _hasReviewed = _reviews.Any();
+        }
+        catch
+        {
+            // Ignore errors when loading reviews
+            _reviews = new List<ProductCommentResponse>();
+        }
+    }
+
+    private async Task OpenReviewDialog()
+    {
+        if (_order == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "OrderId", OrderId },
+            { "Items", _order.Items },
+            { "UserId", _order.UserId }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ReviewDialog>("Đánh giá sản phẩm", parameters, options);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+        {
+            Snackbar.Add("Đã gửi đánh giá thành công", Severity.Success);
+            await LoadReviewsAsync();
         }
     }
 

@@ -87,7 +87,7 @@ public class InstallationBooking : AggregateRoot
             StartedAt = DateTime.UtcNow;
         }
 
-        public void Complete(string customerSignature, int customerRating, string? notes = null)
+        public void Complete(string customerSignature, int customerRating, int customerId = 0, string? notes = null)
         {
             if (Status != InstallationStatus.Installing && Status != InstallationStatus.Testing)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể hoàn thành khi đang lắp hoặc kiểm tra");
@@ -98,7 +98,7 @@ public class InstallationBooking : AggregateRoot
             CustomerRating = customerRating;
             Notes = notes;
 
-            AddDomainEvent(new InstallationCompletedEvent(Id, CompletedAt.Value, Notes));
+            AddDomainEvent(new InstallationCompletedEvent(Id, customerId, CompletedAt.Value, Notes));
         }
 
         public void Reschedule(int newSlotId, DateTime newDate)

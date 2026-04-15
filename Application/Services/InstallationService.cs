@@ -13,15 +13,18 @@ namespace Application.Services
         private readonly IInstallationBookingRepository _bookingRepository;
         private readonly ITechnicianProfileRepository _technicianRepository;
         private readonly IInstallationSlotRepository _slotRepository;
+        private readonly IOrderRepository _orderRepository;
 
         public InstallationService(
             IInstallationBookingRepository bookingRepository,
             ITechnicianProfileRepository technicianRepository,
-            IInstallationSlotRepository slotRepository)
+            IInstallationSlotRepository slotRepository,
+            IOrderRepository orderRepository)
         {
             _bookingRepository = bookingRepository;
             _technicianRepository = technicianRepository;
             _slotRepository = slotRepository;
+            _orderRepository = orderRepository;
         }
 
         public async Task<List<InstallationBookingListResponse>> GetAllAsync()
@@ -137,6 +140,7 @@ namespace Application.Services
             if (oldSlot != null && oldSlot.Id != slotId)
             {
                 oldSlot.Release();
+                await _slotRepository.SaveChangesAsync();
             }
 
             booking.AssignTechnician(technicianId, slotId);
@@ -163,6 +167,14 @@ namespace Application.Services
 
             booking.StartTravel();
             await _bookingRepository.SaveChangesAsync();
+
+            // Update order status to Installing
+            var order = await _orderRepository.GetByIdAsync(booking.OrderId);
+            if (order != null && order.Status == OrderStatus.AwaitingSchedule)
+            {
+                order.UpdateStatusFromInstallation(OrderStatus.Installing);
+                await _orderRepository.SaveChangesAsync();
+            }
         }
 
         public async Task StartInstallationAsync(int id)
@@ -173,15 +185,24 @@ namespace Application.Services
 
             booking.StartInstallation();
             await _bookingRepository.SaveChangesAsync();
+
+            // Order status already set to Installing by StartTravelAsync
         }
 
         public async Task CompleteAsync(int id, CompleteInstallationRequest request)
         {
+            Console.WriteLine($"[CompleteAsync] METHOD CALLED for booking ID: {id}");
             var booking = await _bookingRepository.GetByIdAsync(id);
             if (booking == null)
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
-            booking.Complete(request.CustomerSignature, request.CustomerRating, request.Notes);
+            Console.WriteLine($"[CompleteAsync] Before complete - Booking ID: {booking.Id}, Status: {booking.Status}");
+
+            // Get customerId from order
+            var customerId = booking.Order?.UserId ?? 0;
+            booking.Complete(request.CustomerSignature, request.CustomerRating, customerId, request.Notes);
+
+            Console.WriteLine($"[CompleteAsync] After complete - Booking ID: {booking.Id}, Status: {booking.Status}");
 
             // Update technician stats
             var technician = await _technicianRepository.GetByIdAsync(booking.TechnicianId);
@@ -192,6 +213,17 @@ namespace Application.Services
             }
 
             await _bookingRepository.SaveChangesAsync();
+            Console.WriteLine($"[CompleteAsync] After save booking - Booking ID: {booking.Id}, Status: {booking.Status}");
+
+            // Update order status to Completed
+            var order = await _orderRepository.GetByIdAsync(booking.OrderId);
+            if (order != null)
+            {
+                Console.WriteLine($"[CompleteAsync] Before update order - Order ID: {order.Id}, Status: {order.Status}");
+                order.UpdateStatusFromInstallation(OrderStatus.Completed);
+                await _orderRepository.SaveChangesAsync();
+                Console.WriteLine($"[CompleteAsync] After update order - Order ID: {order.Id}, Status: {order.Status}");
+            }
         }
 
         public async Task RescheduleAsync(int id, RescheduleInstallationRequest request)
@@ -335,10 +367,10 @@ namespace Application.Services
             // Build full address
             var addressParts = new List<string?>
             {
-                order?.ShippingAddressStreet,
-                order?.ShippingAddressWard,
-                order?.ShippingAddressDistrict,
-                order?.ShippingAddressCity
+                order?.ShippingAddress?.Street,
+                order?.ShippingAddress?.Ward,
+                order?.ShippingAddress?.District,
+                order?.ShippingAddress?.City
             }.Where(s => !string.IsNullOrWhiteSpace(s));
             
             return new InstallationBookingResponse
@@ -348,13 +380,13 @@ namespace Application.Services
                 // Order info
                 OrderId = booking.OrderId,
                 OrderNumber = order?.OrderNumber ?? string.Empty,
-                OrderTotal = order?.TotalAmount ?? 0,
+                OrderTotal = order?.TotalAmount.Amount ?? 0,
                 
                 // Customer info
                 CustomerName = order?.ReceiverName ?? string.Empty,
-                CustomerPhone = order?.ReceiverPhone ?? string.Empty,
+                CustomerPhone = order?.ReceiverPhone?.ToString() ?? string.Empty,
                 ShippingAddress = string.Join(", ", addressParts),
-                District = order?.ShippingAddressDistrict,
+                District = order?.ShippingAddress?.District,
                 
                 // Products needing installation
                 Products = order?.Items?.Where(i => i.RequiresInstallation).Select(i => new InstallationProductItem
@@ -363,13 +395,13 @@ namespace Application.Services
                     ProductName = i.Product?.Name ?? $"Sản phẩm #{i.ProductId}",
                     ProductImage = i.Product?.Images?.FirstOrDefault(img => img.IsMain)?.Url,
                     Quantity = i.Quantity,
-                    UnitPrice = i.UnitPrice
+                    UnitPrice = i.UnitPrice.Amount
                 }).ToList() ?? new List<InstallationProductItem>(),
                 
                 // Technician info
                 TechnicianId = booking.TechnicianId,
                 TechnicianName = technician?.FullName ?? $"Kỹ thuật viên #{booking.TechnicianId}",
-                TechnicianPhone = technician?.PhoneNumber ?? string.Empty,
+                TechnicianPhone = technician?.PhoneNumber?.ToString() ?? string.Empty,
                 
                 // Schedule info
                 SlotId = booking.SlotId,
@@ -415,7 +447,7 @@ namespace Application.Services
                 TechnicianId = booking.TechnicianId,
                 TechnicianName = technician?.FullName ?? $"KTV #{booking.TechnicianId}",
                 CustomerName = order?.ReceiverName ?? string.Empty,
-                CustomerPhone = order?.ReceiverPhone ?? string.Empty,
+                CustomerPhone = order?.ReceiverPhone?.ToString() ?? string.Empty,
                 ScheduledDate = booking.ScheduledDate,
                 StartTime = booking.Slot?.StartTime,
                 EndTime = booking.Slot?.EndTime,

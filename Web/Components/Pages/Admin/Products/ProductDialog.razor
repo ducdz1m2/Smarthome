@@ -34,11 +34,6 @@
                                              Variant="Variant.Outlined" Class="mb-3"
                                              Adornment="Adornment.End" AdornmentText="đ"
                                              Min="0" />
-                            
-                            <MudNumericField T="int" @bind-Value="_request.StockQuantity" 
-                                             Label="Số lượng tồn kho" 
-                                             Variant="Variant.Outlined" Class="mb-3"
-                                             Min="0" />
                         </MudItem>
                         
                         <MudItem xs="12" md="6">
@@ -250,7 +245,6 @@
     {
         Name = "",
         BasePrice = 0,
-        StockQuantity = 0,
         CategoryId = 0,
         BrandId = 0,
         IsActive = true
@@ -285,7 +279,6 @@
             {
                 Name = "",
                 BasePrice = 0,
-                StockQuantity = 0,
                 CategoryId = firstCategory?.Id ?? 0,
                 BrandId = firstBrand?.Id ?? 0,
                 IsActive = true
@@ -325,7 +318,6 @@
                 {
                     Name = product.Name,
                     BasePrice = product.BasePrice,
-                    StockQuantity = product.StockQuantity,
                     Description = product.Description,
                     Specs = product.Specs,
                     RequiresInstallation = product.RequiresInstallation,
@@ -463,7 +455,6 @@
                     Name = _request.Name,
                     Sku = _sku,
                     BasePrice = _request.BasePrice,
-                    StockQuantity = _request.StockQuantity,
                     Description = _request.Description,
                     Specs = _request.Specs,
                     RequiresInstallation = _request.RequiresInstallation,
@@ -552,7 +543,7 @@
         var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is true)
+        if (result is not null && !result.Canceled && result.Data is true)
         {
             try
             {

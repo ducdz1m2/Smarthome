@@ -12,6 +12,7 @@ namespace Application.Interfaces.Services
             int page, int pageSize, bool? isAvailable = null, string? search = null);
         Task<List<TechnicianResponse>> GetAvailableAsync();
         Task<List<TechnicianResponse>> GetByDistrictAsync(string district);
+        Task<List<TechnicianResponse>> GetByCityAsync(string city);
         Task<int> CreateAsync(CreateTechnicianProfileRequest request);
         Task UpdateAsync(int id, UpdateTechnicianProfileRequest request);
         Task AddSkillAsync(int id, AddTechnicianSkillRequest request);

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Application.DTOs.Requests;
 using Application.Interfaces.Services;
+using Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -12,11 +13,13 @@ namespace Web.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IIdentityService _identityService;
+    private readonly IAuthService _authService;
     private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IIdentityService identityService, ILogger<AuthController> logger)
+    public AuthController(IIdentityService identityService, IAuthService authService, ILogger<AuthController> logger)
     {
         _identityService = identityService;
+        _authService = authService;
         _logger = logger;
     }
 
@@ -27,41 +30,29 @@ public class AuthController : ControllerBase
         {
             var response = await _identityService.LoginAsync(request);
 
-            // Create claims
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, response.User.Id.ToString()),
-                new(ClaimTypes.Name, response.User.UserName),
-                new(ClaimTypes.Email, response.User.Email),
-                new(ClaimTypes.GivenName, response.User.FullName)
-            };
-
-            foreach (var role in response.User.Roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
-
-            var authProperties = new AuthenticationProperties
-            {
-                IsPersistent = request.RememberMe,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
-            };
-
-            await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                claimsPrincipal,
-                authProperties);
+            // Store user info in CurrentUserService and set cookie
+            await _authService.SignInAsync(
+                response.User!.Id.ToString(),
+                response.User.UserName,
+                response.User.Email,
+                response.User.FullName,
+                response.User.Roles,
+                request.RememberMe);
 
             _logger.LogInformation("User {UserName} logged in successfully", response.User.UserName);
+
+            // Determine redirect URL based on role
+            string redirectUrl = "/";
+            if (response.User.Roles.Contains("Admin"))
+                redirectUrl = "/admin";
+            else if (response.User.Roles.Contains("Technician"))
+                redirectUrl = "/technician";
 
             return Ok(new
             {
                 Success = true,
                 User = response.User,
-                RedirectUrl = response.User.Roles.Contains("Admin") ? "/admin" : "/"
+                RedirectUrl = redirectUrl
             });
         }
         catch (Exception ex)
@@ -78,33 +69,14 @@ public class AuthController : ControllerBase
         {
             var response = await _identityService.RegisterAsync(request);
 
-            // Create claims
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, response.User.Id.ToString()),
-                new(ClaimTypes.Name, response.User.UserName),
-                new(ClaimTypes.Email, response.User.Email),
-                new(ClaimTypes.GivenName, response.User.FullName)
-            };
-
-            foreach (var role in response.User.Roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
-
-            var authProperties = new AuthenticationProperties
-            {
-                IsPersistent = true,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
-            };
-
-            await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                claimsPrincipal,
-                authProperties);
+            // Store user info in CurrentUserService and set cookie
+            await _authService.SignInAsync(
+                response.User.Id.ToString(),
+                response.User.UserName,
+                response.User.Email,
+                response.User.FullName,
+                response.User.Roles,
+                true);
 
             _logger.LogInformation("User {UserName} registered and logged in successfully", response.User.UserName);
 
@@ -125,7 +97,7 @@ public class AuthController : ControllerBase
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        await _authService.SignOutAsync();
         _logger.LogInformation("User logged out");
         return Ok(new { Success = true });
     }

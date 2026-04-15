@@ -37,11 +37,14 @@ namespace Application.Services
 
         public async Task<int> CreateAsync(CreateBannerRequest request)
         {
+            if (string.IsNullOrWhiteSpace(request.ImageUrl))
+                throw new DomainException("ImageUrl is required");
+
             var banner = Banner.Create(
                 request.Title,
-                request.ImageUrl,
+                Domain.ValueObjects.WebsiteUrl.Create(request.ImageUrl)!,
                 request.Subtitle,
-                request.LinkUrl,
+                request.LinkUrl != null ? Domain.ValueObjects.WebsiteUrl.Create(request.LinkUrl) : null,
                 request.Position,
                 request.SortOrder,
                 request.StartDate,
@@ -62,7 +65,7 @@ namespace Application.Services
             banner.Update(
                 request.Title,
                 request.Subtitle,
-                request.LinkUrl,
+                request.LinkUrl != null ? Domain.ValueObjects.WebsiteUrl.Create(request.LinkUrl) : null,
                 request.Position,
                 request.SortOrder,
                 request.StartDate,
@@ -117,8 +120,8 @@ namespace Application.Services
                 Id = banner.Id,
                 Title = banner.Title,
                 Subtitle = banner.Subtitle,
-                ImageUrl = banner.ImageUrl,
-                LinkUrl = banner.LinkUrl,
+                ImageUrl = banner.ImageUrl.Value,
+                LinkUrl = banner.LinkUrl?.Value,
                 Position = banner.Position,
                 SortOrder = banner.SortOrder,
                 StartDate = banner.StartDate,

@@ -10,10 +10,16 @@ namespace Infrastructure.Configuration
         {
             builder.ToTable("ShippingRates");
             builder.HasKey(sr => sr.Id);
-            builder.Property(sr => sr.Price).HasPrecision(18, 2);
+            builder.Property(sr => sr.Price).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
             builder.Property(sr => sr.IsActive).HasDefaultValue(true);
-            builder.Property(sr => sr.WeightFrom).HasPrecision(18, 3);
-            builder.Property(sr => sr.WeightTo).HasPrecision(18, 3);
+            builder.Property(sr => sr.WeightFrom).HasConversion(
+                weight => weight.Value,
+                value => Domain.ValueObjects.Weight.Create(value));
+            builder.Property(sr => sr.WeightTo).HasConversion(
+                weight => weight.Value,
+                value => Domain.ValueObjects.Weight.Create(value));
             builder.HasIndex(sr => sr.ZoneId);
             builder.HasIndex(sr => sr.IsActive);
             builder.Ignore(sr => sr.DomainEvents);

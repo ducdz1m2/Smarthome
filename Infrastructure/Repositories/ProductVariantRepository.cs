@@ -23,9 +23,10 @@ namespace Infrastructure.Repositories
 
         public async Task<ProductVariant?> GetBySkuAsync(string sku)
         {
+            var skuValue = Domain.ValueObjects.Sku.Create(sku.ToUpper());
             return await _context.ProductVariants
                 .AsNoTracking()
-                .FirstOrDefaultAsync(v => v.Sku == sku.ToUpper());
+                .FirstOrDefaultAsync(v => v.Sku == skuValue);
         }
 
         public async Task<List<ProductVariant>> GetByProductIdAsync(int productId)
@@ -39,7 +40,8 @@ namespace Infrastructure.Repositories
 
         public async Task<bool> ExistsAsync(string sku, int? excludeId = null)
         {
-            var query = _context.ProductVariants.Where(v => v.Sku == sku.ToUpper());
+            var skuValue = Domain.ValueObjects.Sku.Create(sku.ToUpper());
+            var query = _context.ProductVariants.Where(v => v.Sku == skuValue);
             if (excludeId.HasValue)
                 query = query.Where(v => v.Id != excludeId.Value);
             return await query.AnyAsync();

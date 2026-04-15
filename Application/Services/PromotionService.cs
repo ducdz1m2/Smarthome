@@ -74,7 +74,7 @@ namespace Application.Services
                 if (request.CustomDiscounts.TryGetValue(productId, out var cd))
                     customDiscount = cd;
 
-                promotion.AddProduct(productId, customDiscount);
+                promotion.AddProduct(productId, customDiscount.HasValue ? Domain.ValueObjects.Percentage.Create(customDiscount.Value) : null);
             }
 
             // Save again if there are products added
@@ -103,8 +103,8 @@ namespace Application.Services
             else
                 typeof(Promotion).GetProperty("Description")?.SetValue(promotion, null);
 
-            typeof(Promotion).GetProperty("DiscountPercent")?.SetValue(promotion, request.DiscountPercent);
-            typeof(Promotion).GetProperty("MinOrderAmount")?.SetValue(promotion, request.MinOrderAmount);
+            typeof(Promotion).GetProperty("DiscountPercent")?.SetValue(promotion, Domain.ValueObjects.Percentage.Create(request.DiscountPercent));
+            typeof(Promotion).GetProperty("MinOrderAmount")?.SetValue(promotion, request.MinOrderAmount.HasValue ? Domain.ValueObjects.Money.Create(request.MinOrderAmount.Value) : null);
             typeof(Promotion).GetProperty("Priority")?.SetValue(promotion, request.Priority);
             typeof(Promotion).GetProperty("IsActive")?.SetValue(promotion, request.IsActive);
 
@@ -127,7 +127,7 @@ namespace Application.Services
                 if (request.CustomDiscounts.TryGetValue(productId, out var cd))
                     customDiscount = cd;
 
-                promotion.AddProduct(productId, customDiscount);
+                promotion.AddProduct(productId, customDiscount.HasValue ? Domain.ValueObjects.Percentage.Create(customDiscount.Value) : null);
             }
 
             _promotionRepository.Update(promotion);
@@ -198,10 +198,10 @@ namespace Application.Services
                 Id = promotion.Id,
                 Name = promotion.Name,
                 Description = promotion.Description,
-                DiscountPercent = promotion.DiscountPercent,
+                DiscountPercent = promotion.DiscountPercent.Value,
                 StartDate = promotion.StartDate,
                 EndDate = promotion.EndDate,
-                MinOrderAmount = promotion.MinOrderAmount,
+                MinOrderAmount = promotion.MinOrderAmount?.Amount,
                 IsActive = promotion.IsActive,
                 Priority = promotion.Priority,
                 CreatedAt = promotion.CreatedAt,
@@ -217,7 +217,7 @@ namespace Application.Services
                     {
                         ProductId = pp.ProductId,
                         ProductName = product?.Name ?? $"Sản phẩm #{pp.ProductId}",
-                        CustomDiscountPercent = pp.CustomDiscountPercent
+                        CustomDiscountPercent = pp.CustomDiscountPercent?.Value
                     });
                 }
             }

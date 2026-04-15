@@ -4,7 +4,10 @@
     {
         public string Name { get; set; } = string.Empty;
         public decimal BasePrice { get; set; }
+
+        [Obsolete("StockQuantity không được cập nhật trực tiếp. Sử dụng InventoryService để quản lý tồn kho.")]
         public int StockQuantity { get; set; }
+
         public string? Description { get; set; }
         public Dictionary<string, string>? Specs { get; set; }
         public bool RequiresInstallation { get; set; }
@@ -19,5 +22,6 @@
     {
         public int Quantity { get; set; }
         public string? Reason { get; set; }
+        public int? WarehouseId { get; set; }
     }
 }

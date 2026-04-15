@@ -63,11 +63,8 @@ namespace Application.Services
 
             warehouse.Update(
                 request.Name,
-                request.AddressStreet ?? "",
-                request.AddressWard,
-                request.AddressDistrict,
-                request.AddressCity,
-                request.Phone,
+                Domain.ValueObjects.Address.Create(request.AddressStreet ?? "", request.AddressWard, request.AddressDistrict ?? "", request.AddressCity ?? ""),
+                request.Phone != null ? Domain.ValueObjects.PhoneNumber.Create(request.Phone) : null,
                 request.ManagerName
             );
 
@@ -117,7 +114,7 @@ namespace Application.Services
 
         private WarehouseResponse MapToResponse(Warehouse warehouse)
         {
-            var address = string.Join(", ", new[] { warehouse.AddressStreet, warehouse.AddressWard, warehouse.AddressDistrict, warehouse.AddressCity }
+            var address = string.Join(", ", new[] { warehouse.Address?.Street, warehouse.Address?.Ward, warehouse.Address?.District, warehouse.Address?.City }
                 .Where(s => !string.IsNullOrWhiteSpace(s)));
 
             return new WarehouseResponse
@@ -126,11 +123,11 @@ namespace Application.Services
                 Name = warehouse.Name,
                 Code = warehouse.Code,
                 Address = address,
-                AddressStreet = warehouse.AddressStreet,
-                AddressWard = warehouse.AddressWard,
-                AddressDistrict = warehouse.AddressDistrict,
-                AddressCity = warehouse.AddressCity,
-                Phone = warehouse.Phone,
+                AddressStreet = warehouse.Address?.Street ?? "",
+                AddressWard = warehouse.Address?.Ward ?? "",
+                AddressDistrict = warehouse.Address?.District ?? "",
+                AddressCity = warehouse.Address?.City ?? "",
+                Phone = warehouse.Phone?.ToString(),
                 ManagerName = warehouse.ManagerName,
                 IsActive = warehouse.IsActive
             };

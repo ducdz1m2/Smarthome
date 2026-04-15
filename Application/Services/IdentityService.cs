@@ -89,10 +89,17 @@ namespace Application.Services
             // Assign roles
             foreach (var roleName in request.Roles)
             {
-                if (await _roleManager.RoleExistsAsync(roleName))
+                // Create role if it doesn't exist
+                if (!await _roleManager.RoleExistsAsync(roleName))
                 {
-                    await _userManager.AddToRoleAsync(user, roleName);
+                    var role = new ApplicationRole
+                    {
+                        Name = roleName,
+                        NormalizedName = roleName.ToUpper()
+                    };
+                    await _roleManager.CreateAsync(role);
                 }
+                await _userManager.AddToRoleAsync(user, roleName);
             }
 
             return (result, user.Id);

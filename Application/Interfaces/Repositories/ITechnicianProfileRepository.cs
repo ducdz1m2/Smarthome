@@ -10,6 +10,7 @@ namespace Application.Interfaces.Repositories
         Task<List<TechnicianProfile>> GetAllAsync();
         Task<List<TechnicianProfile>> GetAvailableAsync();
         Task<List<TechnicianProfile>> GetByDistrictAsync(string district);
+        Task<List<TechnicianProfile>> GetByCityAsync(string city);
         Task<(List<TechnicianProfile> Items, int TotalCount)> GetPagedAsync(
             int page, int pageSize, bool? isAvailable = null, string? search = null);
         Task<bool> ExistsAsync(int id);

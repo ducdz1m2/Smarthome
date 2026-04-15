@@ -11,7 +11,9 @@ namespace Infrastructure.Configuration
             builder.ToTable("ReturnOrders");
             builder.HasKey(ro => ro.Id);
             builder.Property(ro => ro.Reason).IsRequired().HasMaxLength(500);
-            builder.Property(ro => ro.RefundAmount).HasPrecision(18, 2);
+            builder.Property(ro => ro.RefundAmount).HasConversion(
+                money => money.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value));
             builder.HasIndex(ro => ro.OriginalOrderId);
             builder.HasIndex(ro => ro.Status);
             builder.Ignore(ro => ro.DomainEvents);

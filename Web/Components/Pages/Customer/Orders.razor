@@ -175,10 +175,20 @@
         {
             "Pending" => Color.Warning,
             "Confirmed" => Color.Info,
+            "AwaitingPickup" => Color.Info,
+            "Shipping" => Color.Primary,
             "Shipped" => Color.Primary,
             "Delivered" => Color.Success,
+            "AwaitingSchedule" => Color.Info,
+            "Scheduled" => Color.Secondary,
+            "TechnicianAssigned" => Color.Tertiary,
+            "Preparing" => Color.Primary,
+            "Installing" => Color.Primary,
+            "Testing" => Color.Info,
             "Completed" => Color.Success,
             "Cancelled" => Color.Error,
+            "Refunded" => Color.Warning,
+            "ReturnRequested" => Color.Warning,
             _ => Color.Default
         };
     }
@@ -189,10 +199,20 @@
         {
             "Pending" => "Chờ xác nhận",
             "Confirmed" => "Đã xác nhận",
-            "Shipped" => "Đang giao",
+            "AwaitingPickup" => "Chờ lấy hàng",
+            "Shipping" => "Đang giao",
             "Delivered" => "Đã giao",
+            "AwaitingSchedule" => "Chờ lịch",
+            "Scheduled" => "Đã đặt lịch",
+            "TechnicianAssigned" => "Đã giao kỹ thuật",
+            "Preparing" => "Đang chuẩn bị",
+            "Installing" => "Đang lắp đặt",
+            "Testing" => "Đang kiểm tra",
             "Completed" => "Hoàn thành",
             "Cancelled" => "Đã hủy",
+            "Refunded" => "Đã hoàn tiền",
+            "ReturnRequested" => "Yêu cầu trả hàng",
+            "Shipped" => "Đang giao", // Legacy support
             _ => status
         };
     }

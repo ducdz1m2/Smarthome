@@ -32,6 +32,7 @@ namespace Application.DTOs.Responses
     {
         public int Id { get; set; }
         public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
         public int UserId { get; set; }
         public string UserName { get; set; } = string.Empty;
         public string Content { get; set; } = string.Empty;
@@ -39,6 +40,7 @@ namespace Application.DTOs.Responses
         public bool IsApproved { get; set; }
         public bool IsVerifiedPurchase { get; set; }
         public DateTime CreatedAt { get; set; }
+        public List<ProductCommentResponse> Replies { get; set; } = new();
     }
 
     public class ProductVariantResponse

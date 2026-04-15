@@ -105,7 +105,7 @@ public class MixedOrderFlowTests
         booking.StartPreparation();
         booking.StartTravel();
         booking.StartInstallation();
-        booking.Complete("Khách hàng ký nhận", 5, "Hoàn thành tốt");
+        booking.Complete("Khách hàng ký nhận", 5, notes: "Hoàn thành tốt");
 
         // Assert - kiểm tra flow lắp đặt đã hoàn thành
         booking.Status.Should().Be(InstallationStatus.Completed);
@@ -121,6 +121,12 @@ public class MixedOrderFlowTests
         
         var normalItem = order.Items.First(i => !i.RequiresInstallation);
         var installItem = order.Items.First(i => i.RequiresInstallation);
+
+        // Verify items correctly identified
+        normalItem.Should().NotBeNull();
+        installItem.Should().NotBeNull();
+        normalItem.RequiresInstallation.Should().BeFalse();
+        installItem.RequiresInstallation.Should().BeTrue();
 
         // Act 1 - Giao hàng thường trước
         order.MarkItemShipped(normalItem.Id);
@@ -167,8 +173,13 @@ public class MixedOrderFlowTests
         var normalProduct = Product.Create("Mouse", "MOU-001", Money.Vnd(200000), 1, 1, requiresInstallation: false);
         var installProduct = Product.Create("Smart Lock", "LOCK-001", Money.Vnd(2500000), 1, 1, requiresInstallation: true);
 
-        order.AddItem(normalProduct.Id, null, 2, Money.Vnd(200000), false);
-        order.AddItem(installProduct.Id, null, 1, Money.Vnd(2500000), true);
+        var normalItem = order.AddItem(normalProduct.Id, null, 2, Money.Vnd(200000), false);
+        var installItem = order.AddItem(installProduct.Id, null, 1, Money.Vnd(2500000), true);
+        
+        // Set unique Ids using reflection since EF Core hasn't assigned them yet
+        var idProperty = typeof(OrderItem).GetProperty("Id");
+        idProperty?.SetValue(normalItem, 1);
+        idProperty?.SetValue(installItem, 2);
         
         return order;
     }

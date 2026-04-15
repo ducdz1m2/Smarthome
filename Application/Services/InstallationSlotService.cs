@@ -48,7 +48,50 @@ namespace Application.Services
         public async Task<List<InstallationSlotResponse>> GetAvailableSlotsAsync(int technicianId, DateTime date)
         {
             var slots = await _slotRepository.GetAvailableSlotsAsync(technicianId, date);
+
+            // Auto-generate slots if none exist for this date
+            if (!slots.Any())
+            {
+                await GenerateSlotsForDateAsync(technicianId, date);
+                slots = await _slotRepository.GetAvailableSlotsAsync(technicianId, date);
+            }
+
             return slots.Select(MapToResponse).ToList();
+        }
+
+        private async Task GenerateSlotsForDateAsync(int technicianId, DateTime date)
+        {
+            // Generate standard time slots (8:00-10:00, 10:00-12:00, 14:00-16:00, 16:00-18:00)
+            var timeSlots = new List<(TimeSpan Start, TimeSpan End)>
+            {
+                (new TimeSpan(8, 0, 0), new TimeSpan(10, 0, 0)),
+                (new TimeSpan(10, 0, 0), new TimeSpan(12, 0, 0)),
+                (new TimeSpan(14, 0, 0), new TimeSpan(16, 0, 0)),
+                (new TimeSpan(16, 0, 0), new TimeSpan(18, 0, 0))
+            };
+
+            var slots = new List<InstallationSlot>();
+
+            foreach (var (startTime, endTime) in timeSlots)
+            {
+                // Check for overlap before creating
+                if (!await _slotRepository.HasOverlapAsync(technicianId, date, startTime, endTime))
+                {
+                    var slot = InstallationSlot.Create(
+                        technicianId,
+                        date,
+                        startTime,
+                        endTime
+                    );
+                    slots.Add(slot);
+                }
+            }
+
+            if (slots.Any())
+            {
+                await _slotRepository.AddRangeAsync(slots);
+                await _slotRepository.SaveChangesAsync();
+            }
         }
 
         public async Task<(List<InstallationSlotListResponse> Items, int TotalCount)> GetPagedAsync(

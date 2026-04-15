@@ -11,6 +11,7 @@ public class ProductComment : Entity
     {
         public int ProductId { get; private set; }
         public int UserId { get; private set; }
+        public int OrderId { get; private set; } // Liên kết với đơn hàng cụ thể
         public string Content { get; private set; } = string.Empty;
         public int Rating { get; private set; } // 1-5 stars
         public bool IsApproved { get; private set; } = false;
@@ -24,13 +25,16 @@ public class ProductComment : Entity
 
         private ProductComment() { } // EF Core
 
-        public static ProductComment Create(int productId, int userId, string content, int rating, bool isVerifiedPurchase = false, int? parentCommentId = null)
+        public static ProductComment Create(int productId, int userId, int orderId, string content, int rating, bool isVerifiedPurchase = false, int? parentCommentId = null)
         {
             if (productId <= 0)
                 throw new ValidationException(nameof(productId), "ProductId không hợp lệ");
 
             if (userId <= 0)
                 throw new ValidationException(nameof(userId), "UserId không hợp lệ");
+
+            if (orderId <= 0)
+                throw new ValidationException(nameof(orderId), "OrderId không hợp lệ");
 
             if (string.IsNullOrWhiteSpace(content))
                 throw new ValidationException(nameof(content), "Nội dung đánh giá không được trống");
@@ -45,6 +49,7 @@ public class ProductComment : Entity
             {
                 ProductId = productId,
                 UserId = userId,
+                OrderId = orderId,
                 Content = content.Trim(),
                 Rating = rating,
                 IsVerifiedPurchase = isVerifiedPurchase,
@@ -91,9 +96,9 @@ public class ProductComment : Entity
             IsVerifiedPurchase = true;
         }
 
-        public void AddReply(int userId, string content, int rating, bool isVerifiedPurchase = false)
+        public void AddReply(int userId, int orderId, string content, int rating, bool isVerifiedPurchase = false)
         {
-            var reply = Create(ProductId, userId, content, rating, isVerifiedPurchase, Id);
+            var reply = Create(ProductId, userId, orderId, content, rating, isVerifiedPurchase, Id);
             Replies.Add(reply);
         }
     }

@@ -1,10 +1,13 @@
 @page "/technician/bookings"
+@using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Web.Services
 @inject IInstallationService InstallationService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
+@inject IAuthService AuthService
 
 <MudText Typo="Typo.h4" Class="mb-4">Lịch lắp đặt của tôi</MudText>
 
@@ -43,15 +46,25 @@
             var technicianId = await GetCurrentTechnicianId();
             if (technicianId == 0) return;
 
+            Console.WriteLine($"[LoadBookings] Loading bookings for technician ID: {technicianId}");
             _allBookings = await InstallationService.GetByTechnicianAsync(technicianId);
+            Console.WriteLine($"[LoadBookings] Loaded {_allBookings.Count} bookings");
+            
+            foreach (var booking in _allBookings)
+            {
+                Console.WriteLine($"[LoadBookings] Booking ID: {booking.Id}, OrderNumber: {booking.OrderNumber}, Status: {booking.Status}, ScheduledDate: {booking.ScheduledDate}");
+            }
             
             var today = DateTime.Today;
             _pendingBookings = _allBookings.Where(b => b.Status == "Assigned").ToList();
             _upcomingBookings = _allBookings.Where(b => b.ScheduledDate >= today && b.Status != "Completed" && b.Status != "Cancelled" && b.Status != "Assigned").ToList();
             _completedBookings = _allBookings.Where(b => b.Status == "Completed").ToList();
+            
+            Console.WriteLine($"[LoadBookings] Pending: {_pendingBookings.Count}, Upcoming: {_upcomingBookings.Count}, Completed: {_completedBookings.Count}");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[LoadBookings] Error: {ex.Message}");
             Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
         }
         finally
@@ -62,7 +75,10 @@
 
     private async Task<int> GetCurrentTechnicianId()
     {
-        return 1;
+        Console.WriteLine($"[GetCurrentTechnicianId] Getting technician ID...");
+        var technicianId = await AuthService.GetTechnicianIdAsync();
+        Console.WriteLine($"[GetCurrentTechnicianId] Technician ID: {technicianId}");
+        return technicianId ?? 0;
     }
 
     private RenderFragment RenderBookingTable(List<InstallationBookingListResponse> bookings)
@@ -89,7 +105,7 @@
                             <MudText Typo="Typo.body2">@context.CustomerName</MudText>
                             <MudText Typo="Typo.caption">@context.CustomerPhone</MudText>
                         </MudTd>
-                        <MudTd>@context.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
+                        <MudTd>@context.ScheduledDate.Date.ToString("dd/MM/yyyy")</MudTd>
                         <MudTd>@context.StartTime?.ToString("hh\\:mm") - @context.EndTime?.ToString("hh\\:mm")</MudTd>
                         <MudTd>
                             <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status)">@GetStatusText(context.Status)</MudChip>
@@ -101,6 +117,21 @@
                             {
                                 <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" Class="ml-2"
                                            OnClick="() => AcceptBooking(context.Id)">Tiếp nhận</MudButton>
+                            }
+                            @if (context.Status == "Preparing")
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Class="ml-2"
+                                           OnClick="() => StartTravel(context.Id)">Bắt đầu đi</MudButton>
+                            }
+                            @if (context.Status == "OnTheWay")
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Secondary" Size="Size.Small" Class="ml-2"
+                                           OnClick="() => StartInstallation(context.Id)">Bắt đầu lắp</MudButton>
+                            }
+                            @if (context.Status == "Installing")
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" Class="ml-2"
+                                           OnClick="() => CompleteBooking(context.Id)">Hoàn thành</MudButton>
                             }
                         </MudTd>
                     </RowTemplate>
@@ -117,9 +148,67 @@
             await InstallationService.AcceptBookingAsync(bookingId, technicianId);
             Snackbar.Add("Đã tiếp nhận lịch lắp đặt", Severity.Success);
             await LoadBookings();
+            StateHasChanged();
         }
         catch (Exception ex)
         {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartTravel(int bookingId)
+    {
+        try
+        {
+            await InstallationService.StartTravelAsync(bookingId);
+            Snackbar.Add("Đã bắt đầu di chuyển", Severity.Success);
+            await LoadBookings();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartInstallation(int bookingId)
+    {
+        try
+        {
+            await InstallationService.StartInstallationAsync(bookingId);
+            Snackbar.Add("Đã bắt đầu lắp đặt", Severity.Success);
+            await LoadBookings();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CompleteBooking(int bookingId)
+    {
+        Console.WriteLine($"[CompleteBooking] METHOD CALLED for booking ID: {bookingId}");
+        try
+        {
+            Console.WriteLine($"[CompleteBooking] Starting complete for booking ID: {bookingId}");
+            var completeRequest = new CompleteInstallationRequest
+            {
+                CustomerSignature = "",
+                CustomerRating = 5,
+                Notes = ""
+            };
+            await InstallationService.CompleteAsync(bookingId, completeRequest);
+            Console.WriteLine($"[CompleteBooking] CompleteAsync finished successfully");
+            Snackbar.Add("Đã hoàn thành lắp đặt", Severity.Success);
+            await LoadBookings();
+            Console.WriteLine($"[CompleteBooking] LoadBookings finished");
+            StateHasChanged();
+            Console.WriteLine($"[CompleteBooking] StateHasChanged called");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CompleteBooking] Error: {ex.Message}");
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }

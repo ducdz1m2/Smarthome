@@ -29,15 +29,27 @@ public class ServerAuthStateProvider : AuthenticationStateProvider, IDisposable
     public override Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         var httpContext = _httpContextAccessor.HttpContext;
-        
-        if (httpContext?.User?.Identity?.IsAuthenticated == true)
+
+        Console.WriteLine($"[ServerAuthStateProvider] HttpContext: {httpContext != null}");
+
+        if (httpContext == null)
         {
+            Console.WriteLine($"[ServerAuthStateProvider] HttpContext is null");
+            var anonymous = new ClaimsPrincipal(new ClaimsIdentity());
+            return Task.FromResult(new AuthenticationState(anonymous));
+        }
+
+        // Check HttpContext.User directly (set by authentication middleware)
+        if (httpContext.User?.Identity?.IsAuthenticated == true)
+        {
+            Console.WriteLine($"[ServerAuthStateProvider] User authenticated via HttpContext.User: {httpContext.User.Identity.Name}");
             return Task.FromResult(new AuthenticationState(httpContext.User));
         }
 
         // Return unauthenticated state
-        var anonymous = new ClaimsPrincipal(new ClaimsIdentity());
-        return Task.FromResult(new AuthenticationState(anonymous));
+        Console.WriteLine($"[ServerAuthStateProvider] User not authenticated");
+        var anonymousUser = new ClaimsPrincipal(new ClaimsIdentity());
+        return Task.FromResult(new AuthenticationState(anonymousUser));
     }
 
     public void NotifyAuthenticationStateChanged()

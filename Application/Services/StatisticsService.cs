@@ -88,12 +88,12 @@ namespace Application.Services
             var totalOrders = orders.Count;
             var totalRevenue = orders
                 .Where(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered)
-                .Sum(o => o.TotalAmount);
+                .Sum(o => o.TotalAmount.Amount);
 
             var todayOrders = orders.Count(o => o.CreatedAt.Date == today);
             var todayRevenue = orders
                 .Where(o => o.CreatedAt.Date == today && (o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered))
-                .Sum(o => o.TotalAmount);
+                .Sum(o => o.TotalAmount.Amount);
 
             var products = await _productRepository.GetAllAsync();
             var lowStockThreshold = 10;
@@ -143,7 +143,7 @@ namespace Application.Services
                 ordersByMonth[month.Key] = monthOrders.Count;
                 revenueByMonth[month.Key] = monthOrders
                     .Where(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered)
-                    .Sum(o => o.TotalAmount);
+                    .Sum(o => o.TotalAmount.Amount);
             }
 
             var paymentMethodsData = orders
@@ -152,7 +152,7 @@ namespace Application.Services
                 {
                     Method = g.Key,
                     Count = g.Count(),
-                    Revenue = g.Where(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered).Sum(o => o.TotalAmount)
+                    Revenue = g.Where(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered).Sum(o => o.TotalAmount.Amount)
                 }).ToList();
 
             var totalRevenue = paymentMethodsData.Sum(p => p.Revenue);
@@ -171,7 +171,7 @@ namespace Application.Services
                     Name = p.Name,
                     ImageUrl = p.Images?.FirstOrDefault()?.Url,
                     Quantity = p.StockQuantity,
-                    Revenue = p.BasePrice * 10, // Simplified
+                    Revenue = p.BasePrice.Amount * 10, // Simplified
                     SoldCount = 10 // Simplified
                 })
                 .OrderByDescending(p => p.SoldCount)
@@ -180,8 +180,8 @@ namespace Application.Services
             return new SalesStatsResponse
             {
                 TotalOrders = orders.Count,
-                TotalRevenue = deliveredOrders.Sum(o => o.TotalAmount),
-                AverageOrderValue = deliveredOrders.Any() ? deliveredOrders.Average(o => o.TotalAmount) : 0,
+                TotalRevenue = deliveredOrders.Sum(o => o.TotalAmount.Amount),
+                AverageOrderValue = deliveredOrders.Any() ? deliveredOrders.Average(o => o.TotalAmount.Amount) : 0,
                 CompletedOrders = deliveredOrders.Count,
                 CancelledOrders = orders.Count(o => o.Status == OrderStatus.Cancelled),
                 ReturnedOrders = orders.Count(o => o.Status == OrderStatus.Refunded || o.Status == OrderStatus.ReturnRequested),
@@ -291,7 +291,7 @@ namespace Application.Services
                     OrderCount = x.UserOrders.Count,
                     TotalSpent = x.UserOrders
                         .Where(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered)
-                        .Sum(o => o.TotalAmount),
+                        .Sum(o => o.TotalAmount.Amount),
                     LastOrderDate = x.UserOrders.Max(o => o.CreatedAt)
                 })
                 .Where(c => c.TotalSpent > 0)
@@ -331,7 +331,7 @@ namespace Application.Services
                 stockByWarehouse["Chưa có kho"] = products.Sum(p => p.StockQuantity);
             }
 
-            var totalValue = products.Sum(p => p.StockQuantity * p.BasePrice);
+            var totalValue = products.Sum(p => p.StockQuantity * p.BasePrice.Amount);
 
             return new InventoryStatsResponse
             {
@@ -379,7 +379,7 @@ namespace Application.Services
                 {
                     Id = t.Id,
                     FullName = t.FullName,
-                    PhoneNumber = t.PhoneNumber,
+                    PhoneNumber = t.PhoneNumber.ToString(),
                     Rating = (decimal)t.Rating,
                     CompletedJobs = t.CompletedJobs,
                     TotalRevenue = 0 // Simplified - InstallationBooking không có Fee
@@ -455,7 +455,7 @@ namespace Application.Services
                 TotalPromotions = promotions.Count,
                 ActivePromotions = promotions.Count(p => p.StartDate <= now && p.EndDate >= now),
                 UsedCouponsCount = coupons.Sum(c => c.UsedCount),
-                TotalDiscountAmount = coupons.Sum(c => c.DiscountValue * c.UsedCount)
+                TotalDiscountAmount = coupons.Sum(c => c.DiscountValue.Amount * c.UsedCount)
             };
         }
 
@@ -483,7 +483,7 @@ namespace Application.Services
                 revenueChart.Add(new ChartDataPointResponse
                 {
                     Label = month.Label,
-                    Value = monthOrders.Where(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered).Sum(o => o.TotalAmount),
+                    Value = monthOrders.Where(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered).Sum(o => o.TotalAmount.Amount),
                     Count = monthOrders.Count
                 });
 

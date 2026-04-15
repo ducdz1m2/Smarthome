@@ -1,0 +1,82 @@
+@using Application.Interfaces.Services
+@inject IProductCommentService CommentService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Phản hồi đánh giá</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            <strong>Đánh giá gốc:</strong> @OriginalComment
+        </MudText>
+        
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField T="string" @bind-Value="_content" 
+                         Label="Nội dung phản hồi" 
+                         Multiline="true" 
+                         Rows="4"
+                         MaxLength="1000"
+                         Counter="1000"
+                         Required="true"
+                         RequiredError="Vui lòng nhập nội dung phản hồi" />
+            
+            <MudRating T="int" @bind-SelectedValue="_rating" 
+                       MaxValue="5" 
+                       Label="Đánh giá của bạn"
+                       Class="mt-2" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">Gửi phản hồi</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int ParentCommentId { get; set; }
+
+    [Parameter]
+    public int ProductId { get; set; }
+
+    [Parameter]
+    public int OrderId { get; set; }
+
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Parameter]
+    public string OriginalComment { get; set; } = string.Empty;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private string _content = string.Empty;
+    private int _rating = 5;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid || string.IsNullOrWhiteSpace(_content))
+        {
+            Snackbar.Add("Vui lòng nhập nội dung phản hồi", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            await CommentService.AddReplyAsync(ParentCommentId, UserId, OrderId, _content, _rating, false);
+            Snackbar.Add("Đã gửi phản hồi thành công", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

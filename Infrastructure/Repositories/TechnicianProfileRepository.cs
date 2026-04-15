@@ -46,16 +46,28 @@ namespace Infrastructure.Repositories
         {
             return await _context.TechnicianProfiles
                 .AsNoTracking()
-                .Where(t => t.IsAvailable)
                 .OrderByDescending(t => t.Rating)
                 .ToListAsync();
         }
 
         public async Task<List<TechnicianProfile>> GetByDistrictAsync(string district)
         {
+            // Load all technicians and filter in memory since Districts is JSON
+            var allTechnicians = await _context.TechnicianProfiles
+                .AsNoTracking()
+                .ToListAsync();
+
+            return allTechnicians
+                .Where(t => t.GetDistricts().Contains(district, StringComparer.OrdinalIgnoreCase))
+                .OrderByDescending(t => t.Rating)
+                .ToList();
+        }
+
+        public async Task<List<TechnicianProfile>> GetByCityAsync(string city)
+        {
             return await _context.TechnicianProfiles
                 .AsNoTracking()
-                .Where(t => t.Districts.Contains(district))
+                .Where(t => t.City.ToLower() == city.ToLower())
                 .OrderByDescending(t => t.Rating)
                 .ToListAsync();
         }

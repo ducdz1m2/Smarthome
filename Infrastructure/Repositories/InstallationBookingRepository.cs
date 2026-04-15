@@ -1,11 +1,12 @@
 using Application.Interfaces.Repositories;
 using Domain.Entities.Installation;
+using Domain.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories
 {
-    public class InstallationBookingRepository : IInstallationBookingRepository
+    public class InstallationBookingRepository : Application.Interfaces.Repositories.IInstallationBookingRepository, Infrastructure.Repositories.Interfaces.IInstallationBookingRepository
     {
         private readonly AppDbContext _context;
 
@@ -32,15 +33,30 @@ namespace Infrastructure.Repositories
                 .FirstOrDefaultAsync(b => b.Id == id);
         }
 
-        public async Task<InstallationBooking?> GetByOrderIdAsync(int orderId)
+        // Implementation for Infrastructure.Repositories.Interfaces.IInstallationBookingRepository (returns List)
+        async Task<List<InstallationBooking>> Infrastructure.Repositories.Interfaces.IInstallationBookingRepository.GetByOrderIdAsync(int orderId)
         {
             return await _context.InstallationBookings
                 .AsNoTracking()
+                .Where(b => b.OrderId == orderId)
                 .Include(b => b.Order)
                 .Include(b => b.Technician)
                 .Include(b => b.Slot)
                 .Include(b => b.Materials)
-                .FirstOrDefaultAsync(b => b.OrderId == orderId);
+                .ToListAsync();
+        }
+
+        // Implementation for Application.Interfaces.Repositories.IInstallationBookingRepository (returns single item)
+        public async Task<InstallationBooking?> GetByOrderIdAsync(int orderId)
+        {
+            return await _context.InstallationBookings
+                .AsNoTracking()
+                .Where(b => b.OrderId == orderId)
+                .Include(b => b.Order)
+                .Include(b => b.Technician)
+                .Include(b => b.Slot)
+                .Include(b => b.Materials)
+                .FirstOrDefaultAsync();
         }
 
         public async Task<List<InstallationBooking>> GetAllAsync()
@@ -70,6 +86,18 @@ namespace Infrastructure.Repositories
             return await _context.InstallationBookings
                 .AsNoTracking()
                 .Where(b => b.Status.ToString() == status)
+                .Include(b => b.Order)
+                .Include(b => b.Technician)
+                .Include(b => b.Slot)
+                .OrderByDescending(b => b.ScheduledDate)
+                .ToListAsync();
+        }
+
+        public async Task<List<InstallationBooking>> GetByStatusAsync(InstallationStatus status)
+        {
+            return await _context.InstallationBookings
+                .AsNoTracking()
+                .Where(b => b.Status == status)
                 .Include(b => b.Order)
                 .Include(b => b.Technician)
                 .Include(b => b.Slot)
@@ -146,6 +174,46 @@ namespace Infrastructure.Repositories
         public async Task SaveChangesAsync()
         {
             await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<InstallationBooking>> GetScheduledForDateAsync(DateTime date)
+        {
+            return await _context.InstallationBookings
+                .AsNoTracking()
+                .Where(b => b.ScheduledDate.Date == date.Date)
+                .Include(b => b.Order)
+                .Include(b => b.Technician)
+                .Include(b => b.Slot)
+                .OrderBy(b => b.ScheduledDate)
+                .ToListAsync();
+        }
+
+        public async Task<int> CountByStatusAsync(InstallationStatus status)
+        {
+            return await _context.InstallationBookings.CountAsync(b => b.Status == status);
+        }
+
+        public async Task<List<InstallationBooking>> GetPendingAsync()
+        {
+            return await _context.InstallationBookings
+                .AsNoTracking()
+                .Where(b => b.Status == InstallationStatus.Pending)
+                .Include(b => b.Order)
+                .Include(b => b.Technician)
+                .OrderBy(b => b.ScheduledDate)
+                .ToListAsync();
+        }
+
+        public async Task<List<InstallationBooking>> GetOverdueAsync()
+        {
+            return await _context.InstallationBookings
+                .AsNoTracking()
+                .Where(b => b.ScheduledDate.Date < DateTime.UtcNow.Date && 
+                       (b.Status == InstallationStatus.Pending || b.Status == InstallationStatus.Confirmed))
+                .Include(b => b.Order)
+                .Include(b => b.Technician)
+                .OrderBy(b => b.ScheduledDate)
+                .ToListAsync();
         }
     }
 }

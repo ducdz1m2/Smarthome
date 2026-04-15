@@ -181,7 +181,7 @@
         var dialog = await DialogService.ShowAsync<ConfirmDialog>("", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is true)
+        if (result is not null && !result.Canceled && result.Data is true)
         {
             try
             {

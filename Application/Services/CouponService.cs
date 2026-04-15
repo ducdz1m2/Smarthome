@@ -48,14 +48,17 @@ namespace Application.Services
             var coupon = Coupon.Create(
                 request.Code,
                 discountType,
-                request.DiscountValue,
+                Domain.ValueObjects.Money.Vnd(request.DiscountValue),
                 request.ExpiryDate,
                 request.UsageLimit ?? 100
             );
 
             if (request.MinOrderAmount.HasValue || request.MaxDiscountAmount.HasValue)
             {
-                coupon.SetConstraints(request.MinOrderAmount, request.MaxDiscountAmount);
+                coupon.SetConstraints(
+                    request.MinOrderAmount.HasValue ? Domain.ValueObjects.Money.Vnd(request.MinOrderAmount.Value) : null,
+                    request.MaxDiscountAmount.HasValue ? Domain.ValueObjects.Money.Vnd(request.MaxDiscountAmount.Value) : null
+                );
             }
 
             await _couponRepository.AddAsync(coupon);
@@ -127,9 +130,9 @@ namespace Application.Services
                 Id = coupon.Id,
                 Code = coupon.Code,
                 DiscountType = coupon.DiscountType.ToString(),
-                DiscountValue = coupon.DiscountValue,
-                MinOrderAmount = coupon.MinOrderAmount,
-                MaxDiscountAmount = coupon.MaxDiscountAmount,
+                DiscountValue = coupon.DiscountValue.Amount,
+                MinOrderAmount = coupon.MinOrderAmount?.Amount,
+                MaxDiscountAmount = coupon.MaxDiscountAmount?.Amount,
                 ExpiryDate = coupon.ExpiryDate,
                 UsageLimit = coupon.MaxUsage,
                 UsageCount = coupon.UsedCount,

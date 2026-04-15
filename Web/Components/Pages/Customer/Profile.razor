@@ -2,7 +2,10 @@
 @layout Web.Components.Layout.AccountLayout
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Web.Services
 @inject IIdentityService IdentityService
+@inject ITechnicianProfileService TechnicianService
+@inject CurrentUserService CurrentUserService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
@@ -134,25 +137,73 @@
     {
         try
         {
-            // TODO: Get current user ID from auth state
-            var users = await IdentityService.GetAllUsersAsync();
-            _user = users.FirstOrDefault();
-            
-            if (_user != null)
+            // Get current authenticated user from CurrentUserService
+            Console.WriteLine($"[Profile] IsAuthenticated: {CurrentUserService.IsAuthenticated}");
+
+            if (!CurrentUserService.IsAuthenticated || !CurrentUserService.UserId.HasValue)
             {
-                _editModel = new EditModel
+                Snackbar.Add("Không tìm thấy thông tin người dùng", Severity.Error);
+                return;
+            }
+
+            var userId = CurrentUserService.UserId.Value;
+            var roles = CurrentUserService.Roles;
+            Console.WriteLine($"[Profile] UserId: {userId}");
+            Console.WriteLine($"[Profile] Roles: {string.Join(", ", roles)}");
+
+            // Check if user is technician
+            if (roles.Contains("Technician"))
+            {
+                // Load technician profile
+                Console.WriteLine($"[Profile] Loading technician profile for userId: {userId}");
+                var technician = await TechnicianService.GetByUserIdAsync(userId);
+                Console.WriteLine($"[Profile] Technician found: {technician != null}");
+
+                if (technician != null)
                 {
-                    Id = _user.Id,
-                    FullName = _user.FullName,
-                    Email = _user.Email,
-                    PhoneNumber = _user.PhoneNumber,
-                    Avatar = _user.Avatar
-                };
-                await InvokeAsync(StateHasChanged);
+                    _editModel = new EditModel
+                    {
+                        Id = technician.Id,
+                        FullName = technician.FullName,
+                        Email = technician.Email ?? "",
+                        PhoneNumber = technician.PhoneNumber,
+                        Avatar = null // Technician doesn't have avatar
+                    };
+                    await InvokeAsync(StateHasChanged);
+                }
+                else
+                {
+                    Snackbar.Add("Không tìm thấy thông tin kỹ thuật viên", Severity.Error);
+                }
+            }
+            else
+            {
+                // Load regular user profile (customer or admin)
+                Console.WriteLine($"[Profile] Loading user profile for userId: {userId}");
+                _user = await IdentityService.GetUserByIdAsync(userId);
+                Console.WriteLine($"[Profile] User found: {_user != null}");
+
+                if (_user != null)
+                {
+                    _editModel = new EditModel
+                    {
+                        Id = _user.Id,
+                        FullName = _user.FullName,
+                        Email = _user.Email,
+                        PhoneNumber = _user.PhoneNumber,
+                        Avatar = _user.Avatar
+                    };
+                    await InvokeAsync(StateHasChanged);
+                }
+                else
+                {
+                    Snackbar.Add("Không tìm thấy thông tin người dùng", Severity.Error);
+                }
             }
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[Profile] Error: {ex.Message}");
             Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
         }
     }
