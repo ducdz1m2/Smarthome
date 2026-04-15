@@ -2,9 +2,12 @@ using Application.DTOs.Requests;
 using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
+using Domain.Entities.Catalog;
 using Domain.Entities.Installation;
+using Domain.Entities.Sales;
 using Domain.Enums;
 using Domain.Exceptions;
+using Domain.ValueObjects;
 
 namespace Application.Services
 {
@@ -14,17 +17,23 @@ namespace Application.Services
         private readonly ITechnicianProfileRepository _technicianRepository;
         private readonly IInstallationSlotRepository _slotRepository;
         private readonly IOrderRepository _orderRepository;
+        private readonly IReturnOrderRepository _returnOrderRepository;
+        private readonly IWarrantyRequestRepository _warrantyRequestRepository;
 
         public InstallationService(
             IInstallationBookingRepository bookingRepository,
             ITechnicianProfileRepository technicianRepository,
             IInstallationSlotRepository slotRepository,
-            IOrderRepository orderRepository)
+            IOrderRepository orderRepository,
+            IReturnOrderRepository returnOrderRepository,
+            IWarrantyRequestRepository warrantyRequestRepository)
         {
             _bookingRepository = bookingRepository;
             _technicianRepository = technicianRepository;
             _slotRepository = slotRepository;
             _orderRepository = orderRepository;
+            _returnOrderRepository = returnOrderRepository;
+            _warrantyRequestRepository = warrantyRequestRepository;
         }
 
         public async Task<List<InstallationBookingListResponse>> GetAllAsync()
@@ -68,6 +77,9 @@ namespace Application.Services
 
         public async Task<int> CreateAsync(CreateInstallationBookingRequest request)
         {
+            Console.WriteLine($"[InstallationService.CreateAsync] Creating booking for OrderId: {request.OrderId}, TechnicianId: {request.TechnicianId}, SlotId: {request.SlotId}");
+            Console.WriteLine($"[InstallationService.CreateAsync] IsUninstall: {request.IsUninstall}, IsWarranty: {request.IsWarranty}");
+
             // Verify technician exists
             var technician = await _technicianRepository.GetByIdAsync(request.TechnicianId);
             if (technician == null)
@@ -81,8 +93,8 @@ namespace Application.Services
             if (slot.IsBooked)
                 throw new DomainException("Slot đã được đặt");
 
-            // Check if order already has a booking
-            if (await _bookingRepository.ExistsByOrderIdAsync(request.OrderId))
+            // Check if order already has a booking (skip for uninstall and warranty bookings)
+            if (!request.IsUninstall && !request.IsWarranty && await _bookingRepository.ExistsByOrderIdAsync(request.OrderId))
                 throw new DomainException("Đơn hàng đã có lịch lắp đặt");
 
             var booking = InstallationBooking.Create(
@@ -92,13 +104,32 @@ namespace Application.Services
                 request.ScheduledDate
             );
 
+            Console.WriteLine($"[InstallationService.CreateAsync] Booking created with ID: {booking.Id}");
+
+            // Set IsUninstall flag
+            if (request.IsUninstall)
+            {
+                booking.SetIsUninstall(true);
+                Console.WriteLine($"[InstallationService.CreateAsync] Set IsUninstall to true");
+            }
+
+            // Set IsWarranty flag
+            if (request.IsWarranty)
+            {
+                booking.SetIsWarranty(true);
+                Console.WriteLine($"[InstallationService.CreateAsync] Set IsWarranty to true");
+            }
+
             await _bookingRepository.AddAsync(booking);
             await _bookingRepository.SaveChangesAsync();
+
+            Console.WriteLine($"[InstallationService.CreateAsync] Booking saved to database");
 
             // Mark slot as booked
             slot.Book(booking.Id);
             await _slotRepository.SaveChangesAsync();
 
+            Console.WriteLine($"[InstallationService.CreateAsync] Slot marked as booked. Returning booking ID: {booking.Id}");
             return booking.Id;
         }
 
@@ -191,12 +222,12 @@ namespace Application.Services
 
         public async Task CompleteAsync(int id, CompleteInstallationRequest request)
         {
-            Console.WriteLine($"[CompleteAsync] METHOD CALLED for booking ID: {id}");
+            Console.WriteLine($"[InstallationService.CompleteAsync] ========== METHOD STARTED for booking ID: {id} ==========");
             var booking = await _bookingRepository.GetByIdAsync(id);
             if (booking == null)
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
-            Console.WriteLine($"[CompleteAsync] Before complete - Booking ID: {booking.Id}, Status: {booking.Status}");
+            Console.WriteLine($"[InstallationService.CompleteAsync] Before complete - Booking ID: {booking.Id}, Status: {booking.Status}, IsUninstall: {booking.IsUninstall}, IsWarranty: {booking.IsWarranty}");
 
             // Get customerId from order
             var customerId = booking.Order?.UserId ?? 0;
@@ -223,6 +254,106 @@ namespace Application.Services
                 order.UpdateStatusFromInstallation(OrderStatus.Completed);
                 await _orderRepository.SaveChangesAsync();
                 Console.WriteLine($"[CompleteAsync] After update order - Order ID: {order.Id}, Status: {order.Status}");
+            }
+
+            // If this is an uninstall booking, update the return order status to Completed
+            if (booking.IsUninstall)
+            {
+                Console.WriteLine($"[CompleteAsync] This is an uninstall booking, updating return order status");
+                Console.WriteLine($"[CompleteAsync] Booking OrderId: {booking.OrderId}");
+                try
+                {
+                    // Find return order by order ID
+                    var returnOrders = await _returnOrderRepository.GetByOrderIdAsync(booking.OrderId);
+                    Console.WriteLine($"[CompleteAsync] Found {returnOrders.Count} return orders for order {booking.OrderId}");
+                    var returnOrder = returnOrders.FirstOrDefault();
+                    if (returnOrder != null)
+                    {
+                        Console.WriteLine($"[CompleteAsync] Return Order ID: {returnOrder.Id}, Current Status: {returnOrder.Status}");
+                        if (returnOrder.Status == Domain.Entities.Sales.ReturnOrderStatus.Approved)
+                        {
+                            Console.WriteLine($"[CompleteAsync] Return order is Approved, marking as received then completed");
+                            // Mark as Received first (required by business rule before Complete)
+                            returnOrder.MarkReceived();
+                            _returnOrderRepository.Update(returnOrder);
+                            await _returnOrderRepository.SaveChangesAsync();
+                            Console.WriteLine($"[CompleteAsync] Return order marked as received");
+
+                            // Then mark as Completed
+                            returnOrder.Complete();
+                            _returnOrderRepository.Update(returnOrder);
+                            await _returnOrderRepository.SaveChangesAsync();
+                            Console.WriteLine($"[CompleteAsync] Return order marked as completed successfully");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[CompleteAsync] Return order status is not Approved, skipping. Status: {returnOrder.Status}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[CompleteAsync] No return order found for order {booking.OrderId}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[CompleteAsync] Error updating return order: {ex.Message}");
+                    Console.WriteLine($"[CompleteAsync] Stack trace: {ex.StackTrace}");
+                    // Don't throw error, just log it
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[CompleteAsync] This is a regular installation booking, not updating return order");
+            }
+
+            // If this is a warranty booking, update the warranty request status to Completed
+            if (booking.IsWarranty)
+            {
+                Console.WriteLine($"[CompleteAsync] This is a warranty booking, updating warranty request status");
+                Console.WriteLine($"[CompleteAsync] Booking OrderId: {booking.OrderId}");
+                try
+                {
+                    // Find warranty request by order ID
+                    var warrantyRequests = await _warrantyRequestRepository.GetByOrderIdAsync(booking.OrderId);
+                    Console.WriteLine($"[CompleteAsync] Found {warrantyRequests.Count} warranty requests for order {booking.OrderId}");
+                    var warrantyRequest = warrantyRequests.FirstOrDefault();
+                    if (warrantyRequest != null)
+                    {
+                        Console.WriteLine($"[CompleteAsync] Warranty Request ID: {warrantyRequest.Id}, Current Status: {warrantyRequest.Status}");
+                        if (warrantyRequest.Status == Domain.Enums.WarrantyRequestStatus.Approved)
+                        {
+                            Console.WriteLine($"[CompleteAsync] Warranty request is Approved, starting then marking as completed");
+                            warrantyRequest.Start();
+                            warrantyRequest.Complete(request.Notes);
+                            _warrantyRequestRepository.Update(warrantyRequest);
+                            await _warrantyRequestRepository.SaveChangesAsync();
+                            Console.WriteLine($"[CompleteAsync] Warranty request marked as completed successfully");
+                        }
+                        else if (warrantyRequest.Status == Domain.Enums.WarrantyRequestStatus.InProgress)
+                        {
+                            Console.WriteLine($"[CompleteAsync] Warranty request is InProgress, marking as completed");
+                            warrantyRequest.Complete(request.Notes);
+                            _warrantyRequestRepository.Update(warrantyRequest);
+                            await _warrantyRequestRepository.SaveChangesAsync();
+                            Console.WriteLine($"[CompleteAsync] Warranty request marked as completed successfully");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[CompleteAsync] Warranty request status is not Approved or InProgress, skipping. Status: {warrantyRequest.Status}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[CompleteAsync] No warranty request found for order {booking.OrderId}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[CompleteAsync] Error updating warranty request: {ex.Message}");
+                    Console.WriteLine($"[CompleteAsync] Stack trace: {ex.StackTrace}");
+                    // Don't throw error, just log it
+                }
             }
         }
 
@@ -355,8 +486,18 @@ namespace Application.Services
         public async Task<List<InstallationBookingListResponse>> GetPendingForTechnicianAsync(int technicianId)
         {
             var bookings = await _bookingRepository.GetByTechnicianIdAsync(technicianId);
-            var pending = bookings.Where(b => b.Status == Domain.Enums.InstallationStatus.Assigned).ToList();
-            return pending.Select(MapToListResponse).ToList();
+            return bookings.Where(b => b.Status == InstallationStatus.Assigned).Select(MapToListResponse).ToList();
+        }
+
+        public async Task SetIsUninstallAsync(int bookingId, bool isUninstall)
+        {
+            var booking = await _bookingRepository.GetByIdAsync(bookingId);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            booking.SetIsUninstall(isUninstall);
+            _bookingRepository.Update(booking);
+            await _bookingRepository.SaveChangesAsync();
         }
 
         private InstallationBookingResponse MapToResponse(InstallationBooking booking)
@@ -400,8 +541,8 @@ namespace Application.Services
                 
                 // Technician info
                 TechnicianId = booking.TechnicianId,
-                TechnicianName = technician?.FullName ?? $"Kỹ thuật viên #{booking.TechnicianId}",
-                TechnicianPhone = technician?.PhoneNumber?.ToString() ?? string.Empty,
+                TechnicianName = technician?.FullName ?? $"KTV #{booking.TechnicianId}",
+                TechnicianPhone = technician?.PhoneNumber != null ? technician.PhoneNumber.ToString() : string.Empty,
                 
                 // Schedule info
                 SlotId = booking.SlotId,
@@ -420,6 +561,7 @@ namespace Application.Services
                 CustomerSignature = booking.CustomerSignature,
                 Notes = booking.Notes,
                 CreatedAt = booking.CreatedAt,
+                IsUninstall = booking.IsUninstall,
                 
                 // Materials
                 Materials = booking.Materials?.Select(m => new InstallationMaterialResponse
@@ -447,7 +589,7 @@ namespace Application.Services
                 TechnicianId = booking.TechnicianId,
                 TechnicianName = technician?.FullName ?? $"KTV #{booking.TechnicianId}",
                 CustomerName = order?.ReceiverName ?? string.Empty,
-                CustomerPhone = order?.ReceiverPhone?.ToString() ?? string.Empty,
+                CustomerPhone = order?.ReceiverPhone != null ? order.ReceiverPhone.ToString() : string.Empty,
                 ScheduledDate = booking.ScheduledDate,
                 StartTime = booking.Slot?.StartTime,
                 EndTime = booking.Slot?.EndTime,
@@ -455,7 +597,9 @@ namespace Application.Services
                 MaterialsPrepared = booking.MaterialsPrepared,
                 CompletedAt = booking.CompletedAt,
                 CustomerRating = booking.CustomerRating,
-                CreatedAt = booking.CreatedAt
+                CreatedAt = booking.CreatedAt,
+                IsUninstall = booking.IsUninstall,
+                IsWarranty = booking.IsWarranty
             };
         }
     }

@@ -5,6 +5,7 @@
 @inject IWarehouseService WarehouseService
 @inject ISupplierService SupplierService
 @inject IProductService ProductService
+@inject IProductVariantService ProductVariantService
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -52,7 +53,8 @@
                                          Label="Sản phẩm *"
                                          Variant="Variant.Outlined"
                                          Dense="true"
-                                         Required="true" />
+                                         Required="true"
+                                         @onvaluechanged="OnProductChanged" />
                     </MudItem>
                 }
                 else
@@ -60,6 +62,21 @@
                     <MudItem xs="12">
                         <MudTextField Value="@ProductName" Label="Sản phẩm" 
                                       Variant="Variant.Outlined" Disabled="true" />
+                    </MudItem>
+                }
+
+                @* Chọn Phân loại (nếu sản phẩm có phân loại) *@
+                @if (_variants.Any())
+                {
+                    <MudItem xs="12">
+                        <MudSelect T="int?" @bind-Value="_currentDetail.VariantId" Label="Phân loại *" 
+                                   Required="true" RequiredError="Chọn phân loại"
+                                   Variant="Variant.Outlined" Dense="true">
+                            @foreach (var variant in _variants)
+                            {
+                                <MudSelectItem T="int?" Value="@variant.Id">@variant.Sku - @variant.Price.ToString("N0")đ</MudSelectItem>
+                            }
+                        </MudSelect>
                     </MudItem>
                 }
                 
@@ -126,6 +143,7 @@
     private List<SupplierResponse> _suppliers = new();
     private List<ProductListResponse> _products = new();
     private ProductListResponse? _selectedProduct;
+    private List<ProductVariantListResponse> _variants = new();
 
     private CreateStockEntryRequest _request = new()
     {
@@ -149,6 +167,7 @@
         if (ProductId > 0)
         {
             _currentDetail.ProductId = ProductId;
+            await LoadVariants(ProductId);
         }
     }
 
@@ -182,6 +201,43 @@
             .Take(10);
     }
 
+    private async Task OnProductChanged(ProductListResponse? product)
+    {
+        if (product == null)
+        {
+            _variants.Clear();
+            _currentDetail.VariantId = null;
+            return;
+        }
+
+        await LoadVariants(product.Id);
+        _currentDetail.ProductId = product.Id;
+    }
+
+    private async Task LoadVariants(int productId)
+    {
+        try
+        {
+            var variantResponses = await ProductVariantService.GetByProductIdAsync(productId);
+            _variants = variantResponses.Select(v => new ProductVariantListResponse
+            {
+                Id = v.Id,
+                Sku = v.Sku,
+                Price = v.Price,
+                StockQuantity = v.StockQuantity,
+                Attributes = v.Attributes,
+                IsActive = v.IsActive
+            }).ToList();
+            _currentDetail.VariantId = _variants.FirstOrDefault()?.Id;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải phân loại: {ex.Message}", Severity.Error);
+            _variants.Clear();
+        }
+    }
+
     private void Cancel() => MudDialog.Cancel();
 
     private async Task Submit()
@@ -194,6 +250,20 @@
         if (productId == 0)
         {
             Snackbar.Add("Vui lòng chọn sản phẩm", Severity.Warning);
+            return;
+        }
+
+        // Enforce that product must have at least one variant
+        if (!_variants.Any())
+        {
+            Snackbar.Add("Sản phẩm chưa có phân loại. Vui lòng tạo phân loại trước khi nhập kho.", Severity.Warning);
+            return;
+        }
+
+        // Enforce variant selection
+        if (_currentDetail.VariantId == null)
+        {
+            Snackbar.Add("Vui lòng chọn phân loại sản phẩm", Severity.Warning);
             return;
         }
 

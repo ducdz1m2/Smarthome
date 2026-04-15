@@ -926,6 +926,12 @@ namespace Infrastructure.Migrations
                     b.Property<TimeSpan>("EstimatedDuration")
                         .HasColumnType("time");
 
+                    b.Property<bool>("IsUninstall")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsWarranty")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("MaterialsPrepared")
                         .HasColumnType("bit");
 
@@ -1165,6 +1171,58 @@ namespace Infrastructure.Migrations
                     b.ToTable("TechnicianProfiles", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.Installation.TechnicianRating", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVerifiedService")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TechnicianId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("TechnicianId");
+
+                    b.ToTable("TechnicianRatings");
+                });
+
             modelBuilder.Entity("Domain.Entities.Inventory.ProductReservation", b =>
                 {
                     b.Property<int>("Id")
@@ -1247,6 +1305,9 @@ namespace Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("VariantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("WarehouseId")
                         .HasColumnType("int");
 
@@ -1254,8 +1315,9 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("WarehouseId");
 
-                    b.HasIndex("ProductId", "WarehouseId")
-                        .IsUnique();
+                    b.HasIndex("ProductId", "VariantId", "WarehouseId")
+                        .IsUnique()
+                        .HasFilter("[VariantId] IS NOT NULL");
 
                     b.ToTable("ProductWarehouses", (string)null);
                 });
@@ -1349,6 +1411,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("VariantId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -1872,6 +1937,8 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("InstallationBookingId");
+
                     b.HasIndex("OrderId");
 
                     b.HasIndex("ProductId");
@@ -1886,6 +1953,12 @@ namespace Infrastructure.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ApprovedBy")
+                        .HasColumnType("int");
 
                     b.Property<string>("Carrier")
                         .IsRequired()
@@ -1912,6 +1985,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime?>("PickedUpAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("ShipperId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -1934,6 +2010,53 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("OrderShipments", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Sales.OrderWarehouseAllocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AllocatedQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsConfirmed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("OrderItemId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderItemId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.ToTable("OrderWarehouseAllocations", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Sales.PaymentTransaction", b =>
@@ -2184,6 +2307,98 @@ namespace Infrastructure.Migrations
                     b.HasIndex("WarrantyId");
 
                     b.ToTable("WarrantyClaims", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Sales.WarrantyRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TechnicianNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("WarrantyType")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WarrantyRequests");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Sales.WarrantyRequestItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("OrderItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("WarrantyRequestId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WarrantyRequestId");
+
+                    b.ToTable("WarrantyRequestItem");
                 });
 
             modelBuilder.Entity("Domain.Entities.Shipping.ShippingRate", b =>
@@ -2635,6 +2850,25 @@ namespace Infrastructure.Migrations
                     b.Navigation("Address");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Installation.TechnicianRating", b =>
+                {
+                    b.HasOne("Domain.Entities.Installation.InstallationBooking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Installation.TechnicianProfile", "Technician")
+                        .WithMany()
+                        .HasForeignKey("TechnicianId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Technician");
+                });
+
             modelBuilder.Entity("Domain.Entities.Inventory.ProductWarehouse", b =>
                 {
                     b.HasOne("Domain.Entities.Inventory.Warehouse", "Warehouse")
@@ -2852,6 +3086,10 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Entities.Sales.OrderItem", b =>
                 {
+                    b.HasOne("Domain.Entities.Installation.InstallationBooking", "InstallationBooking")
+                        .WithMany()
+                        .HasForeignKey("InstallationBookingId");
+
                     b.HasOne("Domain.Entities.Sales.Order", "Order")
                         .WithMany("Items")
                         .HasForeignKey("OrderId")
@@ -2863,6 +3101,8 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("InstallationBooking");
 
                     b.Navigation("Order");
 
@@ -2878,6 +3118,17 @@ namespace Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Sales.OrderWarehouseAllocation", b =>
+                {
+                    b.HasOne("Domain.Entities.Sales.OrderItem", "OrderItem")
+                        .WithMany("WarehouseAllocations")
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OrderItem");
                 });
 
             modelBuilder.Entity("Domain.Entities.Sales.ReturnOrderItem", b =>
@@ -2898,6 +3149,15 @@ namespace Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Warranty");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Sales.WarrantyRequestItem", b =>
+                {
+                    b.HasOne("Domain.Entities.Sales.WarrantyRequest", null)
+                        .WithMany("Items")
+                        .HasForeignKey("WarrantyRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Entities.Shipping.ShippingRate", b =>
@@ -3039,6 +3299,11 @@ namespace Infrastructure.Migrations
                     b.Navigation("Shipments");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Sales.OrderItem", b =>
+                {
+                    b.Navigation("WarehouseAllocations");
+                });
+
             modelBuilder.Entity("Domain.Entities.Sales.ReturnOrder", b =>
                 {
                     b.Navigation("Items");
@@ -3047,6 +3312,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Entities.Sales.Warranty", b =>
                 {
                     b.Navigation("Claims");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Sales.WarrantyRequest", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Domain.Entities.Shipping.ShippingZone", b =>

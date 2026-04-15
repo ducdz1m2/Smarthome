@@ -23,7 +23,7 @@
                     <MudCardContent>
                         <div class="d-flex align-center gap-2 mb-3">
                             <MudText Typo="Typo.body2">Đánh giá:</MudText>
-                            <MudRating @bind-SelectedValue="_ratings[item.Id]" MaxValue="5" Size="Size.Medium" />
+                            <MudRating Value="_ratings[item.Id]" MaxValue="5" Size="Size.Medium" ReadOnly="false" SelectedValueChanged="(newValue) => OnRatingChanged(item.Id, newValue)" />
                             <MudText Typo="Typo.caption" Color="Color.Primary">@GetRatingText(_ratings[item.Id])</MudText>
                         </div>
                         
@@ -41,7 +41,7 @@
     <DialogActions>
         <MudButton OnClick="Cancel">Hủy</MudButton>
         <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid || !HasAllRatings()">
-            Gửi đánh giá
+            @(_isEditMode ? "Cập nhật" : "Gửi đánh giá")
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -65,19 +65,57 @@
     [Parameter] 
     public int UserId { get; set; }
 
+    [Parameter]
+    public int? ExistingCommentId { get; set; }
+
     private MudForm _form = null!;
     private bool _isValid;
+    private bool _isEditMode = false;
     private Dictionary<int, int> _ratings = new();
     private Dictionary<int, string> _comments = new();
 
     protected override void OnInitialized()
     {
+        _isEditMode = ExistingCommentId.HasValue;
+        
         // Initialize ratings to 0 and comments to empty
         foreach (var item in Items)
         {
             _ratings[item.Id] = 0;
             _comments[item.Id] = "";
         }
+
+        if (_isEditMode)
+        {
+            LoadExistingReviewAsync();
+        }
+    }
+
+    private async Task LoadExistingReviewAsync()
+    {
+        if (!ExistingCommentId.HasValue) return;
+
+        try
+        {
+            var existingComment = await CommentService.GetByIdAsync(ExistingCommentId.Value);
+            if (existingComment != null && Items.Any())
+            {
+                var firstItem = Items.First();
+                _ratings[firstItem.Id] = existingComment.Rating;
+                _comments[firstItem.Id] = existingComment.Content;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải đánh giá: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OnRatingChanged(int itemId, int newValue)
+    {
+        _ratings[itemId] = newValue;
+        InvokeAsync(StateHasChanged);
     }
 
     private bool HasAllRatings()
@@ -111,9 +149,9 @@
 
         try
         {
-            // Submit review for each product
-            foreach (var item in Items)
+            if (_isEditMode && ExistingCommentId.HasValue && Items.Any())
             {
+                var item = Items.First();
                 var request = new CreateProductCommentRequest
                 {
                     ProductId = item.ProductId,
@@ -124,10 +162,30 @@
                     IsVerifiedPurchase = true
                 };
 
-                await CommentService.CreateAsync(request);
+                await CommentService.UpdateAsync(ExistingCommentId.Value, request);
+                Snackbar.Add("Đã cập nhật đánh giá thành công!", Severity.Success);
+            }
+            else
+            {
+                // Submit review for each product
+                foreach (var item in Items)
+                {
+                    var request = new CreateProductCommentRequest
+                    {
+                        ProductId = item.ProductId,
+                        UserId = UserId,
+                        OrderId = OrderId,
+                        Content = _comments[item.Id] ?? "",
+                        Rating = _ratings[item.Id],
+                        IsVerifiedPurchase = true
+                    };
+
+                    await CommentService.CreateAsync(request);
+                }
+
+                Snackbar.Add("Đánh giá đã được gửi thành công!", Severity.Success);
             }
 
-            Snackbar.Add("Đánh giá đã được gửi thành công!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)

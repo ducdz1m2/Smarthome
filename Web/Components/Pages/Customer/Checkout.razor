@@ -338,7 +338,9 @@
         public int Id { get; set; }
         public int ProductId { get; set; }
         public string ProductName { get; set; } = "";
+        public int? VariantId { get; set; }
         public string? VariantName { get; set; }
+        public string? VariantSku { get; set; }
         public string? ImageUrl { get; set; }
         public decimal UnitPrice { get; set; }
         public int Quantity { get; set; }
@@ -546,7 +548,7 @@
             _request.Items = _cartItems.Select(i => new CreateOrderItemRequest
             {
                 ProductId = i.ProductId,
-                VariantId = null, // TODO: Add variant support
+                VariantId = i.VariantId,
                 Quantity = i.Quantity,
                 RequiresInstallation = i.RequiresInstallation
             }).ToList();

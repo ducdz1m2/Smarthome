@@ -1,65 +1,65 @@
-@page "/admin/warranties"
+@page "/admin/warranty-requests"
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @using MudBlazor
 @using Web.Components.Shared
 @layout AdminLayout
-@inject IWarrantyService WarrantyService
+@inject IWarrantyRequestService WarrantyRequestService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 
-<MudText Typo="Typo.h4" Class="mb-4">Quản lý Bảo hành</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý Yêu cầu Bảo hành</MudText>
 
-<MudTable Items="_warranties" Dense="true" Hover="true" Loading="_loading" 
+<MudTable Items="_warrantyRequests" Dense="true" Hover="true" Loading="_loading"
           LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
-          Filter="@FilterWarranties" SortMode="SortMode.Single" AllowUnsorted="false">
+          Filter="@FilterWarrantyRequests" SortMode="SortMode.Single" AllowUnsorted="false">
     <ToolBarContent>
-        <MudText Typo="Typo.h6">Danh sách bảo hành</MudText>
+        <MudText Typo="Typo.h6">Danh sách yêu cầu bảo hành</MudText>
         <MudSpacer />
-        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
+        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..."
                       Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
                       IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
     </ToolBarContent>
     <HeaderContent>
-        <MudTh Width="60px"><MudTableSortLabel T="WarrantyResponse" SortBy="@(w => w.Id)">ID</MudTableSortLabel></MudTh>
-        <MudTh Width="150px"><MudTableSortLabel T="WarrantyResponse" SortBy="@(w => w.ProductName)">Sản phẩm</MudTableSortLabel></MudTh>
-        <MudTh Width="100px"><MudTableSortLabel T="WarrantyResponse" SortBy="@(w => w.OrderItemId)">Mã đơn</MudTableSortLabel></MudTh>
-        <MudTh Width="120px"><MudTableSortLabel T="WarrantyResponse" SortBy="@(w => w.StartDate)">Bắt đầu</MudTableSortLabel></MudTh>
-        <MudTh Width="120px"><MudTableSortLabel T="WarrantyResponse" SortBy="@(w => w.EndDate)">Kết thúc</MudTableSortLabel></MudTh>
-        <MudTh Width="100px"><MudTableSortLabel T="WarrantyResponse" SortBy="@(w => w.Status)">Trạng thái</MudTableSortLabel></MudTh>
-        <MudTh Width="80px">Số yêu cầu</MudTh>
-        <MudTh Width="150px">Thao tác</MudTh>
+        <MudTh Width="60px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh Width="120px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.OrderNumber)">Mã đơn</MudTableSortLabel></MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.WarrantyType)">Loại</MudTableSortLabel></MudTh>
+        <MudTh Width="200px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Description)">Mô tả</MudTableSortLabel></MudTh>
+        <MudTh Width="100px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Status)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh Width="150px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.CreatedAt)">Ngày tạo</MudTableSortLabel></MudTh>
+        <MudTh Width="100px">Thao tác</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
-        <MudTd DataLabel="Sản phẩm">
-            <MudText Typo="Typo.body2" Style="font-weight: 500;">@context.ProductName</MudText>
-            <MudText Typo="Typo.caption">ID: @context.ProductId</MudText>
-        </MudTd>
-        <MudTd DataLabel="Mã đơn">#@context.OrderItemId</MudTd>
-        <MudTd DataLabel="Bắt đầu">@context.StartDate.ToString("dd/MM/yyyy")</MudTd>
-        <MudTd DataLabel="Kết thúc">
-            <MudText Color="@GetExpiryColor(context.EndDate)">
-                @context.EndDate.ToString("dd/MM/yyyy")
-            </MudText>
-        </MudTd>
+        <MudTd DataLabel="Mã đơn">@context.OrderNumber</MudTd>
+        <MudTd DataLabel="Loại">@context.WarrantyType</MudTd>
+        <MudTd DataLabel="Mô tả">@context.Description</MudTd>
         <MudTd DataLabel="Trạng thái">
-            <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">
-                @GetStatusDisplay(context.Status)
-            </MudChip>
+            <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
         </MudTd>
-        <MudTd DataLabel="Yêu cầu">
-            <MudChip T="string" Color="Color.Info" Size="Size.Small">
-                @(context.Claims?.Count ?? 0) yêu cầu
-            </MudChip>
-        </MudTd>
+        <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
         <MudTd>
-            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" 
-                           OnClick="@(() => ViewWarranty(context))" Size="Size.Small" />
-            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Success" 
-                           OnClick="@(() => OpenClaimDialog(context))" Size="Size.Small" 
-                           Disabled="@(!CanCreateClaim(context))" />
+            <div class="d-flex gap-1">
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                             Color="Color.Primary"
+                             Size="Size.Small"
+                             OnClick="() => ViewDetails(context.Id)"
+                             Title="Chi tiết" />
+                @if (context.Status == "Pending")
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Check"
+                                 Color="Color.Success"
+                                 Size="Size.Small"
+                                 OnClick="() => Approve(context.Id)"
+                                 Title="Duyệt" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                 Color="Color.Error"
+                                 Size="Size.Small"
+                                 OnClick="() => Reject(context.Id)"
+                                 Title="Từ chối" />
+                }
+            </div>
         </MudTd>
     </RowTemplate>
     <PagerContent>
@@ -69,34 +69,50 @@
 </MudTable>
 
 @code {
-    private List<WarrantyResponse> _warranties = new();
+    private List<WarrantyRequestResponse> _warrantyRequests = new();
     private bool _loading = true;
     private string _searchString = "";
 
-    private bool FilterWarranties(WarrantyResponse warranty)
+    private bool FilterWarrantyRequests(WarrantyRequestResponse warrantyRequest)
     {
         if (string.IsNullOrWhiteSpace(_searchString))
             return true;
-        
-        return warranty.ProductName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
-               warranty.Id.ToString().Contains(_searchString);
+
+        return warrantyRequest.OrderNumber.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               warrantyRequest.Id.ToString().Contains(_searchString) ||
+               warrantyRequest.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => Color.Warning,
+            "Approved" => Color.Success,
+            "Rejected" => Color.Error,
+            "InProgress" => Color.Info,
+            "Completed" => Color.Primary,
+            _ => Color.Default
+        };
     }
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadWarranties();
+        await LoadWarrantyRequests();
     }
 
-    private async Task LoadWarranties()
+    private async Task LoadWarrantyRequests()
     {
         _loading = true;
         try
         {
-            _warranties = await WarrantyService.GetAllAsync();
+            var allRequests = await WarrantyRequestService.GetAllAsync();
+            // Show all warranty request statuses including InProgress and Completed
+            _warrantyRequests = allRequests.ToList();
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Lỗi khi tải danh sách: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Lỗi khi tải yêu cầu bảo hành: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -104,59 +120,57 @@
         }
     }
 
-    private void ViewWarranty(WarrantyResponse warranty)
+    private async Task Approve(int id)
     {
-        NavigationManager.NavigateTo($"/admin/warranties/{warranty.Id}");
-    }
-
-    private async Task OpenClaimDialog(WarrantyResponse warranty)
-    {
-        var parameters = new DialogParameters<CreateClaimDialog>();
-        parameters.Add(x => x.WarrantyId, warranty.Id);
-
-        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<CreateClaimDialog>("Tạo yêu cầu bảo hành", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
+        try
         {
-            await LoadWarranties();
-            Snackbar.Add("Đã tạo yêu cầu bảo hành", Severity.Success);
+            await WarrantyRequestService.ApproveAsync(id);
+            Snackbar.Add("Đã duyệt yêu cầu bảo hành", Severity.Success);
+            await LoadWarrantyRequests();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }
 
-    private bool CanCreateClaim(WarrantyResponse warranty)
+    private async Task Reject(int id)
     {
-        return warranty.Status == "Active" && warranty.EndDate > DateTime.UtcNow;
-    }
-
-    private static Color GetStatusColor(string status)
-    {
-        return status switch
+        try
         {
-            "Active" => Color.Success,
-            "Expired" => Color.Error,
-            "Void" => Color.Default,
-            _ => Color.Default
-        };
-    }
-
-    private static string GetStatusDisplay(string status)
-    {
-        return status switch
+            await WarrantyRequestService.RejectAsync(id, "Yêu cầu không được duyệt");
+            Snackbar.Add("Đã từ chối yêu cầu bảo hành", Severity.Success);
+            await LoadWarrantyRequests();
+            StateHasChanged();
+        }
+        catch (Exception ex)
         {
-            "Active" => "Còn hiệu lực",
-            "Expired" => "Hết hạn",
-            "Void" => "Vô hiệu",
-            _ => status
-        };
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
     }
 
-    private static Color GetExpiryColor(DateTime endDate)
+    private async Task ViewDetails(int id)
     {
-        var daysRemaining = (endDate - DateTime.UtcNow).Days;
-        if (daysRemaining < 0) return Color.Error;
-        if (daysRemaining < 30) return Color.Warning;
-        return Color.Success;
+        try
+        {
+            var warrantyRequest = await WarrantyRequestService.GetByIdAsync(id);
+            if (warrantyRequest == null)
+            {
+                Snackbar.Add("Không tìm thấy yêu cầu bảo hành", Severity.Error);
+                return;
+            }
+
+            var parameters = new DialogParameters<WarrantyRequestDetailDialog>
+            {
+                { x => x.WarrantyRequest, warrantyRequest }
+            };
+
+            await DialogService.ShowAsync<WarrantyRequestDetailDialog>("Chi tiết yêu cầu bảo hành", parameters);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
     }
 }

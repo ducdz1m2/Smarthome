@@ -37,6 +37,7 @@
     </ToolBarContent>
     <HeaderContent>
         <MudTh width="80px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh width="100px">Loại</MudTh>
         <MudTh width="150px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.OrderNumber)">Mã đơn</MudTableSortLabel></MudTh>
         <MudTh width="150px">Khách hàng</MudTh>
         <MudTh width="150px">Điện thoại</MudTh>
@@ -48,6 +49,12 @@
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Loại">
+            @if (context.HasUninstallBooking)
+            {
+                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Tháo dỡ</MudChip>
+            }
+        </MudTd>
         <MudTd DataLabel="Mã đơn">
             <MudText Typo="Typo.body2" Style="font-weight: 500;">@context.OrderNumber</MudText>
         </MudTd>

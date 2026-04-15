@@ -54,10 +54,12 @@ namespace Infrastructure
             services.AddScoped<Application.Interfaces.Repositories.IInstallationBookingRepository, InstallationBookingRepository>();
             services.AddScoped<ITechnicianProfileRepository, TechnicianProfileRepository>();
             services.AddScoped<IInstallationSlotRepository, InstallationSlotRepository>();
+            services.AddScoped<ITechnicianRatingRepository, TechnicianRatingRepository>();
 
             // Warranty repositories
             services.AddScoped<IWarrantyRepository, WarrantyRepository>();
             services.AddScoped<IWarrantyClaimRepository, WarrantyClaimRepository>();
+            services.AddScoped<IWarrantyRequestRepository, WarrantyRequestRepository>();
 
             // User Address repository
             services.AddScoped<IUserAddressRepository, UserAddressRepository>();
@@ -65,6 +67,7 @@ namespace Infrastructure
             // Return Order & Shipment repositories
             services.AddScoped<IReturnOrderRepository, ReturnOrderRepository>();
             services.AddScoped<IOrderShipmentRepository, OrderShipmentRepository>();
+            services.AddScoped<IOrderWarehouseAllocationRepository, OrderWarehouseAllocationRepository>();
 
             // Product Comment repository
             services.AddScoped<IProductCommentRepository, ProductCommentRepository>();

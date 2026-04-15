@@ -1,9 +1,12 @@
 @using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Application.Interfaces.Repositories
 @using Domain.Enums
 @inject IOrderService OrderService
 @inject ISnackbar Snackbar
+@inject IWarehouseService WarehouseService
+@inject IProductWarehouseRepository ProductWarehouseRepository
 
 <MudDialog>
     <DialogContent>
@@ -66,14 +69,35 @@
                                 <HeaderContent>
                                     <MudTh>Sản phẩm</MudTh>
                                     <MudTh>SKU</MudTh>
+                                    <MudTh>Phân loại</MudTh>
                                     <MudTh>Số lượng</MudTh>
                                     <MudTh>Đơn giá</MudTh>
                                     <MudTh>Thành tiền</MudTh>
                                     <MudTh>Cần lắp đặt</MudTh>
+                                    <MudTh>Kho</MudTh>
                                 </HeaderContent>
                                 <RowTemplate>
                                     <MudTd>@context.ProductName</MudTd>
-                                    <MudTd>@context.Sku</MudTd>
+                                    <MudTd>
+                                        @if (!string.IsNullOrEmpty(context.VariantSku))
+                                        {
+                                            @context.VariantSku
+                                        }
+                                        else
+                                        {
+                                            @context.Sku
+                                        }
+                                    </MudTd>
+                                    <MudTd>
+                                        @if (!string.IsNullOrEmpty(context.VariantName))
+                                        {
+                                            @context.VariantName
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">-</MudText>
+                                        }
+                                    </MudTd>
                                     <MudTd>@context.Quantity</MudTd>
                                     <MudTd>@context.UnitPrice.ToString("N0") đ</MudTd>
                                     <MudTd>@context.TotalPrice.ToString("N0") đ</MudTd>
@@ -81,6 +105,69 @@
                                         @if (context.RequiresInstallation)
                                         {
                                             <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" />
+                                        }
+                                        else
+                                        {
+                                            <MudText>-</MudText>
+                                        }
+                                    </MudTd>
+                                    <MudTd>
+                                        @if (_order.Status == "Pending" && !context.RequiresInstallation)
+                                        {
+                                            <div style="max-width: 400px;">
+                                                @if (_availableStockByWarehouse.ContainsKey(context.Id) && _availableStockByWarehouse[context.Id].Any())
+                                                {
+                                                    @foreach (var warehouse in _warehouses.Where(w => _availableStockByWarehouse[context.Id].ContainsKey(w.Id)))
+                                                    {
+                                                        var availableStock = _availableStockByWarehouse[context.Id][warehouse.Id];
+                                                        <div class="d-flex align-center mb-2 flex-wrap">
+                                                            <MudCheckBox Value="@_checkboxStates[context.Id][warehouse.Id]" 
+                                                                         Color="Color.Primary" Class="mr-2"
+                                                                         @onclick="() => ToggleWarehouse(context.Id, warehouse.Id)" />
+                                                            <div style="min-width: 150px;">
+                                                                <MudText Class="mr-2">@warehouse.Name</MudText>
+                                                                <MudText Typo="Typo.caption" Class="text-secondary">Có sẵn: @availableStock</MudText>
+                                                            </div>
+                                                            @if (_checkboxStates[context.Id][warehouse.Id])
+                                                            {
+                                                                var allocation = _warehouseAllocations[context.Id].FirstOrDefault(a => a.WarehouseId == warehouse.Id);
+                                                                if (allocation != null)
+                                                                {
+                                                                    <MudNumericField T="int" Variant="Variant.Outlined" Dense="true" 
+                                                                                   @bind-Value="@allocation.Quantity"
+                                                                                   Min="1" Max="@Math.Min(context.Quantity, availableStock)" Label="Số lượng" Class="ml-2" Style="min-width: 120px;" />
+                                                                }
+                                                            }
+                                                        </div>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <MudText Typo="Typo.body2" Color="Color.Warning">Không có kho nào có sẵn sản phẩm này</MudText>
+                                                }
+                                            </div>
+                                        }
+                                        else if (!context.RequiresInstallation)
+                                        {
+                                            <div style="max-width: 400px;">
+                                                @if (_warehouseAllocations.ContainsKey(context.Id) && _warehouseAllocations[context.Id].Any())
+                                                {
+                                                    @foreach (var allocation in _warehouseAllocations[context.Id])
+                                                    {
+                                                        var warehouse = _warehouses.FirstOrDefault(w => w.Id == allocation.WarehouseId);
+                                                        if (warehouse != null)
+                                                        {
+                                                            <div class="mb-2">
+                                                                <MudText>@warehouse.Name: <strong>@allocation.Quantity</strong> / @context.Quantity</MudText>
+                                                            </div>
+                                                        }
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Chưa phân bổ kho</MudText>
+                                                }
+                                            </div>
                                         }
                                         else
                                         {
@@ -214,10 +301,34 @@
 
     private OrderResponse? _order;
     private bool _loading = true;
+    private List<WarehouseResponse> _warehouses = new();
+    private Dictionary<int, List<WarehouseAllocationItem>> _warehouseAllocations = new();
+    private Dictionary<int, Dictionary<int, int>> _availableStockByWarehouse = new();
+    private Dictionary<int, Dictionary<int, bool>> _checkboxStates = new();
+
+    private class WarehouseAllocationItem
+    {
+        public int WarehouseId { get; set; }
+        public int Quantity { get; set; }
+        public int AvailableStock { get; set; }
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadWarehouses();
         await LoadOrder();
+    }
+
+    private async Task LoadWarehouses()
+    {
+        try
+        {
+            _warehouses = await WarehouseService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách kho: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task LoadOrder()
@@ -226,6 +337,66 @@
         try
         {
             _order = await OrderService.GetByIdAsync(OrderId);
+            
+            // Initialize warehouse allocations dictionary and load available warehouses
+            if (_order != null)
+            {
+                foreach (var item in _order.Items)
+                {
+                    if (!_warehouseAllocations.ContainsKey(item.Id))
+                    {
+                        _warehouseAllocations[item.Id] = new List<WarehouseAllocationItem>();
+                    }
+
+                    if (!_checkboxStates.ContainsKey(item.Id))
+                    {
+                        _checkboxStates[item.Id] = new Dictionary<int, bool>();
+                    }
+
+                    // Load available warehouses for this product variant
+                    var availableWarehouses = await ProductWarehouseRepository.GetAvailableWarehousesForProductVariantAsync(
+                        item.ProductId, 
+                        item.VariantId
+                    );
+
+                    if (!_availableStockByWarehouse.ContainsKey(item.Id))
+                    {
+                        _availableStockByWarehouse[item.Id] = new Dictionary<int, int>();
+                    }
+
+                    foreach (var warehouseStock in availableWarehouses)
+                    {
+                        _availableStockByWarehouse[item.Id][warehouseStock.WarehouseId] = warehouseStock.GetAvailableStock();
+                        _checkboxStates[item.Id][warehouseStock.WarehouseId] = false;
+                    }
+
+                    // If order is not Pending, load existing warehouse allocations for display
+                    if (_order.Status != "Pending" && !item.RequiresInstallation)
+                    {
+                        var allocations = await OrderService.GetWarehouseAllocationsAsync(OrderId);
+                        var itemAllocations = allocations.Where(a => a.OrderItemId == item.Id).ToList();
+                        
+                        // Remove duplicates by warehouse ID
+                        var uniqueAllocations = itemAllocations
+                            .GroupBy(a => a.WarehouseId)
+                            .Select(g => g.First())
+                            .ToList();
+                        
+                        foreach (var alloc in uniqueAllocations)
+                        {
+                            _warehouseAllocations[item.Id].Add(new WarehouseAllocationItem
+                            {
+                                WarehouseId = alloc.WarehouseId,
+                                Quantity = alloc.Quantity,
+                                AvailableStock = _availableStockByWarehouse.ContainsKey(item.Id) && 
+                                                   _availableStockByWarehouse[item.Id].ContainsKey(alloc.WarehouseId)
+                                                   ? _availableStockByWarehouse[item.Id][alloc.WarehouseId]
+                                                   : 0
+                            });
+                        }
+                    }
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -239,11 +410,64 @@
 
     private void Cancel() => MudDialog.Cancel();
 
+    private void ToggleWarehouse(int orderItemId, int warehouseId)
+    {
+        // Toggle checkbox state
+        if (_checkboxStates.ContainsKey(orderItemId) && _checkboxStates[orderItemId].ContainsKey(warehouseId))
+        {
+            var currentState = _checkboxStates[orderItemId][warehouseId];
+            _checkboxStates[orderItemId][warehouseId] = !currentState;
+            
+            if (!currentState)
+            {
+                // Create allocation
+                if (!_warehouseAllocations[orderItemId].Any(a => a.WarehouseId == warehouseId))
+                {
+                    var availableStock = _availableStockByWarehouse.ContainsKey(orderItemId) && 
+                                         _availableStockByWarehouse[orderItemId].ContainsKey(warehouseId)
+                                         ? _availableStockByWarehouse[orderItemId][warehouseId]
+                                         : 0;
+                    _warehouseAllocations[orderItemId].Add(new WarehouseAllocationItem 
+                    { 
+                        WarehouseId = warehouseId, 
+                        Quantity = 1,
+                        AvailableStock = availableStock
+                    });
+                }
+            }
+            else
+            {
+                // Remove allocation
+                _warehouseAllocations[orderItemId].RemoveAll(a => a.WarehouseId == warehouseId);
+            }
+        }
+
+        StateHasChanged();
+    }
+
     private async Task ConfirmOrder()
     {
         try
         {
-            await OrderService.ConfirmAsync(OrderId);
+            // Build warehouse allocation request
+            var warehouseAllocations = new List<WarehouseAllocationRequest>();
+            foreach (var item in _order.Items)
+            {
+                if (!item.RequiresInstallation && _warehouseAllocations.TryGetValue(item.Id, out var allocations))
+                {
+                    foreach (var allocation in allocations)
+                    {
+                        warehouseAllocations.Add(new WarehouseAllocationRequest
+                        {
+                            OrderItemId = item.Id,
+                            WarehouseId = allocation.WarehouseId,
+                            Quantity = allocation.Quantity
+                        });
+                    }
+                }
+            }
+
+            await OrderService.ConfirmAsync(OrderId, warehouseAllocations);
             Snackbar.Add("Đã xác nhận đơn hàng", Severity.Success);
             await LoadOrder();
             MudDialog.Close(DialogResult.Ok(true));

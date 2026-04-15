@@ -32,7 +32,7 @@ public class MixedOrderFlowTests
     }
 
     [Fact]
-    public void Order_Co_Ca_2_Loai_Khi_Confirm_Phai_Vao_Trang_Thai_AwaitingSchedule()
+    public void Order_Co_Ca_2_Loai_Khi_Confirm_Phai_Vao_Trang_Thai_Confirmed()
     {
         // Arrange
         var order = CreateMixedOrder();
@@ -40,8 +40,8 @@ public class MixedOrderFlowTests
         // Act
         order.Confirm();
 
-        // Assert - khi có cả 2 loại thì chờ lên lịch lắp đặt
-        order.Status.Should().Be(OrderStatus.AwaitingSchedule);
+        // Assert - khi có cả 2 loại thì chờ xử lý cả 2 luồng
+        order.Status.Should().Be(OrderStatus.Confirmed);
     }
 
     [Fact]
@@ -61,10 +61,134 @@ public class MixedOrderFlowTests
             slotId: 1,
             scheduledDate: DateTime.UtcNow.AddDays(3));
 
+        // Link booking to item
+        installItem.AssignInstallation(booking.Id);
+
         // Assert
         booking.Should().NotBeNull();
-        booking.OrderId.Should().Be(1); // Giả định order đã lưu với Id = 1
+        booking.OrderId.Should().Be(1);
         booking.Status.Should().Be(InstallationStatus.Assigned);
+        installItem.InstallationBookingId.Should().Be(booking.Id);
+    }
+
+    [Fact]
+    public void Order_Co_Nhieu_San_Pham_Can_Lap_Dat_Moi_Item_Co_Booking_Rieng()
+    {
+        // Arrange
+        var order = CreateTestOrder();
+        var installProduct1 = Product.Create("Camera", "CAM-001", Money.Vnd(3500000), 1, 1, requiresInstallation: true);
+        var installProduct2 = Product.Create("Smart Lock", "LOCK-001", Money.Vnd(2500000), 1, 1, requiresInstallation: true);
+
+        order.AddItem(installProduct1.Id, null, 1, Money.Vnd(3500000), true);
+        order.AddItem(installProduct2.Id, null, 2, Money.Vnd(2500000), true);
+        order.Confirm();
+
+        // Act - tạo installation booking cho từng sản phẩm cần lắp đặt
+        var installItems = order.Items.Where(i => i.RequiresInstallation).ToList();
+        
+        var booking1 = InstallationBooking.Create(
+            orderId: 1,
+            technicianId: 1,
+            slotId: 1,
+            scheduledDate: DateTime.UtcNow.AddDays(3));
+
+        var booking2 = InstallationBooking.Create(
+            orderId: 1,
+            technicianId: 2,
+            slotId: 2,
+            scheduledDate: DateTime.UtcNow.AddDays(4));
+
+        // Link bookings to items
+        installItems[0].AssignInstallation(booking1.Id);
+        installItems[1].AssignInstallation(booking2.Id);
+
+        // Assert
+        installItems.Should().HaveCount(2);
+        installItems[0].InstallationBookingId.Should().Be(booking1.Id);
+        installItems[1].InstallationBookingId.Should().Be(booking2.Id);
+        booking1.Id.Should().NotBe(booking2.Id); // Each item has different booking
+    }
+
+    [Fact]
+    public void Order_Mixed_Co_The_Bat_Dau_Lu_Song_Shipping()
+    {
+        // Arrange
+        var order = CreateMixedOrder();
+        order.Confirm();
+
+        // Act
+        order.StartShippingFlow();
+
+        // Assert
+        order.Status.Should().Be(OrderStatus.AwaitingPickup);
+    }
+
+    [Fact]
+    public void Order_Mixed_Co_The_Bat_Dau_Lu_Song_Installation()
+    {
+        // Arrange
+        var order = CreateMixedOrder();
+        order.Confirm();
+
+        // Act
+        order.StartInstallationFlow();
+
+        // Assert
+        order.Status.Should().Be(OrderStatus.AwaitingSchedule);
+    }
+
+    [Fact]
+    public void Order_Chi_Complete_Khi_Ca_2_Lu_Deu_Xong()
+    {
+        // Arrange
+        var order = CreateMixedOrder();
+        order.Confirm();
+        order.StartShippingFlow();
+        order.StartInstallationFlow();
+
+        var normalItem = order.Items.First(i => !i.RequiresInstallation);
+        var installItem = order.Items.First(i => i.RequiresInstallation);
+
+        // Act 1 - Chỉ ship xong, chưa lắp
+        normalItem.MarkAsShipped();
+        order.MarkItemShipped(normalItem.Id);
+
+        // Assert 1 - Chưa complete vì còn lắp đặt
+        order.Status.Should().NotBe(OrderStatus.Completed);
+
+        // Act 2 - Lắp xong
+        installItem.MarkAsInstalled();
+        order.MarkItemInstalled(installItem.Id);
+
+        // Assert 2 - Giờ mới complete
+        order.Status.Should().Be(OrderStatus.Completed);
+    }
+
+    [Fact]
+    public void Order_Chi_Complete_Khi_Ca_2_Lu_Deu_Xong_Nguoc_Lai()
+    {
+        // Arrange
+        var order = CreateMixedOrder();
+        order.Confirm();
+        order.StartShippingFlow();
+        order.StartInstallationFlow();
+
+        var normalItem = order.Items.First(i => !i.RequiresInstallation);
+        var installItem = order.Items.First(i => i.RequiresInstallation);
+
+        // Act 1 - Chỉ lắp xong, chưa ship
+        installItem.MarkAsInstalled();
+        order.MarkItemInstalled(installItem.Id);
+
+        // Assert 1 - Chưa complete vì còn giao hàng
+        order.Status.Should().NotBe(OrderStatus.Completed);
+
+        // Act 2 - Ship xong
+        normalItem.MarkAsShipped();
+        order.MarkItemShipped(normalItem.Id);
+
+        // Assert 2 - Giờ mới complete
+        order.Status.Should().Be(OrderStatus.Completed);
     }
 
     [Fact]

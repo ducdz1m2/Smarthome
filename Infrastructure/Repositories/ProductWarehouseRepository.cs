@@ -26,7 +26,15 @@ namespace Infrastructure.Repositories
         public async Task<ProductWarehouse?> GetByProductAndWarehouseAsync(int productId, int warehouseId)
         {
             return await _context.ProductWarehouses
+                .AsNoTracking()
                 .FirstOrDefaultAsync(pw => pw.ProductId == productId && pw.WarehouseId == warehouseId);
+        }
+
+        public async Task<ProductWarehouse?> GetByProductVariantAndWarehouseAsync(int productId, int? variantId, int warehouseId)
+        {
+            return await _context.ProductWarehouses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(pw => pw.ProductId == productId && pw.VariantId == variantId && pw.WarehouseId == warehouseId);
         }
 
         public async Task<List<ProductWarehouse>> GetByProductAsync(int productId)
@@ -59,6 +67,35 @@ namespace Infrastructure.Repositories
             return await _context.ProductWarehouses
                 .AsNoTracking()
                 .Where(pw => productIds.Contains(pw.ProductId))
+                .Include(pw => pw.Warehouse)
+                .ToListAsync();
+        }
+
+        public async Task<List<ProductWarehouse>> GetAvailableWarehousesForProductAsync(int productId)
+        {
+            return await _context.ProductWarehouses
+                .AsNoTracking()
+                .Where(pw => pw.ProductId == productId && pw.Quantity > pw.ReservedQuantity)
+                .Include(pw => pw.Warehouse)
+                .ToListAsync();
+        }
+
+        public async Task<List<ProductWarehouse>> GetAvailableWarehousesForProductVariantAsync(int productId, int? variantId)
+        {
+            var query = _context.ProductWarehouses
+                .AsNoTracking()
+                .Where(pw => pw.ProductId == productId && pw.Quantity > pw.ReservedQuantity);
+
+            if (variantId.HasValue)
+            {
+                query = query.Where(pw => pw.VariantId == variantId.Value);
+            }
+            else
+            {
+                query = query.Where(pw => pw.VariantId == null);
+            }
+
+            return await query
                 .Include(pw => pw.Warehouse)
                 .ToListAsync();
         }

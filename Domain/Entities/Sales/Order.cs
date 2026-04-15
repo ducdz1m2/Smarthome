@@ -129,12 +129,14 @@ public class Order : AggregateRoot
             var hasInstallItems = Items.Any(i => i.RequiresInstallation);
             var hasShipItems = Items.Any(i => !i.RequiresInstallation);
 
+            // For mixed orders, we need to track both flows separately
+            // Set status to indicate both flows are active
             if (hasInstallItems && hasShipItems)
-                Status = OrderStatus.AwaitingSchedule;
+                Status = OrderStatus.Confirmed; // Both flows need to be processed
             else if (hasInstallItems)
-                Status = OrderStatus.AwaitingSchedule;
+                Status = OrderStatus.AwaitingSchedule; // Only installation flow
             else
-                Status = OrderStatus.AwaitingPickup;
+                Status = OrderStatus.AwaitingPickup; // Only shipping flow
 
             AddStatusHistory(Status, "Đơn hàng đã được xác nhận");
             AddDomainEvent(new OrderConfirmedEvent(Id, UserId, DateTime.UtcNow));
@@ -173,6 +175,34 @@ public class Order : AggregateRoot
 
             item.MarkAsInstalled();
             UpdateOverallStatus();
+        }
+
+        public void StartShippingFlow()
+        {
+            // Allow starting shipping flow from Confirmed, AwaitingPickup, or AwaitingSchedule (for mixed orders)
+            if (Status != OrderStatus.Confirmed && Status != OrderStatus.AwaitingPickup && Status != OrderStatus.AwaitingSchedule)
+                throw new InvalidOrderStateException(Status.ToString(), "bắt đầu luồng giao hàng");
+
+            var hasShipItems = Items.Any(i => !i.RequiresInstallation);
+            if (!hasShipItems)
+                throw new BusinessRuleViolationException("NoShipItems", "Không có sản phẩm cần giao hàng");
+
+            Status = OrderStatus.AwaitingPickup;
+            AddStatusHistory(Status, "Bắt đầu luồng giao hàng");
+        }
+
+        public void StartInstallationFlow()
+        {
+            // Allow starting installation flow from Confirmed, AwaitingSchedule, or AwaitingPickup (for mixed orders)
+            if (Status != OrderStatus.Confirmed && Status != OrderStatus.AwaitingSchedule && Status != OrderStatus.AwaitingPickup)
+                throw new InvalidOrderStateException(Status.ToString(), "bắt đầu luồng lắp đặt");
+
+            var hasInstallItems = Items.Any(i => i.RequiresInstallation);
+            if (!hasInstallItems)
+                throw new BusinessRuleViolationException("NoInstallItems", "Không có sản phẩm cần lắp đặt");
+
+            Status = OrderStatus.AwaitingSchedule;
+            AddStatusHistory(Status, "Bắt đầu luồng lắp đặt");
         }
 
         public void Complete()
@@ -245,17 +275,29 @@ public class Order : AggregateRoot
 
         private void UpdateOverallStatus()
         {
-            var allShipped = Items.Where(i => !i.RequiresInstallation).All(i => i.IsShipped);
-            var allInstalled = Items.Where(i => i.RequiresInstallation).All(i => i.IsInstalled);
+            var shipItems = Items.Where(i => !i.RequiresInstallation).ToList();
+            var installItems = Items.Where(i => i.RequiresInstallation).ToList();
 
-            if (allShipped && allInstalled)
+            var allShipped = shipItems.Any() && shipItems.All(i => i.IsShipped);
+            var allInstalled = installItems.Any() && installItems.All(i => i.IsInstalled);
+            var noShipItems = !shipItems.Any();
+            var noInstallItems = !installItems.Any();
+
+            // Order completes only when both flows are done (or only one flow exists and it's done)
+            if ((allShipped || noShipItems) && (allInstalled || noInstallItems))
             {
                 Status = OrderStatus.Completed;
                 AddDomainEvent(new OrderCompletedEvent(Id, DateTime.UtcNow));
             }
-            else if (allShipped && Items.Any(i => i.RequiresInstallation && !i.IsInstalled))
+            // If shipping is done but installation is still pending
+            else if ((allShipped || noShipItems) && installItems.Any(i => !i.IsInstalled))
             {
                 Status = OrderStatus.Installing;
+            }
+            // If installation is done but shipping is still pending
+            else if ((allInstalled || noInstallItems) && shipItems.Any(i => !i.IsShipped))
+            {
+                Status = OrderStatus.AwaitingPickup;
             }
         }
 

@@ -19,4 +19,12 @@ public interface IShipmentService
     Task MarkPickedUpAsync(int id);
     Task MarkDeliveredAsync(int id);
     Task DeleteAsync(int id);
+    
+    // Admin approval methods
+    Task ApproveShipmentAsync(int shipmentId, int approvedBy);
+    Task RejectShipmentAsync(int shipmentId, string reason);
+    
+    // Shipper assignment methods
+    Task AssignShipperAsync(int shipmentId, int shipperId);
+    Task AutoAssignShipmentAsync(int shipmentId, int shipperId);
 }

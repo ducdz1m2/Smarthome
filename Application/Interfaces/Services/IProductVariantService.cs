@@ -14,5 +14,6 @@ namespace Application.Interfaces.Services
         Task<bool> ActivateAsync(int id);
         Task<bool> DeactivateAsync(int id);
         Task AddStockAsync(int id, int quantity);
+        Task UpdateStockQuantityAsync(int id, int quantity);
     }
 }

@@ -11,6 +11,7 @@ using Domain.Exceptions;
 public class ProductWarehouse : Entity
 {
         public int ProductId { get; private set; }
+        public int? VariantId { get; private set; }
         public int WarehouseId { get; private set; }
         public int Quantity { get; private set; }
         public int ReservedQuantity { get; private set; }
@@ -30,6 +31,24 @@ public class ProductWarehouse : Entity
             return new ProductWarehouse
             {
                 ProductId = productId,
+                WarehouseId = warehouseId,
+                Quantity = initialQuantity,
+                ReservedQuantity = 0
+            };
+        }
+
+        public static ProductWarehouse Create(int productId, int? variantId, int warehouseId, int initialQuantity = 0)
+        {
+            if (productId <= 0)
+                throw new ValidationException(nameof(productId), "ProductId không hợp lệ");
+
+            if (warehouseId <= 0)
+                throw new ValidationException(nameof(warehouseId), "WarehouseId không hợp lệ");
+
+            return new ProductWarehouse
+            {
+                ProductId = productId,
+                VariantId = variantId,
                 WarehouseId = warehouseId,
                 Quantity = initialQuantity,
                 ReservedQuantity = 0

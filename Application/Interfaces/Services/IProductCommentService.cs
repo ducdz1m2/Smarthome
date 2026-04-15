@@ -16,6 +16,7 @@ namespace Application.Interfaces.Services
         Task<int> CountPendingAsync();
         Task<ProductCommentResponse> CreateAsync(CreateProductCommentRequest request);
         Task<ProductCommentResponse> AddReplyAsync(int parentCommentId, int userId, int orderId, string content, int rating, bool isVerifiedPurchase = false);
+        Task<ProductCommentResponse> UpdateAsync(int id, CreateProductCommentRequest request);
         Task ApproveAsync(int id);
         Task RejectAsync(int id);
         Task DeleteAsync(int id);

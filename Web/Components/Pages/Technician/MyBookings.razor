@@ -9,29 +9,25 @@
 @inject IDialogService DialogService
 @inject IAuthService AuthService
 
-<MudText Typo="Typo.h4" Class="mb-4">Lịch lắp đặt của tôi</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">Lịch công việc của tôi</MudText>
 
 <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
-    <MudTabPanel Text="Tất cả" Icon="@Icons.Material.Filled.CalendarMonth">
-        @RenderBookingTable(_allBookings)
+    <MudTabPanel Text="Lắp đặt" Icon="@Icons.Material.Filled.Build">
+        @RenderBookingTable(_installationBookings, "installation")
     </MudTabPanel>
-    <MudTabPanel Text="Chờ xác nhận" Icon="@Icons.Material.Filled.Pending">
-        @RenderBookingTable(_pendingBookings)
+    <MudTabPanel Text="Bảo hành" Icon="@Icons.Material.Filled.Handyman">
+        @RenderBookingTable(_warrantyBookings, "warranty")
     </MudTabPanel>
-    <MudTabPanel Text="Sắp tới" Icon="@Icons.Material.Filled.Event">
-        @RenderBookingTable(_upcomingBookings)
-    </MudTabPanel>
-    <MudTabPanel Text="Hoàn thành" Icon="@Icons.Material.Filled.CheckCircle">
-        @RenderBookingTable(_completedBookings)
+    <MudTabPanel Text="Tháo dỡ" Icon="@Icons.Material.Filled.Delete">
+        @RenderBookingTable(_uninstallBookings, "uninstall")
     </MudTabPanel>
 </MudTabs>
 
 @code {
     private List<InstallationBookingListResponse> _allBookings = new();
-    private List<InstallationBookingListResponse> _pendingBookings = new();
-    private List<InstallationBookingListResponse> _upcomingBookings = new();
-    private List<InstallationBookingListResponse> _completedBookings = new();
-    private bool _loading = true;
+    private List<InstallationBookingListResponse> _installationBookings = new();
+    private List<InstallationBookingListResponse> _warrantyBookings = new();
+    private List<InstallationBookingListResponse> _uninstallBookings = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -42,34 +38,24 @@
     {
         try
         {
-            _loading = true;
             var technicianId = await GetCurrentTechnicianId();
             if (technicianId == 0) return;
 
             Console.WriteLine($"[LoadBookings] Loading bookings for technician ID: {technicianId}");
             _allBookings = await InstallationService.GetByTechnicianAsync(technicianId);
             Console.WriteLine($"[LoadBookings] Loaded {_allBookings.Count} bookings");
-            
-            foreach (var booking in _allBookings)
-            {
-                Console.WriteLine($"[LoadBookings] Booking ID: {booking.Id}, OrderNumber: {booking.OrderNumber}, Status: {booking.Status}, ScheduledDate: {booking.ScheduledDate}");
-            }
-            
-            var today = DateTime.Today;
-            _pendingBookings = _allBookings.Where(b => b.Status == "Assigned").ToList();
-            _upcomingBookings = _allBookings.Where(b => b.ScheduledDate >= today && b.Status != "Completed" && b.Status != "Cancelled" && b.Status != "Assigned").ToList();
-            _completedBookings = _allBookings.Where(b => b.Status == "Completed").ToList();
-            
-            Console.WriteLine($"[LoadBookings] Pending: {_pendingBookings.Count}, Upcoming: {_upcomingBookings.Count}, Completed: {_completedBookings.Count}");
+
+            // Filter by type
+            _installationBookings = _allBookings.Where(b => !b.IsWarranty && !b.IsUninstall).ToList();
+            _warrantyBookings = _allBookings.Where(b => b.IsWarranty).ToList();
+            _uninstallBookings = _allBookings.Where(b => b.IsUninstall).ToList();
+
+            Console.WriteLine($"[LoadBookings] Installation: {_installationBookings.Count}, Warranty: {_warrantyBookings.Count}, Uninstall: {_uninstallBookings.Count}");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[LoadBookings] Error: {ex.Message}");
             Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _loading = false;
         }
     }
 
@@ -81,12 +67,12 @@
         return technicianId ?? 0;
     }
 
-    private RenderFragment RenderBookingTable(List<InstallationBookingListResponse> bookings)
+    private RenderFragment RenderBookingTable(List<InstallationBookingListResponse> bookings, string bookingType)
     {
         return @<text>
             @if (!bookings.Any())
             {
-                <MudAlert Severity="Severity.Info" Class="my-4">Không có lịch nào.</MudAlert>
+                <MudAlert Severity="Severity.Info" Class="my-4">Không có lịch @(bookingType == "installation" ? "lắp đặt" : bookingType == "warranty" ? "bảo hành" : "tháo dỡ") nào.</MudAlert>
             }
             else
             {
@@ -94,7 +80,7 @@
                     <HeaderContent>
                         <MudTh>Mã đơn</MudTh>
                         <MudTh>Khách hàng</MudTh>
-                        <MudTh>Ngày lắp</MudTh>
+                        <MudTh>Ngày làm</MudTh>
                         <MudTh>Khung giờ</MudTh>
                         <MudTh>Trạng thái</MudTh>
                         <MudTh>Thao tác</MudTh>
@@ -108,7 +94,10 @@
                         <MudTd>@context.ScheduledDate.Date.ToString("dd/MM/yyyy")</MudTd>
                         <MudTd>@context.StartTime?.ToString("hh\\:mm") - @context.EndTime?.ToString("hh\\:mm")</MudTd>
                         <MudTd>
-                            <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status)">@GetStatusText(context.Status)</MudChip>
+                            @{
+                                var isUninstall = bookingType == "uninstall";
+                            }
+                            <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status, isUninstall)">@GetStatusText(context.Status, isUninstall)</MudChip>
                         </MudTd>
                         <MudTd>
                             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
@@ -126,7 +115,7 @@
                             @if (context.Status == "OnTheWay")
                             {
                                 <MudButton Variant="Variant.Filled" Color="Color.Secondary" Size="Size.Small" Class="ml-2"
-                                           OnClick="() => StartInstallation(context.Id)">Bắt đầu lắp</MudButton>
+                                           OnClick="() => StartInstallation(context.Id)">Bắt đầu làm</MudButton>
                             }
                             @if (context.Status == "Installing")
                             {
@@ -188,7 +177,7 @@
 
     private async Task CompleteBooking(int bookingId)
     {
-        Console.WriteLine($"[CompleteBooking] METHOD CALLED for booking ID: {bookingId}");
+        Console.WriteLine($"[CompleteBooking] ========== METHOD CALLED for booking ID: {bookingId} ==========");
         try
         {
             Console.WriteLine($"[CompleteBooking] Starting complete for booking ID: {bookingId}");
@@ -198,8 +187,9 @@
                 CustomerRating = 5,
                 Notes = ""
             };
+            Console.WriteLine($"[CompleteBooking] About to call InstallationService.CompleteAsync");
             await InstallationService.CompleteAsync(bookingId, completeRequest);
-            Console.WriteLine($"[CompleteBooking] CompleteAsync finished successfully");
+            Console.WriteLine($"[CompleteBooking] InstallationService.CompleteAsync finished successfully");
             Snackbar.Add("Đã hoàn thành lắp đặt", Severity.Success);
             await LoadBookings();
             Console.WriteLine($"[CompleteBooking] LoadBookings finished");
@@ -209,30 +199,59 @@
         catch (Exception ex)
         {
             Console.WriteLine($"[CompleteBooking] Error: {ex.Message}");
+            Console.WriteLine($"[CompleteBooking] Stack trace: {ex.StackTrace}");
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }
 
-    private static Color GetStatusColor(string status)
+    private static Color GetStatusColor(string status, bool isUninstall)
     {
+        if (isUninstall)
+        {
+            return status switch
+            {
+                "Assigned" => Color.Warning,
+                "Preparing" => Color.Warning,
+                "OnTheWay" => Color.Warning,
+                "Installing" => Color.Warning,
+                "Completed" => Color.Success,
+                "Cancelled" => Color.Error,
+                _ => Color.Default
+            };
+        }
+
         return status switch
         {
-            "Assigned" => Color.Warning,
-            "Preparing" => Color.Info,
-            "OnTheWay" => Color.Primary,
-            "Installing" => Color.Secondary,
+            "Assigned" => Color.Info,
+            "Preparing" => Color.Primary,
+            "OnTheWay" => Color.Secondary,
+            "Installing" => Color.Tertiary,
             "Completed" => Color.Success,
             "Cancelled" => Color.Error,
             _ => Color.Default
         };
     }
 
-    private static string GetStatusText(string status)
+    private static string GetStatusText(string status, bool isUninstall)
     {
+        if (isUninstall)
+        {
+            return status switch
+            {
+                "Assigned" => "Chờ KT tháo",
+                "Preparing" => "KT chuẩn bị tháo",
+                "OnTheWay" => "Đang đi tháo",
+                "Installing" => "Đang tháo",
+                "Completed" => "Đã tháo xong",
+                "Cancelled" => "Đã hủy tháo",
+                _ => status
+            };
+        }
+
         return status switch
         {
             "Assigned" => "Chờ xác nhận",
-            "Preparing" => "Chuẩn bị",
+            "Preparing" => "Đang chuẩn bị",
             "OnTheWay" => "Đang đi",
             "Installing" => "Đang lắp",
             "Completed" => "Hoàn thành",

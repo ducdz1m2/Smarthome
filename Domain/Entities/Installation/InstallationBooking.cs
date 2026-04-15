@@ -23,6 +23,8 @@ public class InstallationBooking : AggregateRoot
         public int? CustomerRating { get; private set; }
         public string? CustomerSignature { get; private set; }
         public string? Notes { get; private set; }
+        public bool IsUninstall { get; private set; } = false;
+        public bool IsWarranty { get; private set; } = false;
 
         public virtual Entities.Sales.Order Order { get; private set; } = null!;
         public virtual TechnicianProfile Technician { get; private set; } = null!;
@@ -62,10 +64,10 @@ public class InstallationBooking : AggregateRoot
 
         public void StartPreparation()
         {
-            if (Status != InstallationStatus.TechnicianAssigned)
-                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể chuẩn bị sau khi đã phân công");
+            if (Status != InstallationStatus.Preparing)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể chuẩn bị sau khi đã tiếp nhận");
 
-            Status = InstallationStatus.Preparing;
+            // Status is already Preparing from Accept(), just mark materials as prepared
             MaterialsPrepared = true;
         }
 
@@ -149,5 +151,15 @@ public class InstallationBooking : AggregateRoot
         {
             var material = InstallationMaterial.Create(Id, productId, quantityTaken);
             Materials.Add(material);
+        }
+
+        public void SetIsUninstall(bool isUninstall)
+        {
+            IsUninstall = isUninstall;
+        }
+
+        public void SetIsWarranty(bool isWarranty)
+        {
+            IsWarranty = isWarranty;
         }
     }

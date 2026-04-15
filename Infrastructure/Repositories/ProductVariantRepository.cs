@@ -38,6 +38,16 @@ namespace Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<ProductVariant>> GetByProductIdsAsync(List<int> productIds)
+        {
+            return await _context.ProductVariants
+                .AsNoTracking()
+                .Where(v => productIds.Contains(v.ProductId))
+                .OrderBy(v => v.ProductId)
+                .ThenBy(v => v.Id)
+                .ToListAsync();
+        }
+
         public async Task<bool> ExistsAsync(string sku, int? excludeId = null)
         {
             var skuValue = Domain.ValueObjects.Sku.Create(sku.ToUpper());

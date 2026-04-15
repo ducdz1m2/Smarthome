@@ -136,12 +136,10 @@ else
                                        SelectionMode="SelectionMode.SingleSelection">
                                 @foreach (var variant in _product.Variants.Where(v => v.IsActive))
                                 {
-                                    var isDisabled = variant.StockQuantity <= 0;
                                     <MudChip T="ProductVariantResponse" 
                                             Value="@variant"
                                             Text="@GetVariantDisplayText(variant)"
-                                            Color="Color.Primary"
-                                            Disabled="@isDisabled"/>
+                                            Color="Color.Primary"/>
                                 }
                             </MudChipSet>
                             @if (_selectedVariant != null)
@@ -609,10 +607,10 @@ else
                           ?? "";
 
             // Check if item already exists in cart
-            var existingItem = cartItems.FirstOrDefault(i => 
-                i.ProductId == ProductId && 
-                ((_selectedVariant == null && string.IsNullOrEmpty(i.VariantName)) || 
-                 (_selectedVariant != null && i.VariantName == GetVariantDisplayText(_selectedVariant))));
+            var existingItem = cartItems.FirstOrDefault(i =>
+                i.ProductId == ProductId &&
+                ((_selectedVariant == null && string.IsNullOrEmpty(i.VariantName)) ||
+                 (_selectedVariant != null && i.VariantId == _selectedVariant.Id)));
 
             if (existingItem != null)
             {
@@ -625,7 +623,9 @@ else
                     Id = cartItems.Count > 0 ? cartItems.Max(i => i.Id) + 1 : 1,
                     ProductId = ProductId,
                     ProductName = productName,
+                    VariantId = _selectedVariant?.Id,
                     VariantName = _selectedVariant != null ? GetVariantDisplayText(_selectedVariant) : null,
+                    VariantSku = _selectedVariant?.Sku,
                     ImageUrl = imageUrl,
                     UnitPrice = price,
                     Quantity = _quantity,
@@ -651,7 +651,9 @@ else
         public int Id { get; set; }
         public int ProductId { get; set; }
         public string ProductName { get; set; } = "";
+        public int? VariantId { get; set; }
         public string? VariantName { get; set; }
+        public string? VariantSku { get; set; }
         public string? ImageUrl { get; set; }
         public decimal UnitPrice { get; set; }
         public int Quantity { get; set; }

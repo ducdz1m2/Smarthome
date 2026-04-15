@@ -3,18 +3,16 @@
 
 <MudNavMenu>
     <MudNavLink Href="/technician" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Tổng quan</MudNavLink>
-    
-    <MudNavGroup Title="Lịch lắp đặt" Expanded="true" Icon="@Icons.Material.Filled.EventNote">
-        <MudNavLink Href="/technician/bookings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CalendarMonth">Lịch của tôi</MudNavLink>
-        <MudNavLink Href="/technician/bookings?status=pending" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Pending">Chờ xác nhận</MudNavLink>
+
+    <MudNavGroup Title="Lịch công việc" Expanded="true" Icon="@Icons.Material.Filled.EventNote">
+        <MudNavLink Href="/technician/bookings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CalendarMonth">Tất cả</MudNavLink>
+        <MudNavLink Href="/technician/bookings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Build">Lắp đặt</MudNavLink>
+        <MudNavLink Href="/technician/bookings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Handyman">Bảo hành</MudNavLink>
+        <MudNavLink Href="/technician/bookings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Delete">Tháo dỡ</MudNavLink>
     </MudNavGroup>
-    
-    <MudNavGroup Title="Bảo hành" Icon="@Icons.Material.Filled.Security">
-        <MudNavLink Href="/technician/warranty-claims" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Build">Yêu cầu BH</MudNavLink>
-    </MudNavGroup>
-    
+
     <MudDivider Class="my-2" />
-    
+
     <MudNavLink OnClick="Logout" Icon="@Icons.Material.Filled.Logout" Color="Color.Error">Đăng xuất</MudNavLink>
 </MudNavMenu>
 

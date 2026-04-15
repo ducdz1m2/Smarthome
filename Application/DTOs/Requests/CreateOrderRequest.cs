@@ -21,5 +21,13 @@
         public int Quantity { get; set; }
         public int? VariantId { get; set; }
         public bool RequiresInstallation { get; set; }
+        public List<WarehouseAllocationRequest> WarehouseAllocations { get; set; } = new();
+    }
+
+    public class WarehouseAllocationRequest
+    {
+        public int OrderItemId { get; set; }
+        public int WarehouseId { get; set; }
+        public int Quantity { get; set; }
     }
 }

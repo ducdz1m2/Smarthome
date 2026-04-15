@@ -41,6 +41,7 @@
     </ToolBarContent>
     <HeaderContent>
         <MudTh>ID</MudTh>
+        <MudTh>Loại</MudTh>
         <MudTh>Đơn hàng</MudTh>
         <MudTh>Kỹ thuật viên</MudTh>
         <MudTh><MudTableSortLabel T="InstallationBookingListResponse" SortBy="@(b => b.ScheduledDate)">Ngày lắp</MudTableSortLabel></MudTh>
@@ -51,6 +52,16 @@
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Loại">
+            @if (context.IsUninstall)
+            {
+                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Tháo dỡ</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Primary" Size="Size.Small">Lắp đặt</MudChip>
+            }
+        </MudTd>
         <MudTd DataLabel="Đơn hàng">#@context.OrderId</MudTd>
         <MudTd DataLabel="Kỹ thuật viên">@(context.TechnicianName ?? "Chưa phân công")</MudTd>
         <MudTd DataLabel="Ngày lắp">@context.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
@@ -65,8 +76,8 @@
             }
         </MudTd>
         <MudTd DataLabel="Trạng thái">
-            <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">
-                @GetStatusText(context.Status)
+            <MudChip T="string" Color="@GetStatusColor(context.Status, context.IsUninstall)" Size="Size.Small">
+                @GetStatusText(context.Status, context.IsUninstall)
             </MudChip>
         </MudTd>
         <MudTd DataLabel="Đánh giá">
@@ -196,14 +207,28 @@
         }
     }
 
-    private static Color GetStatusColor(string status)
+    private static Color GetStatusColor(string status, bool isUninstall)
     {
+        if (isUninstall)
+        {
+            return status switch
+            {
+                "Assigned" => Color.Warning,
+                "Preparing" => Color.Warning,
+                "OnTheWay" => Color.Warning,
+                "Installing" => Color.Warning,
+                "Completed" => Color.Success,
+                "Cancelled" => Color.Error,
+                _ => Color.Default
+            };
+        }
+
         return status switch
         {
-            "Assigned" => Color.Warning,
-            "Preparing" => Color.Info,
-            "OnTheWay" => Color.Primary,
-            "Installing" => Color.Secondary,
+            "Assigned" => Color.Info,
+            "Preparing" => Color.Primary,
+            "OnTheWay" => Color.Secondary,
+            "Installing" => Color.Tertiary,
             "Completed" => Color.Success,
             "Cancelled" => Color.Error,
             // Legacy statuses
@@ -213,8 +238,22 @@
         };
     }
 
-    private static string GetStatusText(string status)
+    private static string GetStatusText(string status, bool isUninstall)
     {
+        if (isUninstall)
+        {
+            return status switch
+            {
+                "Assigned" => "Chờ KT tháo",
+                "Preparing" => "KT chuẩn bị tháo",
+                "OnTheWay" => "Đang đi tháo",
+                "Installing" => "Đang tháo",
+                "Completed" => "Đã tháo xong",
+                "Cancelled" => "Đã hủy tháo",
+                _ => status
+            };
+        }
+
         return status switch
         {
             "Assigned" => "Chờ KT xác nhận",

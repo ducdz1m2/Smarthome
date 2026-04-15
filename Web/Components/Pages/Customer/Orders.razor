@@ -5,6 +5,8 @@
 @using Domain.Enums
 
 @inject IOrderService OrderService
+@inject IReturnOrderService ReturnOrderService
+@inject IWarrantyRequestService WarrantyRequestService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
@@ -60,8 +62,8 @@
                                             @order.CreatedAt.ToString("dd/MM/yyyy HH:mm")
                                         </MudText>
                                     </div>
-                                    <MudChip T="string" Color="@GetStatusColor(order.Status)" Size="Size.Small">
-                                        @GetStatusText(order.Status)
+                                    <MudChip T="string" Color="@GetStatusColor(order.Status, _returnOrders.ContainsKey(order.Id) ? _returnOrders[order.Id] : null, _warrantyRequests.ContainsKey(order.Id) ? _warrantyRequests[order.Id] : null)" Size="Size.Small">
+                                        @GetStatusText(order.Status, _returnOrders.ContainsKey(order.Id) ? _returnOrders[order.Id] : null, _warrantyRequests.ContainsKey(order.Id) ? _warrantyRequests[order.Id] : null)
                                     </MudChip>
                                 </div>
                             </CardHeaderContent>
@@ -75,7 +77,12 @@
                                     @foreach (var item in order.Items.Take(2))
                                     {
                                         <MudText Typo="Typo.body2" Class="text-truncate">
-                                            @item.ProductName x @item.Quantity
+                                            @item.ProductName
+                                            @if (!string.IsNullOrEmpty(item.VariantName))
+                                            {
+                                                <span> (@item.VariantName)</span>
+                                            }
+                                            x @item.Quantity
                                         </MudText>
                                     }
                                     @if (order.Items.Count > 2)
@@ -123,6 +130,8 @@
 @code {
     private List<OrderResponse> _orders = new();
     private bool _isLoading = true;
+    private Dictionary<int, ReturnOrderResponse?> _returnOrders = new();
+    private Dictionary<int, WarrantyRequestResponse?> _warrantyRequests = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -141,6 +150,21 @@
             // For now, get all orders (should filter by current user)
             var allOrders = await OrderService.GetAllAsync();
             _orders = allOrders;
+
+            // Load return orders for each order
+            foreach (var order in _orders)
+            {
+                var returnOrders = await ReturnOrderService.GetByOrderIdAsync(order.Id);
+                // Get the most recent return order (not rejected if possible)
+                var nonRejected = returnOrders.FirstOrDefault(r => r.Status != "Rejected");
+                _returnOrders[order.Id] = nonRejected ?? returnOrders.OrderByDescending(r => r.CreatedAt).FirstOrDefault();
+
+                // Load warranty requests for each order
+                var warrantyRequests = await WarrantyRequestService.GetByOrderIdAsync(order.Id);
+                // Get the most recent warranty request (not rejected if possible)
+                var nonRejectedWarranty = warrantyRequests.FirstOrDefault(w => w.Status != "Rejected");
+                _warrantyRequests[order.Id] = nonRejectedWarranty ?? warrantyRequests.OrderByDescending(w => w.CreatedAt).FirstOrDefault();
+            }
         }
         catch (Exception ex)
         {
@@ -169,9 +193,37 @@
         await dialog.Result;
     }
 
-    private static Color GetStatusColor(string status)
+    private static Color GetStatusColor(string orderStatus, ReturnOrderResponse? returnOrder, WarrantyRequestResponse? warrantyRequest)
     {
-        return status switch
+        // If there's an active warranty request, show warranty status color
+        if (warrantyRequest != null && warrantyRequest.Status != "Completed")
+        {
+            return warrantyRequest.Status switch
+            {
+                "Pending" => Color.Warning,
+                "Approved" => Color.Success,
+                "Rejected" => Color.Error,
+                "InProgress" => Color.Info,
+                "Completed" => Color.Primary,
+                _ => Color.Default
+            };
+        }
+
+        // If there's an active return order, show return status color
+        if (returnOrder != null)
+        {
+            return returnOrder.Status switch
+            {
+                "Pending" => Color.Warning,
+                "Approved" => Color.Info,
+                "Received" => Color.Primary,
+                "Completed" => Color.Success,
+                "Rejected" => Color.Error,
+                _ => Color.Default
+            };
+        }
+
+        return orderStatus switch
         {
             "Pending" => Color.Warning,
             "Confirmed" => Color.Info,
@@ -193,9 +245,37 @@
         };
     }
 
-    private static string GetStatusText(string status)
+    private static string GetStatusText(string orderStatus, ReturnOrderResponse? returnOrder, WarrantyRequestResponse? warrantyRequest)
     {
-        return status switch
+        // If there's an active warranty request, show warranty status text
+        if (warrantyRequest != null && warrantyRequest.Status != "Completed")
+        {
+            return warrantyRequest.Status switch
+            {
+                "Pending" => "Yêu cầu bảo hành",
+                "Approved" => "Đã duyệt bảo hành",
+                "Rejected" => "Đã từ chối bảo hành",
+                "InProgress" => "Đang bảo hành",
+                "Completed" => "Bảo hành hoàn thành",
+                _ => warrantyRequest.Status
+            };
+        }
+
+        // If there's an active return order, show return status text
+        if (returnOrder != null)
+        {
+            return returnOrder.Status switch
+            {
+                "Pending" => "Yêu cầu hoàn hàng",
+                "Approved" => "Đã duyệt hoàn hàng",
+                "Received" => "Đã nhận hàng hoàn",
+                "Completed" => "Đã hoàn thành hoàn hàng",
+                "Rejected" => "Đã từ chối hoàn hàng",
+                _ => returnOrder.Status
+            };
+        }
+
+        return orderStatus switch
         {
             "Pending" => "Chờ xác nhận",
             "Confirmed" => "Đã xác nhận",
@@ -213,7 +293,7 @@
             "Refunded" => "Đã hoàn tiền",
             "ReturnRequested" => "Yêu cầu trả hàng",
             "Shipped" => "Đang giao", // Legacy support
-            _ => status
+            _ => orderStatus
         };
     }
 

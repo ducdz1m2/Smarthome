@@ -1,0 +1,198 @@
+@page "/technician/warranty-claims"
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Web.Services
+@inject IInstallationService InstallationService
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject IAuthService AuthService
+
+<MudText Typo="Typo.h4" Class="mb-4">Đơn bảo hành của tôi</MudText>
+
+@if (_loading)
+{
+    <MudProgressCircular Class="ma-auto" Color="Color.Primary" Indeterminate="true" />
+}
+else if (!_warrantyBookings.Any())
+{
+    <MudAlert Severity="Severity.Info" Class="my-4">Không có đơn bảo hành nào.</MudAlert>
+}
+else
+{
+    <MudTable Items="_warrantyBookings" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Mã đơn</MudTh>
+            <MudTh>Khách hàng</MudTh>
+            <MudTh>Ngày lắp</MudTh>
+            <MudTh>Khung giờ</MudTh>
+            <MudTh>Trạng thái</MudTh>
+            <MudTh>Thao tác</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.OrderNumber</MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2">@context.CustomerName</MudText>
+                <MudText Typo="Typo.caption">@context.CustomerPhone</MudText>
+            </MudTd>
+            <MudTd>@context.ScheduledDate.Date.ToString("dd/MM/yyyy")</MudTd>
+            <MudTd>@context.StartTime?.ToString("hh\\:mm") - @context.EndTime?.ToString("hh\\:mm")</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status)">@GetStatusText(context.Status)</MudChip>
+            </MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                           Href="@($"/technician/bookings/{context.Id}")">Chi tiết</MudButton>
+                @if (context.Status == "Assigned")
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" Class="ml-2"
+                               OnClick="() => AcceptBooking(context.Id)">Tiếp nhận</MudButton>
+                }
+                @if (context.Status == "Preparing")
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Class="ml-2"
+                               OnClick="() => StartTravel(context.Id)">Bắt đầu đi</MudButton>
+                }
+                @if (context.Status == "OnTheWay")
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" Size="Size.Small" Class="ml-2"
+                               OnClick="() => StartInstallation(context.Id)">Bắt đầu lắp</MudButton>
+                }
+                @if (context.Status == "Installing")
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" Class="ml-2"
+                               OnClick="() => CompleteBooking(context.Id)">Hoàn thành</MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private List<InstallationBookingListResponse> _warrantyBookings = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWarrantyBookings();
+    }
+
+    private async Task LoadWarrantyBookings()
+    {
+        try
+        {
+            _loading = true;
+            var technicianId = await GetCurrentTechnicianId();
+            if (technicianId == 0) return;
+
+            var allBookings = await InstallationService.GetByTechnicianAsync(technicianId);
+            _warrantyBookings = allBookings.Where(b => b.IsWarranty).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task<int> GetCurrentTechnicianId()
+    {
+        var technicianId = await AuthService.GetTechnicianIdAsync();
+        return technicianId ?? 0;
+    }
+
+    private async Task AcceptBooking(int id)
+    {
+        try
+        {
+            var technicianId = await GetCurrentTechnicianId();
+            await InstallationService.AcceptBookingAsync(id, technicianId);
+            Snackbar.Add("Đã tiếp nhận đơn bảo hành", Severity.Success);
+            await LoadWarrantyBookings();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartTravel(int id)
+    {
+        try
+        {
+            await InstallationService.StartTravelAsync(id);
+            Snackbar.Add("Đã bắt đầu đi", Severity.Success);
+            await LoadWarrantyBookings();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartInstallation(int id)
+    {
+        try
+        {
+            await InstallationService.StartInstallationAsync(id);
+            Snackbar.Add("Đã bắt đầu lắp", Severity.Success);
+            await LoadWarrantyBookings();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CompleteBooking(int id)
+    {
+        try
+        {
+            var request = new CompleteInstallationRequest
+            {
+                CustomerSignature = "Signed",
+                CustomerRating = 5,
+                Notes = "Warranty completed"
+            };
+            await InstallationService.CompleteAsync(id, request);
+            Snackbar.Add("Đã hoàn thành đơn bảo hành", Severity.Success);
+            await LoadWarrantyBookings();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Assigned" => Color.Warning,
+            "Preparing" => Color.Info,
+            "OnTheWay" => Color.Primary,
+            "Installing" => Color.Secondary,
+            "Completed" => Color.Success,
+            "Cancelled" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetStatusText(string status)
+    {
+        return status switch
+        {
+            "Assigned" => "Chờ xác nhận",
+            "Preparing" => "Chuẩn bị",
+            "OnTheWay" => "Đang đi",
+            "Installing" => "Đang lắp",
+            "Completed" => "Hoàn thành",
+            "Cancelled" => "Đã hủy",
+            _ => status
+        };
+    }
+}

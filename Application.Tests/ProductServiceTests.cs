@@ -12,12 +12,16 @@ namespace Application.Tests;
 public class ProductServiceTests
 {
     private readonly Mock<IProductRepository> _productRepositoryMock;
+    private readonly Mock<IProductWarehouseRepository> _productWarehouseRepositoryMock;
+    private readonly Mock<IWarehouseRepository> _warehouseRepositoryMock;
     private readonly ProductService _productService;
 
     public ProductServiceTests()
     {
         _productRepositoryMock = new Mock<IProductRepository>();
-        _productService = new ProductService(_productRepositoryMock.Object);
+        _productWarehouseRepositoryMock = new Mock<IProductWarehouseRepository>();
+        _warehouseRepositoryMock = new Mock<IWarehouseRepository>();
+        _productService = new ProductService(_productRepositoryMock.Object, _productWarehouseRepositoryMock.Object, _warehouseRepositoryMock.Object);
     }
 
     [Fact]

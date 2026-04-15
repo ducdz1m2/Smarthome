@@ -1,0 +1,177 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject ITechnicianRatingService TechnicianRatingService
+@inject IInstallationService InstallationService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Đánh giá kỹ thuật viên</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_isLoading)
+        {
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" Animation="Animation.Wave" />
+        }
+        else if (_booking == null)
+        {
+            <MudAlert Severity="Severity.Error">Không tìm thấy thông tin lịch lắp đặt</MudAlert>
+        }
+        else
+        {
+            <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">
+                Kỹ thuật viên: @_technicianName
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                Đơn hàng: @OrderNumber
+            </MudText>
+
+            <MudText Typo="Typo.body2" Class="mb-2">Đánh giá (1-5 sao) *</MudText>
+            <MudRating Value="_rating" MaxValue="5" Class="mb-3" ReadOnly="false" SelectedValueChanged="OnRatingChanged" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Đã chọn: @_rating sao</MudText>
+
+            <MudForm @ref="_form" @bind-IsValid="_isValid">
+                <MudTextField @bind-Value="_content" Label="Nhận xét của bạn"
+                              Variant="Variant.Outlined" Lines="4" MaxLength="1000"
+                              Required="true" RequiredError="Vui lòng nhập nhận xét"
+                              Counter="1000" Class="mb-3" />
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" Disabled="!_isValid" OnClick="Submit">
+            @(_isEditMode ? "Cập nhật" : "Gửi đánh giá")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int BookingId { get; set; }
+
+    [Parameter]
+    public int TechnicianId { get; set; }
+
+    [Parameter]
+    public int OrderId { get; set; }
+
+    [Parameter]
+    public string OrderNumber { get; set; } = string.Empty;
+
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Parameter]
+    public int? ExistingRatingId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid = false;
+    private bool _isLoading = true;
+    private bool _isEditMode = false;
+    private int _rating = 5;
+    private string _content = string.Empty;
+    private string _technicianName = string.Empty;
+    private InstallationBookingResponse? _booking;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isEditMode = ExistingRatingId.HasValue;
+        if (_isEditMode)
+        {
+            await LoadExistingRatingAsync();
+        }
+        await LoadBookingAsync();
+    }
+
+    private async Task LoadExistingRatingAsync()
+    {
+        if (!ExistingRatingId.HasValue) return;
+
+        try
+        {
+            var rating = await TechnicianRatingService.GetByIdAsync(ExistingRatingId.Value);
+            if (rating != null)
+            {
+                _rating = rating.Rating;
+                _content = rating.Content;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải đánh giá: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadBookingAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _booking = await InstallationService.GetByOrderIdAsync(OrderId);
+            if (_booking != null)
+            {
+                _technicianName = _booking.TechnicianName;
+                BookingId = _booking.Id;
+                if (_booking.TechnicianId.HasValue)
+                {
+                    TechnicianId = _booking.TechnicianId.Value;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải thông tin: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void OnRatingChanged(int newValue)
+    {
+        _rating = newValue;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Submit()
+    {
+        try
+        {
+            var request = new CreateTechnicianRatingRequest
+            {
+                TechnicianId = TechnicianId,
+                UserId = UserId,
+                BookingId = BookingId,
+                Content = _content,
+                Rating = _rating,
+                IsVerifiedService = true
+            };
+
+            if (_isEditMode && ExistingRatingId.HasValue)
+            {
+                await TechnicianRatingService.UpdateAsync(ExistingRatingId.Value, request);
+                Snackbar.Add("Đã cập nhật đánh giá thành công", Severity.Success);
+            }
+            else
+            {
+                await TechnicianRatingService.CreateAsync(request);
+                Snackbar.Add("Đã gửi đánh giá thành công", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

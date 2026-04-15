@@ -6,7 +6,10 @@ namespace Application.Interfaces.Repositories
     {
         Task<ProductWarehouse?> GetByIdAsync(int id);
         Task<ProductWarehouse?> GetByProductAndWarehouseAsync(int productId, int warehouseId);
+        Task<ProductWarehouse?> GetByProductVariantAndWarehouseAsync(int productId, int? variantId, int warehouseId);
         Task<List<ProductWarehouse>> GetByProductAsync(int productId);
+        Task<List<ProductWarehouse>> GetAvailableWarehousesForProductAsync(int productId);
+        Task<List<ProductWarehouse>> GetAvailableWarehousesForProductVariantAsync(int productId, int? variantId);
         Task<List<ProductWarehouse>> GetByWarehouseAsync(int warehouseId);
         Task<List<ProductWarehouse>> GetAllAsync();
         Task<List<ProductWarehouse>> GetByProductsAsync(List<int> productIds);

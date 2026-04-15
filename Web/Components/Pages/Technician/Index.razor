@@ -146,6 +146,7 @@ else
     private bool _loading = true;
     private int _pendingCount = 0;
     private int _todayCount = 0;
+    private int _warrantyCount = 0;
     private int _completedThisWeek = 0;
     private double _averageRating = 0;
     
@@ -186,11 +187,14 @@ else
             
             // Load all bookings for stats
             _allBookings = await InstallationService.GetByTechnicianAsync(technicianId);
-            
+
             // Today's bookings
             var today = DateTime.Today;
             _todayBookings = _allBookings.Where(b => b.ScheduledDate.Date == today && b.Status != "Completed" && b.Status != "Cancelled").ToList();
             _todayCount = _todayBookings.Count;
+
+            // Warranty bookings
+            _warrantyCount = _allBookings.Count(b => b.IsWarranty && b.Status != "Completed" && b.Status != "Cancelled");
             
             // Completed this week
             var startOfWeek = today.AddDays(-(int)today.DayOfWeek);

@@ -20,6 +20,8 @@ namespace Application.DTOs.Responses
         public DateTime? CompletedAt { get; set; }
         public int? CustomerRating { get; set; }
         public DateTime CreatedAt { get; set; }
+        public bool IsUninstall { get; set; }
+        public bool IsWarranty { get; set; }
     }
 
     public class TechnicianListResponse

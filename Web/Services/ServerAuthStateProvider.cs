@@ -11,7 +11,6 @@ public class ServerAuthStateProvider : AuthenticationStateProvider, IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly CancellationTokenSource _cts = new();
-    private Task<AuthenticationState>? _currentAuthenticationStateTask;
 
     public ServerAuthStateProvider(IServiceProvider serviceProvider, IHttpContextAccessor httpContextAccessor)
     {

@@ -1,0 +1,214 @@
+@page "/admin/returns"
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Enums
+@using MudBlazor
+@layout AdminLayout
+@inject IReturnOrderService ReturnOrderService
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý hoàn hàng</MudText>
+
+<MudCard Elevation="2" Class="mb-4">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <div class="d-flex align-center justify-space-between">
+                <MudText Typo="Typo.h6">Danh sách yêu cầu hoàn hàng</MudText>
+                <div class="d-flex gap-2">
+                    <MudBadge Content="_pendingCount" Color="Color.Error" Overlap="true" Visible="_pendingCount > 0">
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadPending">
+                            Chờ duyệt
+                        </MudButton>
+                    </MudBadge>
+                    <MudButton Color="Color.Default" Variant="Variant.Outlined" OnClick="LoadAll">
+                        Tất cả
+                    </MudButton>
+                </div>
+            </div>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="my-4" />
+        }
+        else if (_returnOrders?.Any() != true)
+        {
+            <MudAlert Severity="Severity.Info">Chưa có yêu cầu hoàn hàng nào</MudAlert>
+        }
+        else
+        {
+            <MudTable Items="_returnOrders" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Mã đơn</MudTh>
+                    <MudTh>Đơn hàng</MudTh>
+                    <MudTh>Loại</MudTh>
+                    <MudTh>Lý do</MudTh>
+                    <MudTh>Số tiền hoàn</MudTh>
+                    <MudTh>Trạng thái</MudTh>
+                    <MudTh>Ngày tạo</MudTh>
+                    <MudTh>Thao tác</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudText Typo="Typo.body2" Class="fw-bold">#@context.Id</MudText>
+                    </MudTd>
+                    <MudTd>
+                        <MudText Typo="Typo.body2">@context.OrderNumber</MudText>
+                    </MudTd>
+                    <MudTd>
+                        @if (context.ReturnType == "Exchange")
+                        {
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small">Đổi hàng</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">Hoàn tiền</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudText Typo="Typo.body2" Style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
+                            @context.Reason
+                        </MudText>
+                    </MudTd>
+                    <MudTd>
+                        @if (context.RefundAmount > 0)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Success">@context.RefundAmount.ToString("N0") đ</MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        @if (context.Status == "Pending")
+                        {
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
+                        }
+                        else if (context.Status == "Approved")
+                        {
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small">Đã duyệt</MudChip>
+                        }
+                        else if (context.Status == "Received")
+                        {
+                            <MudChip T="string" Color="Color.Primary" Size="Size.Small">Đã nhận hàng</MudChip>
+                        }
+                        else if (context.Status == "Completed")
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Hoàn thành</MudChip>
+                        }
+                        else if (context.Status == "Rejected")
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small">Đã từ chối</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small">@context.Status</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                    <MudTd>
+                        <div class="d-flex gap-1">
+                            @if (context.Status == "Pending")
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Check"
+                                             Color="Color.Success"
+                                             Size="Size.Small"
+                                             OnClick="() => Approve(context.Id)"
+                                             Title="Duyệt" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                             Color="Color.Error"
+                                             Size="Size.Small"
+                                             OnClick="() => Reject(context.Id)"
+                                             Title="Từ chối" />
+                            }
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .fw-bold {
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    private List<ReturnOrderResponse>? _returnOrders;
+    private bool _loading = true;
+    private int _pendingCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAll();
+    }
+
+    private async Task LoadAll()
+    {
+        _loading = true;
+        try
+        {
+            _returnOrders = await ReturnOrderService.GetAllAsync();
+            _pendingCount = (await ReturnOrderService.GetByStatusAsync("Pending")).Count;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadPending()
+    {
+        _loading = true;
+        try
+        {
+            _returnOrders = await ReturnOrderService.GetByStatusAsync("Pending");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Approve(int id)
+    {
+        try
+        {
+            await ReturnOrderService.ApproveAsync(id);
+            Snackbar.Add("Đã duyệt yêu cầu hoàn hàng", Severity.Success);
+            await LoadAll();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Reject(int id)
+    {
+        try
+        {
+            await ReturnOrderService.RejectAsync(id, "Yêu cầu không được duyệt");
+            Snackbar.Add("Đã từ chối yêu cầu hoàn hàng", Severity.Success);
+            await LoadAll();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

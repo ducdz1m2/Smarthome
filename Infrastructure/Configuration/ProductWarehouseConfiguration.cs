@@ -10,7 +10,8 @@ namespace Infrastructure.Configuration
         {
             builder.ToTable("ProductWarehouses");
             builder.HasKey(pw => pw.Id);
-            builder.HasIndex(pw => new { pw.ProductId, pw.WarehouseId }).IsUnique();
+            builder.Property(pw => pw.VariantId).IsRequired(false);
+            builder.HasIndex(pw => new { pw.ProductId, pw.VariantId, pw.WarehouseId }).IsUnique();
             builder.HasOne(pw => pw.Warehouse).WithMany(w => w.ProductWarehouses).HasForeignKey(pw => pw.WarehouseId).OnDelete(DeleteBehavior.Cascade);
             builder.Ignore(pw => pw.DomainEvents);
         }

@@ -3,7 +3,10 @@
 @using Application.Interfaces.Services
 @inject IOrderService OrderService
 @inject IReturnOrderService ReturnOrderService
+@inject IWarrantyRequestService WarrantyRequestService
 @inject IProductCommentService CommentService
+@inject ITechnicianRatingService TechnicianRatingService
+@inject IInstallationService InstallationService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -49,7 +52,18 @@
                                         </MudAvatar>
                                         <div>
                                             <MudText Typo="Typo.body1" Class="fw-bold">@item.ProductName</MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">SKU: @item.Sku</MudText>
+                                            @if (!string.IsNullOrEmpty(item.VariantSku))
+                                            {
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">SKU: @item.VariantSku</MudText>
+                                            }
+                                            else
+                                            {
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">SKU: @item.Sku</MudText>
+                                            }
+                                            @if (!string.IsNullOrEmpty(item.VariantName))
+                                            {
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">Phân loại: @item.VariantName</MudText>
+                                            }
                                             @if (item.RequiresInstallation)
                                             {
                                                 <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="mt-1">
@@ -185,12 +199,52 @@
                     </MudItem>
                 }
 
+                <!-- Warranty Request Status -->
+                @if (_warrantyRequest != null)
+                {
+                    <MudItem xs="12" Class="mt-4">
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Trạng thái bảo hành</MudText>
+                        <MudCard Elevation="0" Outlined="true">
+                            <MudCardContent>
+                                <div class="d-flex align-center justify-space-between mb-2">
+                                    <div>
+                                        <MudText Typo="Typo.body2" Class="fw-bold">Loại bảo hành:</MudText>
+                                        <MudText Typo="Typo.caption">@_warrantyRequest.WarrantyType</MudText>
+                                    </div>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetWarrantyStatusColor(_warrantyRequest.Status)">
+                                        @GetWarrantyStatusText(_warrantyRequest.Status)
+                                    </MudChip>
+                                </div>
+                                @if (!string.IsNullOrEmpty(_warrantyRequest.Description))
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                        Mô tả: @_warrantyRequest.Description
+                                    </MudText>
+                                }
+                                @if (_warrantyRequest.ApprovedAt.HasValue)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                        Ngày duyệt: @_warrantyRequest.ApprovedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                                    </MudText>
+                                }
+                                @if (_warrantyRequest.CompletedAt.HasValue)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                        Ngày hoàn thành: @_warrantyRequest.CompletedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                                    </MudText>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+
                 <!-- Reviews -->
                 @if (_reviews?.Any() == true)
                 {
                     <MudItem xs="12" Class="mt-4">
                         <MudDivider Class="my-2" />
-                        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Đánh giá của bạn</MudText>
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Đánh giá sản phẩm</MudText>
                         @foreach (var review in _reviews)
                         {
                             <MudCard Class="mb-2" Elevation="0" Outlined="true">
@@ -230,6 +284,40 @@
                         }
                     </MudItem>
                 }
+
+                <!-- Technician Rating -->
+                @if (_hasInstallation && _technicianRating != null)
+                {
+                    <MudItem xs="12" Class="mt-4">
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Đánh giá kỹ thuật viên</MudText>
+                        <MudCard Elevation="0" Outlined="true">
+                            <MudCardContent>
+                                <div class="d-flex align-center justify-space-between">
+                                    <div>
+                                        <MudText Typo="Typo.body2" Class="fw-bold mb-1">
+                                            Kỹ thuật viên: @_technicianRating.TechnicianName
+                                        </MudText>
+                                        <div class="d-flex align-center gap-2">
+                                            <MudRating SelectedValue="_technicianRating.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
+                                            <MudText Typo="Typo.caption" Color="Color.Primary">@_technicianRating.Rating/5</MudText>
+                                            @if (_technicianRating.IsApproved)
+                                            {
+                                                <MudChip T="string" Color="Color.Success" Size="Size.Small">Đã duyệt</MudChip>
+                                            }
+                                            else
+                                            {
+                                                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                                <MudText Typo="Typo.body2" Class="mt-2">@_technicianRating.Content</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@_technicianRating.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
             </MudGrid>
         }
     </DialogContent>
@@ -251,13 +339,47 @@
                 Hoàn hàng
             </MudButton>
         }
-        
-        @* Nút Đánh giá - hiển thị khi đơn hàng hoàn thành *@
-        @if (_order != null && _order.Status == "Completed" && !_hasReviewed)
+
+        @* Nút Bảo hành - hiển thị khi đơn hàng đã giao hoặc hoàn thành và chưa hoàn hàng *@
+        @if (_order != null && (_order.Status == "Delivered" || _order.Status == "Completed") && !_hasWarrantyRequest && !_hasReturnOrder)
         {
-            <MudButton Color="Color.Primary" OnClick="OpenReviewDialog" StartIcon="@Icons.Material.Filled.RateReview">
-                Đánh giá
+            <MudButton Color="Color.Info" OnClick="OpenWarrantyDialog" StartIcon="@Icons.Material.Filled.Build">
+                Bảo hành
             </MudButton>
+        }
+        
+        @* Nút Đánh giá sản phẩm - hiển thị khi đơn hàng hoàn thành *@
+        @if (_order != null && _order.Status == "Completed")
+        {
+            @if (_hasReviewed)
+            {
+                <MudButton Color="Color.Primary" OnClick="OpenEditReviewDialog" StartIcon="@Icons.Material.Filled.Edit">
+                    Đánh giá sản phẩm
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Color="Color.Primary" OnClick="OpenReviewDialog" StartIcon="@Icons.Material.Filled.RateReview">
+                    Đánh giá sản phẩm
+                </MudButton>
+            }
+        }
+        
+        @* Nút Đánh giá kỹ thuật viên - hiển thị khi đơn hàng hoàn thành và có lắp đặt *@
+        @if (_order != null && _order.Status == "Completed" && _hasInstallation)
+        {
+            @if (_hasRatedTechnician)
+            {
+                <MudButton Color="Color.Secondary" OnClick="OpenEditTechnicianRatingDialog" StartIcon="@Icons.Material.Filled.Edit">
+                    Đánh giá kỹ thuật viên
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Color="Color.Secondary" OnClick="OpenTechnicianRatingDialog" StartIcon="@Icons.Material.Filled.Star">
+                    Đánh giá kỹ thuật viên
+                </MudButton>
+            }
         }
     </DialogActions>
 </MudDialog>
@@ -281,8 +403,13 @@
     private OrderResponse? _order;
     private bool _isLoading = true;
     private bool _hasReturnOrder = false;
+    private bool _hasWarrantyRequest = false;
     private bool _hasReviewed = false;
+    private bool _hasInstallation = false;
+    private bool _hasRatedTechnician = false;
+    private TechnicianRatingResponse? _technicianRating;
     private List<ProductCommentResponse>? _reviews;
+    private WarrantyRequestResponse? _warrantyRequest;
 
     protected override async Task OnInitializedAsync()
     {
@@ -302,8 +429,22 @@
                 var returnOrders = await ReturnOrderService.GetByOrderIdAsync(OrderId);
                 _hasReturnOrder = returnOrders.Any();
 
+                // Check if order has warranty request
+                var warrantyRequests = await WarrantyRequestService.GetByOrderIdAsync(OrderId);
+                _hasWarrantyRequest = warrantyRequests.Any();
+                _warrantyRequest = warrantyRequests.OrderByDescending(w => w.CreatedAt).FirstOrDefault();
+
+                // Check if order has installation items
+                _hasInstallation = _order.Items.Any(i => i.RequiresInstallation);
+
                 // Load reviews for this order's products
                 await LoadReviewsAsync();
+
+                // Check if user has rated technician
+                if (_hasInstallation)
+                {
+                    await CheckTechnicianRatingAsync();
+                }
             }
         }
         catch (Exception ex)
@@ -358,6 +499,29 @@
         }
     }
 
+    private async Task OpenWarrantyDialog()
+    {
+        if (_order == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "OrderId", OrderId },
+            { "OrderNumber", _order.OrderNumber },
+            { "Items", _order.Items }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<WarrantyRequestDialog>("Yêu cầu bảo hành", parameters, options);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+        {
+            Snackbar.Add("Đã gửi yêu cầu bảo hành thành công", Severity.Success);
+            _hasWarrantyRequest = true;
+            await LoadOrderAsync();
+        }
+    }
+
     private async Task LoadReviewsAsync()
     {
         try
@@ -392,6 +556,97 @@
         {
             Snackbar.Add("Đã gửi đánh giá thành công", Severity.Success);
             await LoadReviewsAsync();
+        }
+    }
+
+    private async Task OpenEditReviewDialog()
+    {
+        if (_order == null || _reviews == null || !_reviews.Any()) return;
+
+        var firstReview = _reviews.First();
+        var parameters = new DialogParameters
+        {
+            { "OrderId", OrderId },
+            { "Items", _order.Items },
+            { "UserId", _order.UserId },
+            { "ExistingCommentId", firstReview.Id }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ReviewDialog>("Sửa đánh giá sản phẩm", parameters, options);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+        {
+            Snackbar.Add("Đã cập nhật đánh giá thành công", Severity.Success);
+            await LoadReviewsAsync();
+        }
+    }
+
+    private async Task CheckTechnicianRatingAsync()
+    {
+        try
+        {
+            if (_order == null) return;
+
+            var booking = await InstallationService.GetByOrderIdAsync(OrderId);
+            if (booking != null && booking.TechnicianId.HasValue)
+            {
+                var rating = await TechnicianRatingService.GetByTechnicianAndBookingAsync(booking.TechnicianId.Value, booking.Id);
+                _hasRatedTechnician = rating != null;
+                _technicianRating = rating;
+            }
+        }
+        catch
+        {
+            // Ignore errors when checking technician rating
+            _hasRatedTechnician = false;
+            _technicianRating = null;
+        }
+    }
+
+    private async Task OpenTechnicianRatingDialog()
+    {
+        if (_order == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "OrderId", OrderId },
+            { "OrderNumber", _order.OrderNumber },
+            { "UserId", _order.UserId }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TechnicianRatingDialog>("Đánh giá kỹ thuật viên", parameters, options);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+        {
+            Snackbar.Add("Đã gửi đánh giá thành công", Severity.Success);
+            await CheckTechnicianRatingAsync();
+        }
+    }
+
+    private async Task OpenEditTechnicianRatingDialog()
+    {
+        if (_order == null || _technicianRating == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "OrderId", OrderId },
+            { "OrderNumber", _order.OrderNumber },
+            { "UserId", _order.UserId },
+            { "ExistingRatingId", _technicianRating.Id }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TechnicianRatingDialog>("Sửa đánh giá kỹ thuật viên", parameters, options);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+        {
+            Snackbar.Add("Đã cập nhật đánh giá thành công", Severity.Success);
+            await CheckTechnicianRatingAsync();
         }
     }
 
@@ -458,6 +713,32 @@
             "CreditCard" => "Thẻ tín dụng",
             "EWallet" => "Ví điện tử",
             _ => paymentMethod
+        };
+    }
+
+    private static Color GetWarrantyStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => Color.Warning,
+            "Approved" => Color.Success,
+            "Rejected" => Color.Error,
+            "InProgress" => Color.Info,
+            "Completed" => Color.Primary,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetWarrantyStatusText(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ duyệt",
+            "Approved" => "Đã duyệt",
+            "Rejected" => "Đã từ chối",
+            "InProgress" => "Đang thực hiện",
+            "Completed" => "Đã hoàn thành",
+            _ => status
         };
     }
 

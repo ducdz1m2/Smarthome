@@ -21,6 +21,8 @@ public class OrderItem : Entity
 
     public virtual Order Order { get; private set; } = null!;
     public virtual Entities.Catalog.Product Product { get; private set; } = null!;
+    public virtual Installation.InstallationBooking? InstallationBooking { get; private set; }
+    public virtual ICollection<OrderWarehouseAllocation> WarehouseAllocations { get; private set; } = new List<OrderWarehouseAllocation>();
 
     private OrderItem() { }
 

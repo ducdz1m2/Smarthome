@@ -15,6 +15,9 @@ public class InstallationServiceTests
     private readonly Mock<IInstallationBookingRepository> _bookingRepositoryMock;
     private readonly Mock<ITechnicianProfileRepository> _technicianRepositoryMock;
     private readonly Mock<IInstallationSlotRepository> _slotRepositoryMock;
+    private readonly Mock<IOrderRepository> _orderRepositoryMock;
+    private readonly Mock<IReturnOrderRepository> _returnOrderRepositoryMock;
+    private readonly Mock<IWarrantyRequestRepository> _warrantyRequestRepositoryMock;
     private readonly InstallationService _installationService;
 
     public InstallationServiceTests()
@@ -22,11 +25,17 @@ public class InstallationServiceTests
         _bookingRepositoryMock = new Mock<IInstallationBookingRepository>();
         _technicianRepositoryMock = new Mock<ITechnicianProfileRepository>();
         _slotRepositoryMock = new Mock<IInstallationSlotRepository>();
-        
+        _orderRepositoryMock = new Mock<IOrderRepository>();
+        _returnOrderRepositoryMock = new Mock<IReturnOrderRepository>();
+        _warrantyRequestRepositoryMock = new Mock<IWarrantyRequestRepository>();
+
         _installationService = new InstallationService(
             _bookingRepositoryMock.Object,
             _technicianRepositoryMock.Object,
-            _slotRepositoryMock.Object);
+            _slotRepositoryMock.Object,
+            _orderRepositoryMock.Object,
+            _returnOrderRepositoryMock.Object,
+            _warrantyRequestRepositoryMock.Object);
     }
 
     [Fact]
@@ -159,13 +168,26 @@ public class InstallationServiceTests
         // Arrange - Set up booking in proper state for completion
         var booking = InstallationBooking.Create(1, 1, 1, DateTime.UtcNow.AddDays(-1));
         typeof(InstallationBooking).GetProperty("Id")?.SetValue(booking, 1);
-        
+
         // Use reflection to set status directly to Installing (to test Complete without full workflow)
         var statusProperty = typeof(InstallationBooking).GetProperty("Status");
         statusProperty?.SetValue(booking, InstallationStatus.Installing);
 
-        _bookingRepositoryMock.Setup(x => x.GetByIdWithDetailsAsync(1)).ReturnsAsync(booking);
+        // Set up order
+        var order = Order.Create(
+            1,
+            "Customer Name",
+            "0901234567",
+            "Street",
+            "Ward",
+            "District",
+            "City");
+        typeof(Order).GetProperty("Id")?.SetValue(order, 1);
+
+        _bookingRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(booking);
+        _orderRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(order);
         _bookingRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+        _orderRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
 
         // Act
         var request = new CompleteInstallationRequest
@@ -200,4 +222,248 @@ public class InstallationServiceTests
         result.Should().HaveCount(2);
     }
 
+    [Fact]
+    public async Task CompleteAsync_WhenUninstallBooking_Should_UpdateReturnOrderStatus()
+    {
+        // Arrange - Set up uninstall booking
+        var booking = InstallationBooking.Create(1, 1, 1, DateTime.UtcNow.AddDays(-1));
+        typeof(InstallationBooking).GetProperty("Id")?.SetValue(booking, 1);
+        booking.SetIsUninstall(true);
+
+        var statusProperty = typeof(InstallationBooking).GetProperty("Status");
+        statusProperty?.SetValue(booking, InstallationStatus.Installing);
+
+        // Set up return order - set status to Approved
+        var returnOrder = ReturnOrder.Create(1, ReturnType.Exchange, "Product defect");
+        typeof(ReturnOrder).GetProperty("Id")?.SetValue(returnOrder, 1);
+        var returnOrderStatusProperty = typeof(ReturnOrder).GetProperty("Status");
+        returnOrderStatusProperty?.SetValue(returnOrder, ReturnOrderStatus.Approved);
+
+        // Set up order
+        var order = Order.Create(
+            1,
+            "Customer Name",
+            "0901234567",
+            "Street",
+            "Ward",
+            "District",
+            "City");
+        typeof(Order).GetProperty("Id")?.SetValue(order, 1);
+
+        _bookingRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(booking);
+        _orderRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(order);
+        _orderRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+        _returnOrderRepositoryMock.Setup(x => x.GetByOrderIdAsync(1)).ReturnsAsync(new List<ReturnOrder> { returnOrder });
+        _returnOrderRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+
+        // Act
+        var request = new CompleteInstallationRequest
+        {
+            CustomerSignature = "customer-signature-123",
+            CustomerRating = 5,
+            Notes = "Uninstall completed"
+        };
+        await _installationService.CompleteAsync(1, request);
+
+        // Assert
+        booking.Status.Should().Be(InstallationStatus.Completed);
+        _returnOrderRepositoryMock.Verify(x => x.Update(It.IsAny<ReturnOrder>()), Times.AtLeastOnce);
+        _returnOrderRepositoryMock.Verify(x => x.SaveChangesAsync(), Times.AtLeast(2));
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WhenRegularBooking_Should_NotUpdateReturnOrder()
+    {
+        // Arrange - Set up regular installation booking (not uninstall)
+        var booking = InstallationBooking.Create(1, 1, 1, DateTime.UtcNow.AddDays(-1));
+        typeof(InstallationBooking).GetProperty("Id")?.SetValue(booking, 1);
+        booking.SetIsUninstall(false);
+        
+        var statusProperty = typeof(InstallationBooking).GetProperty("Status");
+        statusProperty?.SetValue(booking, InstallationStatus.Installing);
+
+        // Set up order
+        var order = Order.Create(
+            1, 
+            "Customer Name", 
+            "0901234567", 
+            "Street", 
+            "Ward", 
+            "District", 
+            "City");
+        typeof(Order).GetProperty("Id")?.SetValue(order, 1);
+
+        _bookingRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(booking);
+        _orderRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(order);
+        _orderRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+
+        // Act
+        var request = new CompleteInstallationRequest
+        {
+            CustomerSignature = "customer-signature-123",
+            CustomerRating = 5,
+            Notes = "Installation completed"
+        };
+        await _installationService.CompleteAsync(1, request);
+
+        // Assert
+        booking.Status.Should().Be(InstallationStatus.Completed);
+        _returnOrderRepositoryMock.Verify(x => x.Update(It.IsAny<ReturnOrder>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WhenWarrantyBooking_Should_UpdateWarrantyRequestStatusToCompleted()
+    {
+        // Arrange - Set up warranty booking
+        var booking = InstallationBooking.Create(1, 1, 1, DateTime.UtcNow.AddDays(-1));
+        typeof(InstallationBooking).GetProperty("Id")?.SetValue(booking, 1);
+        booking.SetIsWarranty(true);
+
+        var statusProperty = typeof(InstallationBooking).GetProperty("Status");
+        statusProperty?.SetValue(booking, InstallationStatus.Installing);
+
+        // Set up warranty request
+        var warrantyRequest = Domain.Entities.Sales.WarrantyRequest.Create(1, Domain.Enums.WarrantyType.Repair, "Test warranty");
+        typeof(Domain.Entities.Sales.WarrantyRequest).GetProperty("Id")?.SetValue(warrantyRequest, 1);
+        typeof(Domain.Entities.Sales.WarrantyRequest).GetProperty("Status")?.SetValue(warrantyRequest, Domain.Enums.WarrantyRequestStatus.Approved);
+
+        // Set up order
+        var order = Order.Create(
+            1,
+            "Customer Name",
+            "0901234567",
+            "Street",
+            "Ward",
+            "District",
+            "City");
+        typeof(Order).GetProperty("Id")?.SetValue(order, 1);
+
+        _bookingRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(booking);
+        _orderRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(order);
+        _orderRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+        _warrantyRequestRepositoryMock.Setup(x => x.GetByOrderIdAsync(1)).ReturnsAsync(new List<Domain.Entities.Sales.WarrantyRequest> { warrantyRequest });
+        _warrantyRequestRepositoryMock.Setup(x => x.Update(It.IsAny<Domain.Entities.Sales.WarrantyRequest>())).Verifiable();
+        _warrantyRequestRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+        _bookingRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+
+        // Act
+        var request = new CompleteInstallationRequest
+        {
+            CustomerSignature = "customer-signature-123",
+            CustomerRating = 5,
+            Notes = "Warranty completed"
+        };
+        await _installationService.CompleteAsync(1, request);
+
+        // Assert
+        booking.Status.Should().Be(InstallationStatus.Completed);
+        warrantyRequest.Status.Should().Be(Domain.Enums.WarrantyRequestStatus.Completed);
+        warrantyRequest.StartedAt.Should().NotBeNull();
+        warrantyRequest.CompletedAt.Should().NotBeNull();
+        warrantyRequest.TechnicianNotes.Should().Be("Warranty completed");
+        _warrantyRequestRepositoryMock.Verify(x => x.Update(It.IsAny<Domain.Entities.Sales.WarrantyRequest>()), Times.Once);
+        _warrantyRequestRepositoryMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WhenWarrantyBooking_And_WarrantyRequestInProgress_Should_UpdateToCompleted()
+    {
+        // Arrange - Set up warranty booking
+        var booking = InstallationBooking.Create(1, 1, 1, DateTime.UtcNow.AddDays(-1));
+        typeof(InstallationBooking).GetProperty("Id")?.SetValue(booking, 1);
+        booking.SetIsWarranty(true);
+
+        var statusProperty = typeof(InstallationBooking).GetProperty("Status");
+        statusProperty?.SetValue(booking, InstallationStatus.Installing);
+
+        // Set up warranty request already in InProgress status
+        var warrantyRequest = Domain.Entities.Sales.WarrantyRequest.Create(1, Domain.Enums.WarrantyType.Repair, "Test warranty");
+        typeof(Domain.Entities.Sales.WarrantyRequest).GetProperty("Id")?.SetValue(warrantyRequest, 1);
+        typeof(Domain.Entities.Sales.WarrantyRequest).GetProperty("Status")?.SetValue(warrantyRequest, Domain.Enums.WarrantyRequestStatus.InProgress);
+
+        // Set up order
+        var order = Order.Create(
+            1,
+            "Customer Name",
+            "0901234567",
+            "Street",
+            "Ward",
+            "District",
+            "City");
+        typeof(Order).GetProperty("Id")?.SetValue(order, 1);
+
+        _bookingRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(booking);
+        _orderRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(order);
+        _orderRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+        _warrantyRequestRepositoryMock.Setup(x => x.GetByOrderIdAsync(1)).ReturnsAsync(new List<Domain.Entities.Sales.WarrantyRequest> { warrantyRequest });
+        _warrantyRequestRepositoryMock.Setup(x => x.Update(It.IsAny<Domain.Entities.Sales.WarrantyRequest>())).Verifiable();
+        _warrantyRequestRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+        _bookingRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+
+        // Act
+        var request = new CompleteInstallationRequest
+        {
+            CustomerSignature = "customer-signature-123",
+            CustomerRating = 5,
+            Notes = "Warranty completed"
+        };
+        await _installationService.CompleteAsync(1, request);
+
+        // Assert
+        booking.Status.Should().Be(InstallationStatus.Completed);
+        warrantyRequest.Status.Should().Be(Domain.Enums.WarrantyRequestStatus.Completed);
+        warrantyRequest.CompletedAt.Should().NotBeNull();
+        warrantyRequest.TechnicianNotes.Should().Be("Warranty completed");
+        _warrantyRequestRepositoryMock.Verify(x => x.Update(It.IsAny<Domain.Entities.Sales.WarrantyRequest>()), Times.Once);
+        _warrantyRequestRepositoryMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WhenWarrantyBooking_And_WarrantyRequestCompleted_Should_NotUpdate()
+    {
+        // Arrange - Set up warranty booking
+        var booking = InstallationBooking.Create(1, 1, 1, DateTime.UtcNow.AddDays(-1));
+        typeof(InstallationBooking).GetProperty("Id")?.SetValue(booking, 1);
+        booking.SetIsWarranty(true);
+
+        var statusProperty = typeof(InstallationBooking).GetProperty("Status");
+        statusProperty?.SetValue(booking, InstallationStatus.Installing);
+
+        // Set up warranty request already in Completed status
+        var warrantyRequest = Domain.Entities.Sales.WarrantyRequest.Create(1, Domain.Enums.WarrantyType.Repair, "Test warranty");
+        typeof(Domain.Entities.Sales.WarrantyRequest).GetProperty("Id")?.SetValue(warrantyRequest, 1);
+        typeof(Domain.Entities.Sales.WarrantyRequest).GetProperty("Status")?.SetValue(warrantyRequest, Domain.Enums.WarrantyRequestStatus.Completed);
+
+        // Set up order
+        var order = Order.Create(
+            1,
+            "Customer Name",
+            "0901234567",
+            "Street",
+            "Ward",
+            "District",
+            "City");
+        typeof(Order).GetProperty("Id")?.SetValue(order, 1);
+
+        _bookingRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(booking);
+        _orderRepositoryMock.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(order);
+        _orderRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+        _warrantyRequestRepositoryMock.Setup(x => x.GetByOrderIdAsync(1)).ReturnsAsync(new List<Domain.Entities.Sales.WarrantyRequest> { warrantyRequest });
+        _bookingRepositoryMock.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+
+        // Act
+        var request = new CompleteInstallationRequest
+        {
+            CustomerSignature = "customer-signature-123",
+            CustomerRating = 5,
+            Notes = "Warranty completed"
+        };
+        await _installationService.CompleteAsync(1, request);
+
+        // Assert
+        booking.Status.Should().Be(InstallationStatus.Completed);
+        warrantyRequest.Status.Should().Be(Domain.Enums.WarrantyRequestStatus.Completed);
+        _warrantyRequestRepositoryMock.Verify(x => x.Update(It.IsAny<Domain.Entities.Sales.WarrantyRequest>()), Times.Never);
+        _warrantyRequestRepositoryMock.Verify(x => x.SaveChangesAsync(), Times.Never);
+    }
 }

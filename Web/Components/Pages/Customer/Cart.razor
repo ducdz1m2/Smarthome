@@ -56,6 +56,12 @@
                                 </MudItem>
                                 <MudItem xs="12" sm="5">
                                     <MudText Typo="Typo.subtitle1" Class="fw-bold">@item.ProductName</MudText>
+                                    @if (!string.IsNullOrEmpty(item.VariantSku))
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            SKU: @item.VariantSku
+                                        </MudText>
+                                    }
                                     @if (!string.IsNullOrEmpty(item.VariantName))
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">
@@ -185,7 +191,9 @@
         public int Id { get; set; }
         public int ProductId { get; set; }
         public string ProductName { get; set; } = "";
+        public int? VariantId { get; set; }
         public string? VariantName { get; set; }
+        public string? VariantSku { get; set; }
         public string? ImageUrl { get; set; }
         public decimal UnitPrice { get; set; }
         public int Quantity { get; set; }

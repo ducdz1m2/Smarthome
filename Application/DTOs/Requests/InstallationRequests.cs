@@ -6,6 +6,8 @@ namespace Application.DTOs.Requests
         public int TechnicianId { get; set; }
         public int SlotId { get; set; }
         public DateTime ScheduledDate { get; set; }
+        public bool IsUninstall { get; set; } = false;
+        public bool IsWarranty { get; set; } = false;
     }
 
     public class UpdateInstallationBookingRequest

@@ -29,5 +29,8 @@ namespace Application.Interfaces.Services
         Task AcceptBookingAsync(int bookingId, int technicianId);
         Task RejectBookingAsync(int bookingId, int technicianId, RejectBookingRequest request);
         Task<List<InstallationBookingListResponse>> GetPendingForTechnicianAsync(int technicianId);
+
+        // Uninstall booking management
+        Task SetIsUninstallAsync(int bookingId, bool isUninstall);
     }
 }

@@ -13,7 +13,8 @@ namespace Application.Interfaces.Services
         Task<List<OrderResponse>> GetByUserIdAsync(int userId);
         Task<int> CreateAsync(CreateOrderRequest request);
         Task UpdateStatusAsync(int id, UpdateOrderStatusRequest request);
-        Task ConfirmAsync(int id);
+        Task ConfirmAsync(int id, List<WarehouseAllocationRequest>? warehouseAllocations = null);
+    Task<List<WarehouseAllocationResponse>> GetWarehouseAllocationsAsync(int orderId);
         Task StartShippingAsync(int id);
         Task MarkDeliveredAsync(int id);
         Task CancelAsync(int id, string reason);

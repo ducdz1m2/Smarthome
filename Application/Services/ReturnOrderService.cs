@@ -13,13 +13,19 @@ public class ReturnOrderService : IReturnOrderService
 {
     private readonly IReturnOrderRepository _returnOrderRepository;
     private readonly IOrderRepository _orderRepository;
+    private readonly IInstallationService _installationService;
+    private readonly IInstallationSlotService _slotService;
 
     public ReturnOrderService(
         IReturnOrderRepository returnOrderRepository,
-        IOrderRepository orderRepository)
+        IOrderRepository orderRepository,
+        IInstallationService installationService,
+        IInstallationSlotService slotService)
     {
         _returnOrderRepository = returnOrderRepository;
         _orderRepository = orderRepository;
+        _installationService = installationService;
+        _slotService = slotService;
     }
 
     public async Task<List<ReturnOrderResponse>> GetAllAsync()
@@ -99,6 +105,67 @@ public class ReturnOrderService : IReturnOrderService
 
         _returnOrderRepository.Update(returnOrder);
         await _returnOrderRepository.SaveChangesAsync();
+
+        // Check if the original order has an installation booking
+        Console.WriteLine($"[ReturnOrderService.ApproveAsync] Checking for installation booking for order {returnOrder.OriginalOrderId}");
+        var order = await _orderRepository.GetByIdAsync(returnOrder.OriginalOrderId);
+        if (order != null)
+        {
+            Console.WriteLine($"[ReturnOrderService.ApproveAsync] Order found: {order.OrderNumber}");
+            var existingBooking = await _installationService.GetByOrderIdAsync(order.Id);
+            if (existingBooking != null && existingBooking.TechnicianId.HasValue)
+            {
+                Console.WriteLine($"[ReturnOrderService.ApproveAsync] Existing booking found: {existingBooking.Id}, TechnicianId: {existingBooking.TechnicianId.Value}");
+                
+                var technicianId = existingBooking.TechnicianId.Value;
+                
+                // Find available slots for the technician starting from tomorrow
+                var searchDate = DateTime.UtcNow.AddDays(1);
+                InstallationSlotResponse? availableSlot = null;
+                
+                // Search for the next 7 days for an available slot
+                for (int day = 0; day < 7; day++)
+                {
+                    var currentDate = searchDate.AddDays(day);
+                    Console.WriteLine($"[ReturnOrderService.ApproveAsync] Checking available slots for technician {technicianId} on {currentDate:dd/MM/yyyy}");
+                    
+                    var availableSlots = await _slotService.GetAvailableSlotsAsync(technicianId, currentDate);
+                    if (availableSlots != null && availableSlots.Any())
+                    {
+                        availableSlot = availableSlots.First();
+                        Console.WriteLine($"[ReturnOrderService.ApproveAsync] Found available slot: ID {availableSlot.Id}, Time {availableSlot.StartTime} - {availableSlot.EndTime} on {currentDate:dd/MM/yyyy}");
+                        break;
+                    }
+                }
+                
+                if (availableSlot != null)
+                {
+                    // Create uninstall booking with the available slot
+                    Console.WriteLine($"[ReturnOrderService.ApproveAsync] Creating uninstall booking for technician {technicianId} with slot {availableSlot.Id}");
+                    var uninstallBookingId = await _installationService.CreateAsync(new CreateInstallationBookingRequest
+                    {
+                        OrderId = order.Id,
+                        TechnicianId = technicianId,
+                        SlotId = availableSlot.Id,
+                        ScheduledDate = availableSlot.Date,
+                        IsUninstall = true
+                    });
+                    Console.WriteLine($"[ReturnOrderService.ApproveAsync] Uninstall booking created with ID: {uninstallBookingId}");
+                }
+                else
+                {
+                    Console.WriteLine($"[ReturnOrderService.ApproveAsync] No available slots found for technician {technicianId} in the next 7 days");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[ReturnOrderService.ApproveAsync] No existing installation booking found for order {order.Id}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[ReturnOrderService.ApproveAsync] Order not found with ID {returnOrder.OriginalOrderId}");
+        }
     }
 
     public async Task RejectAsync(int id, string? reason = null)

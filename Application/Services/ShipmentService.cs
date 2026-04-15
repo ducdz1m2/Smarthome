@@ -87,6 +87,50 @@ public class ShipmentService : IShipmentService
         return shipment.Id;
     }
 
+    public async Task AssignShipperAsync(int shipmentId, int shipperId)
+    {
+        var shipment = await _shipmentRepository.GetByIdAsync(shipmentId);
+        if (shipment == null)
+            throw new DomainException("Không tìm thấy thông tin vận chuyển");
+
+        shipment.AssignShipper(shipperId);
+        _shipmentRepository.Update(shipment);
+        await _shipmentRepository.SaveChangesAsync();
+    }
+
+    public async Task ApproveShipmentAsync(int shipmentId, int approvedBy)
+    {
+        var shipment = await _shipmentRepository.GetByIdAsync(shipmentId);
+        if (shipment == null)
+            throw new DomainException("Không tìm thấy thông tin vận chuyển");
+
+        shipment.Approve(approvedBy);
+        _shipmentRepository.Update(shipment);
+        await _shipmentRepository.SaveChangesAsync();
+    }
+
+    public async Task RejectShipmentAsync(int shipmentId, string reason)
+    {
+        var shipment = await _shipmentRepository.GetByIdAsync(shipmentId);
+        if (shipment == null)
+            throw new DomainException("Không tìm thấy thông tin vận chuyển");
+
+        shipment.Reject(reason);
+        _shipmentRepository.Update(shipment);
+        await _shipmentRepository.SaveChangesAsync();
+    }
+
+    public async Task AutoAssignShipmentAsync(int shipmentId, int shipperId)
+    {
+        var shipment = await _shipmentRepository.GetByIdAsync(shipmentId);
+        if (shipment == null)
+            throw new DomainException("Không tìm thấy thông tin vận chuyển");
+
+        shipment.AutoAssign(shipperId);
+        _shipmentRepository.Update(shipment);
+        await _shipmentRepository.SaveChangesAsync();
+    }
+
     public async Task UpdateTrackingAsync(int id, UpdateTrackingRequest request)
     {
         var shipment = await _shipmentRepository.GetByIdAsync(id);
@@ -143,7 +187,7 @@ public class ShipmentService : IShipmentService
             throw new DomainException("Không tìm thấy thông tin vận chuyển");
 
         // Only allow deletion if not yet picked up
-        if (shipment.Status != OrderShipmentStatus.Pending)
+        if (shipment.Status != OrderShipmentStatus.PendingApproval && shipment.Status != OrderShipmentStatus.Approved)
             throw new DomainException("Chỉ có thể xóa vận chuyển chưa được lấy hàng");
 
         _shipmentRepository.Delete(shipment);

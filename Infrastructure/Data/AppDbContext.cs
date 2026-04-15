@@ -36,10 +36,12 @@ namespace Infrastructure.Data
         public DbSet<Order> Orders => Set<Order>();
         public DbSet<OrderItem> OrderItems => Set<OrderItem>();
         public DbSet<OrderShipment> OrderShipments => Set<OrderShipment>();
+        public DbSet<OrderWarehouseAllocation> OrderWarehouseAllocations => Set<OrderWarehouseAllocation>();
         public DbSet<CartItem> CartItems => Set<CartItem>();
         public DbSet<Warranty> Warranties => Set<Warranty>();
         public DbSet<WarrantyClaim> WarrantyClaims => Set<WarrantyClaim>();
         public DbSet<ReturnOrder> ReturnOrders => Set<ReturnOrder>();
+        public DbSet<WarrantyRequest> WarrantyRequests => Set<WarrantyRequest>();
         public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
         // Installation
@@ -47,6 +49,7 @@ namespace Infrastructure.Data
         public DbSet<InstallationSlot> InstallationSlots => Set<InstallationSlot>();
         public DbSet<InstallationBooking> InstallationBookings => Set<InstallationBooking>();
         public DbSet<InstallationMaterial> InstallationMaterials => Set<InstallationMaterial>();
+        public DbSet<TechnicianRating> TechnicianRatings => Set<TechnicianRating>();
 
         // Promotions
         public DbSet<Coupon> Coupons => Set<Coupon>();

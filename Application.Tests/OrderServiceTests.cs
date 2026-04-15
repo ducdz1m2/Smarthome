@@ -1,5 +1,6 @@
 using Application.DTOs.Requests;
 using Application.Interfaces.Repositories;
+using Application.Interfaces.Services;
 using Application.Services;
 using Domain.Entities.Catalog;
 using Domain.Entities.Sales;
@@ -14,13 +15,19 @@ public class OrderServiceTests
 {
     private readonly Mock<IOrderRepository> _orderRepositoryMock;
     private readonly Mock<IProductRepository> _productRepositoryMock;
+    private readonly Mock<IInstallationService> _installationServiceMock;
+    private readonly Mock<IInstallationSlotService> _installationSlotServiceMock;
+    private readonly Mock<ITechnicianProfileService> _technicianProfileServiceMock;
     private readonly OrderService _orderService;
 
     public OrderServiceTests()
     {
         _orderRepositoryMock = new Mock<IOrderRepository>();
         _productRepositoryMock = new Mock<IProductRepository>();
-        _orderService = new OrderService(_orderRepositoryMock.Object, _productRepositoryMock.Object);
+        _installationServiceMock = new Mock<IInstallationService>();
+        _installationSlotServiceMock = new Mock<IInstallationSlotService>();
+        _technicianProfileServiceMock = new Mock<ITechnicianProfileService>();
+        _orderService = new OrderService(_orderRepositoryMock.Object, _productRepositoryMock.Object, _installationServiceMock.Object, _installationSlotServiceMock.Object, _technicianProfileServiceMock.Object);
     }
 
     [Fact]

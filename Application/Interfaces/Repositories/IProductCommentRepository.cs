@@ -5,6 +5,7 @@ namespace Application.Interfaces.Repositories
     public interface IProductCommentRepository
     {
         Task<ProductComment?> GetByIdAsync(int id);
+        Task<ProductComment?> GetByIdForUpdateAsync(int id);
         Task<List<ProductComment>> GetAllAsync();
         Task<List<ProductComment>> GetByProductAsync(int productId);
         Task<List<ProductComment>> GetByUserAsync(int userId);

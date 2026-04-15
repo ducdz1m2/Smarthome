@@ -19,14 +19,18 @@ namespace Application.DTOs.Responses
         public DateTime CreatedAt { get; set; }
         public List<OrderItemResponse> Items { get; set; } = new();
         public List<OrderShipmentResponse> Shipments { get; set; } = new();
+        public bool HasUninstallBooking { get; set; } = false;
     }
 
     public class OrderItemResponse
     {
         public int Id { get; set; }
         public int ProductId { get; set; }
+        public int? VariantId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public string Sku { get; set; } = string.Empty;
+        public string? VariantSku { get; set; }
+        public string? VariantName { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }
@@ -44,6 +48,14 @@ namespace Application.DTOs.Responses
         public DateTime? DeliveredAt { get; set; }
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; }
+    }
+
+    public class WarehouseAllocationResponse
+    {
+        public int OrderItemId { get; set; }
+        public int WarehouseId { get; set; }
+        public string WarehouseName { get; set; } = string.Empty;
+        public int Quantity { get; set; }
     }
 
     

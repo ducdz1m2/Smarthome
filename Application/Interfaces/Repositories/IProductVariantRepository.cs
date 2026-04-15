@@ -7,6 +7,7 @@ namespace Application.Interfaces.Repositories
         Task<ProductVariant?> GetByIdAsync(int id);
         Task<ProductVariant?> GetBySkuAsync(string sku);
         Task<List<ProductVariant>> GetByProductIdAsync(int productId);
+        Task<List<ProductVariant>> GetByProductIdsAsync(List<int> productIds);
         Task<bool> ExistsAsync(string sku, int? excludeId = null);
         Task AddAsync(ProductVariant variant);
         void Update(ProductVariant variant);

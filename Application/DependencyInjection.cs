@@ -32,9 +32,11 @@ namespace Application
             services.AddScoped<IInstallationService, InstallationService>();
             services.AddScoped<ITechnicianProfileService, TechnicianProfileService>();
             services.AddScoped<IInstallationSlotService, InstallationSlotService>();
+            services.AddScoped<ITechnicianRatingService, TechnicianRatingService>();
 
             // Warranty services
             services.AddScoped<IWarrantyService, WarrantyService>();
+            services.AddScoped<IWarrantyRequestService, WarrantyRequestService>();
 
             // Return Order services
             services.AddScoped<IReturnOrderService, ReturnOrderService>();

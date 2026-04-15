@@ -113,9 +113,31 @@ namespace Application.Services
             return MapToResponse(created!);
         }
 
+        public async Task<ProductCommentResponse> UpdateAsync(int id, CreateProductCommentRequest request)
+        {
+            var comment = await _commentRepository.GetByIdForUpdateAsync(id);
+            if (comment == null)
+                throw new Exception("Không tìm thấy đánh giá");
+
+            comment.UpdateContent(request.Content);
+            
+            // Update rating using reflection since there's no UpdateRating method
+            comment.GetType().GetProperty("Rating")?.SetValue(comment, request.Rating);
+            
+            // Reset approval when editing
+            comment.GetType().GetProperty("IsApproved")?.SetValue(comment, false);
+
+            _commentRepository.Update(comment);
+            await _commentRepository.SaveChangesAsync();
+
+            // Reload with Product for mapping
+            var updated = await _commentRepository.GetByIdAsync(id);
+            return MapToResponse(updated!);
+        }
+
         public async Task ApproveAsync(int id)
         {
-            var comment = await _commentRepository.GetByIdAsync(id);
+            var comment = await _commentRepository.GetByIdForUpdateAsync(id);
             if (comment == null) return;
             
             comment.Approve();
@@ -125,17 +147,16 @@ namespace Application.Services
 
         public async Task RejectAsync(int id)
         {
-            var comment = await _commentRepository.GetByIdAsync(id);
+            var comment = await _commentRepository.GetByIdForUpdateAsync(id);
             if (comment == null) return;
             
-            comment.Reject();
-            _commentRepository.Update(comment);
+            _commentRepository.Delete(comment);
             await _commentRepository.SaveChangesAsync();
         }
 
         public async Task DeleteAsync(int id)
         {
-            var comment = await _commentRepository.GetByIdAsync(id);
+            var comment = await _commentRepository.GetByIdForUpdateAsync(id);
             if (comment == null) return;
             
             _commentRepository.Delete(comment);

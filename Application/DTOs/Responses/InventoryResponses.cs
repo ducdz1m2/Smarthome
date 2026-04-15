@@ -7,27 +7,30 @@ namespace Application.DTOs.Responses
         public string ProductName { get; set; } = string.Empty;
         public string Sku { get; set; } = string.Empty;
         public decimal BasePrice { get; set; }
-        
+
         // Category info
         public int CategoryId { get; set; }
         public string CategoryName { get; set; } = string.Empty;
         public string? CategoryPath { get; set; }
-        
+
         // Brand info
         public int BrandId { get; set; }
         public string BrandName { get; set; } = string.Empty;
-        
+
         // Stock info
         public int TotalQuantity { get; set; }
         public int TotalReserved { get; set; }
         public int AvailableStock => TotalQuantity - TotalReserved;
         public bool IsLowStock { get; set; }
         public int LowStockThreshold { get; set; } = 10;
-        
+
         public string? MainImageUrl { get; set; }
-        
+
         // Chi tiết theo từng kho
         public List<WarehouseStockDetailResponse> WarehouseStocks { get; set; } = new();
+
+        // Chi tiết theo từng phân loại
+        public List<ProductVariantInventoryResponse> Variants { get; set; } = new();
     }
 
     public class WarehouseStockDetailResponse
@@ -38,6 +41,20 @@ namespace Application.DTOs.Responses
         public int Quantity { get; set; }
         public int ReservedQuantity { get; set; }
         public int AvailableStock => Quantity - ReservedQuantity;
+    }
+
+    public class ProductVariantInventoryResponse
+    {
+        public int VariantId { get; set; }
+        public string Sku { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
+        public Dictionary<string, string> Attributes { get; set; } = new();
+        public bool IsActive { get; set; }
+        public List<WarehouseStockDetailResponse> WarehouseStocks { get; set; } = new();
+        public int TotalQuantity => WarehouseStocks.Sum(w => w.Quantity);
+        public int TotalReserved => WarehouseStocks.Sum(w => w.ReservedQuantity);
+        public int AvailableStock => TotalQuantity - TotalReserved;
     }
 
     // Tồn kho tổng hợp theo danh mục

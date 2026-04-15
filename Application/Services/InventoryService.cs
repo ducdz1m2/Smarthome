@@ -16,6 +16,8 @@ namespace Application.Services
         private readonly ISupplierRepository _supplierRepository;
         private readonly IStockEntryRepository _stockEntryRepository;
         private readonly ICategoryRepository _categoryRepository;
+        private readonly IProductVariantRepository _productVariantRepository;
+        private readonly IProductVariantService _productVariantService;
 
         public InventoryService(
             IProductRepository productRepository,
@@ -23,7 +25,9 @@ namespace Application.Services
             IWarehouseRepository warehouseRepository,
             ISupplierRepository supplierRepository,
             IStockEntryRepository stockEntryRepository,
-            ICategoryRepository categoryRepository)
+            ICategoryRepository categoryRepository,
+            IProductVariantRepository productVariantRepository,
+            IProductVariantService productVariantService)
         {
             _productRepository = productRepository;
             _productWarehouseRepository = productWarehouseRepository;
@@ -31,6 +35,8 @@ namespace Application.Services
             _supplierRepository = supplierRepository;
             _stockEntryRepository = stockEntryRepository;
             _categoryRepository = categoryRepository;
+            _productVariantRepository = productVariantRepository;
+            _productVariantService = productVariantService;
         }
 
         #region Product Inventory
@@ -38,19 +44,24 @@ namespace Application.Services
         public async Task<List<ProductInventoryResponse>> GetProductInventoryAsync(InventoryFilterRequest? filter = null)
         {
             var products = await _productRepository.GetAllAsync();
-            
+
             if (filter?.CategoryId.HasValue == true)
                 products = products.Where(p => p.CategoryId == filter.CategoryId.Value).ToList();
 
             if (!string.IsNullOrWhiteSpace(filter?.SearchTerm))
-                products = products.Where(p => 
-                    p.Name.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase) || 
+                products = products.Where(p =>
+                    p.Name.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase) ||
                     p.Sku.Value.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
 
             var productIds = products.Select(p => p.Id).ToList();
-            var warehouseStocks = productIds.Any() 
-                ? await _productWarehouseRepository.GetByProductsAsync(productIds) 
+            var warehouseStocks = productIds.Any()
+                ? await _productWarehouseRepository.GetByProductsAsync(productIds)
                 : new List<ProductWarehouse>();
+
+            // Load variants for all products
+            var allVariants = productIds.Any()
+                ? await _productVariantRepository.GetByProductIdsAsync(productIds)
+                : new List<ProductVariant>();
 
             var result = new List<ProductInventoryResponse>();
 
@@ -59,6 +70,34 @@ namespace Application.Services
                 var productStocks = warehouseStocks.Where(pw => pw.ProductId == product.Id).ToList();
                 var totalQty = productStocks.Sum(pw => pw.Quantity);
                 var totalReserved = productStocks.Sum(pw => pw.ReservedQuantity);
+
+                // Load variants for this product
+                var productVariants = allVariants.Where(v => v.ProductId == product.Id).ToList();
+                var variantResponses = new List<ProductVariantInventoryResponse>();
+
+                foreach (var variant in productVariants)
+                {
+                    // Get warehouse stocks for this variant
+                    var variantStocks = productStocks.Where(pw => pw.VariantId == variant.Id).ToList();
+
+                    variantResponses.Add(new ProductVariantInventoryResponse
+                    {
+                        VariantId = variant.Id,
+                        Sku = variant.Sku.Value,
+                        Price = variant.Price.Amount,
+                        StockQuantity = variant.StockQuantity,
+                        Attributes = variant.GetAttributes(),
+                        IsActive = variant.IsActive,
+                        WarehouseStocks = variantStocks.Select(pw => new WarehouseStockDetailResponse
+                        {
+                            WarehouseId = pw.WarehouseId,
+                            WarehouseName = pw.Warehouse?.Name ?? "",
+                            WarehouseCode = pw.Warehouse?.Code ?? "",
+                            Quantity = pw.Quantity,
+                            ReservedQuantity = pw.ReservedQuantity
+                        }).ToList()
+                    });
+                }
 
                 var response = new ProductInventoryResponse
                 {
@@ -81,7 +120,8 @@ namespace Application.Services
                         WarehouseCode = pw.Warehouse?.Code ?? "",
                         Quantity = pw.Quantity,
                         ReservedQuantity = pw.ReservedQuantity
-                    }).ToList()
+                    }).ToList(),
+                    Variants = variantResponses
                 };
 
                 if (filter?.WarehouseId.HasValue == true)
@@ -428,7 +468,7 @@ namespace Application.Services
                 if (product == null)
                     throw new DomainException($"Không tìm thấy sản phẩm ID: {detail.ProductId}");
 
-                entry.AddItem(detail.ProductId, detail.Quantity, detail.UnitCost);
+                entry.AddItem(detail.ProductId, detail.Quantity, detail.UnitCost, variantId: detail.VariantId);
             }
 
             await _stockEntryRepository.AddAsync(entry);
@@ -449,11 +489,11 @@ namespace Application.Services
             foreach (var detail in entry.Details)
             {
                 var productWarehouse = await _productWarehouseRepository
-                    .GetByProductAndWarehouseAsync(detail.ProductId, entry.WarehouseId);
+                    .GetByProductVariantAndWarehouseAsync(detail.ProductId, detail.VariantId, entry.WarehouseId);
 
                 if (productWarehouse == null)
                 {
-                    productWarehouse = ProductWarehouse.Create(detail.ProductId, entry.WarehouseId, 0);
+                    productWarehouse = ProductWarehouse.Create(detail.ProductId, detail.VariantId, entry.WarehouseId, 0);
                     await _productWarehouseRepository.AddAsync(productWarehouse);
                 }
 
@@ -493,6 +533,18 @@ namespace Application.Services
             // Note: Product không có method SetFrozenStockQuantity, nên cần cập nhật trực tiếp qua EF
             _productRepository.Update(product);
             await _productRepository.SaveChangesAsync();
+
+            // Đồng bộ ProductVariant.StockQuantity cho tất cả variants của sản phẩm
+            var variants = await _productVariantRepository.GetByProductIdAsync(productId);
+            foreach (var variant in variants)
+            {
+                // Tính tổng stock cho variant từ tất cả các kho
+                var variantStocks = warehouseStocks.Where(pw => pw.VariantId == variant.Id).ToList();
+                var variantTotalStock = variantStocks.Sum(pw => pw.Quantity);
+
+                // Cập nhật StockQuantity của variant
+                await _productVariantService.UpdateStockQuantityAsync(variant.Id, variantTotalStock);
+            }
         }
 
         public async Task CancelStockEntryAsync(int stockEntryId)

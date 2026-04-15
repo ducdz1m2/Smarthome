@@ -144,6 +144,18 @@ namespace Application.Services
             await _variantRepository.SaveChangesAsync();
         }
 
+        public async Task UpdateStockQuantityAsync(int id, int quantity)
+        {
+            var variant = await _variantRepository.GetByIdAsync(id);
+            if (variant == null)
+                throw new DomainException("Không tìm thấy phân loại sản phẩm");
+
+            // Update StockQuantity directly using reflection
+            typeof(ProductVariant).GetProperty("StockQuantity")?.SetValue(variant, quantity);
+            _variantRepository.Update(variant);
+            await _variantRepository.SaveChangesAsync();
+        }
+
         private ProductVariantListResponse MapToListResponse(ProductVariant variant)
         {
             return new ProductVariantListResponse

@@ -4,129 +4,237 @@
 @using MudBlazor
 @layout AdminLayout
 @inject IProductCommentService CommentService
+@inject ITechnicianRatingService TechnicianRatingService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
 <MudText Typo="Typo.h4" Class="mb-4">Quản lý đánh giá</MudText>
 
-<MudCard Elevation="2" Class="mb-4">
-    <MudCardHeader>
-        <CardHeaderContent>
-            <div class="d-flex align-center justify-space-between">
-                <MudText Typo="Typo.h6">Danh sách đánh giá</MudText>
-                <div class="d-flex gap-2">
-                    <MudBadge Content="_pendingCount" Color="Color.Error" Overlap="true" Visible="_pendingCount > 0">
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadPending">
-                            Chờ duyệt
-                        </MudButton>
-                    </MudBadge>
-                    <MudButton Color="Color.Default" Variant="Variant.Outlined" OnClick="LoadAll">
-                        Tất cả
-                    </MudButton>
-                </div>
-            </div>
-        </CardHeaderContent>
-    </MudCardHeader>
-    <MudCardContent>
-        @if (_loading)
-        {
-            <MudProgressLinear Indeterminate="true" Class="my-4" />
-        }
-        else if (_comments?.Any() != true)
-        {
-            <MudAlert Severity="Severity.Info">Chưa có đánh giá nào</MudAlert>
-        }
-        else
-        {
-            <MudTable Items="_comments" Dense="true" Hover="true">
-                <HeaderContent>
-                    <MudTh>Sản phẩm</MudTh>
-                    <MudTh>Khách hàng</MudTh>
-                    <MudTh>Đánh giá</MudTh>
-                    <MudTh>Nội dung</MudTh>
-                    <MudTh>Trạng thái</MudTh>
-                    <MudTh>Ngày tạo</MudTh>
-                    <MudTh>Thao tác</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd>
-                        <div class="d-flex align-center">
-                            <MudAvatar Size="Size.Small" Color="Color.Primary" Class="mr-2">
-                                @context.ProductName[0]
-                            </MudAvatar>
-                            <div>
-                                <MudText Typo="Typo.body2" Class="fw-bold">@context.ProductName</MudText>
-                                <MudText Typo="Typo.caption">ID: @context.ProductId</MudText>
-                            </div>
+<MudTabs Elevation="2" Class="mb-4">
+    <MudTabPanel Text="Đánh giá sản phẩm">
+        <MudCard Elevation="0">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div class="d-flex align-center justify-space-between">
+                        <MudText Typo="Typo.h6">Đánh giá sản phẩm</MudText>
+                        <div class="d-flex gap-2">
+                            <MudBadge Content="_pendingCount" Color="Color.Error" Overlap="true" Visible="_pendingCount > 0">
+                                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadPending">
+                                    Chờ duyệt
+                                </MudButton>
+                            </MudBadge>
+                            <MudButton Color="Color.Default" Variant="Variant.Outlined" OnClick="LoadAll">
+                                Tất cả
+                            </MudButton>
                         </div>
-                    </MudTd>
-                    <MudTd>@context.UserName</MudTd>
-                    <MudTd>
-                        <div class="d-flex align-center">
-                            <MudRating SelectedValue="context.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
-                            <MudText Typo="Typo.body2" Class="ml-2">@context.Rating/5</MudText>
-                        </div>
-                    </MudTd>
-                    <MudTd>
-                        <div>
-                            <MudText Typo="Typo.body2" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
-                                @context.Content
-                            </MudText>
-                            @if (context.Replies?.Any() == true)
-                            {
-                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                                    @context.Replies.Count phản hồi
-                                </MudText>
-                                @foreach (var reply in context.Replies)
+                    </div>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_loading)
+                {
+                    <MudProgressLinear Indeterminate="true" Class="my-4" />
+                }
+                else if (_comments?.Any() != true)
+                {
+                    <MudAlert Severity="Severity.Info">Chưa có đánh giá nào</MudAlert>
+                }
+                else
+                {
+                    <MudTable Items="_comments" Dense="true" Hover="true">
+                        <HeaderContent>
+                            <MudTh>Sản phẩm</MudTh>
+                            <MudTh>Khách hàng</MudTh>
+                            <MudTh>Đánh giá</MudTh>
+                            <MudTh>Nội dung</MudTh>
+                            <MudTh>Trạng thái</MudTh>
+                            <MudTh>Ngày tạo</MudTh>
+                            <MudTh>Thao tác</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <div class="d-flex align-center">
+                                    <MudAvatar Size="Size.Small" Color="Color.Primary" Class="mr-2">
+                                        @context.ProductName[0]
+                                    </MudAvatar>
+                                    <div>
+                                        <MudText Typo="Typo.body2" Class="fw-bold">@context.ProductName</MudText>
+                                        <MudText Typo="Typo.caption">ID: @context.ProductId</MudText>
+                                    </div>
+                                </div>
+                            </MudTd>
+                            <MudTd>@context.UserName</MudTd>
+                            <MudTd>
+                                <div class="d-flex align-center">
+                                    <MudRating SelectedValue="context.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
+                                    <MudText Typo="Typo.body2" Class="ml-2">@context.Rating/5</MudText>
+                                </div>
+                            </MudTd>
+                            <MudTd>
+                                <div>
+                                    <MudText Typo="Typo.body2" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                                        @context.Content
+                                    </MudText>
+                                    @if (context.Replies?.Any() == true)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                            @context.Replies.Count phản hồi
+                                        </MudText>
+                                        @foreach (var reply in context.Replies)
+                                        {
+                                            <MudCard Class="mt-1" Elevation="0" Outlined="true" Style="background-color: #f5f5f5;">
+                                                <MudCardContent Class="pa-2">
+                                                    <MudText Typo="Typo.caption" Class="fw-bold">@reply.UserName</MudText>
+                                                    <MudText Typo="Typo.caption">@reply.Content</MudText>
+                                                </MudCardContent>
+                                            </MudCard>
+                                        }
+                                    }
+                                </div>
+                            </MudTd>
+                            <MudTd>
+                                @if (context.IsApproved)
                                 {
-                                    <MudCard Class="mt-1" Elevation="0" Outlined="true" Style="background-color: #f5f5f5;">
-                                        <MudCardContent Class="pa-2">
-                                            <MudText Typo="Typo.caption" Class="fw-bold">@reply.UserName</MudText>
-                                            <MudText Typo="Typo.caption">@reply.Content</MudText>
-                                        </MudCardContent>
-                                    </MudCard>
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Đã duyệt</MudChip>
                                 }
-                            }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
+                                }
+                            </MudTd>
+                            <MudTd>@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                            <MudTd>
+                                <div class="d-flex gap-1">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Reply" 
+                                                 Color="Color.Primary" 
+                                                 Size="Size.Small"
+                                                 OnClick="() => OpenReplyDialog(context)"
+                                                 Title="Phản hồi" />
+                                    @if (!context.IsApproved)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.Check" 
+                                                     Color="Color.Success" 
+                                                     Size="Size.Small"
+                                                     OnClick="() => Approve(context.Id)"
+                                                     Title="Duyệt" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                                     Color="Color.Error" 
+                                                     Size="Size.Small"
+                                                     OnClick="() => Reject(context.Id)"
+                                                     Title="Từ chối" />
+                                    }
+                                </div>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudTabPanel>
+    <MudTabPanel Text="Đánh giá kỹ thuật viên">
+        <MudCard Elevation="0">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div class="d-flex align-center justify-space-between">
+                        <MudText Typo="Typo.h6">Đánh giá kỹ thuật viên</MudText>
+                        <div class="d-flex gap-2">
+                            <MudBadge Content="_technicianPendingCount" Color="Color.Error" Overlap="true" Visible="_technicianPendingCount > 0">
+                                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadTechnicianPending">
+                                    Chờ duyệt
+                                </MudButton>
+                            </MudBadge>
+                            <MudButton Color="Color.Default" Variant="Variant.Outlined" OnClick="LoadTechnicianAll">
+                                Tất cả
+                            </MudButton>
                         </div>
-                    </MudTd>
-                    <MudTd>
-                        @if (context.IsApproved)
-                        {
-                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Đã duyệt</MudChip>
-                        }
-                        else
-                        {
-                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
-                        }
-                    </MudTd>
-                    <MudTd>@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
-                    <MudTd>
-                        <div class="d-flex gap-1">
-                            <MudIconButton Icon="@Icons.Material.Filled.Reply" 
-                                         Color="Color.Primary" 
-                                         Size="Size.Small"
-                                         OnClick="() => OpenReplyDialog(context)"
-                                         Title="Phản hồi" />
-                            @if (!context.IsApproved)
-                            {
-                                <MudIconButton Icon="@Icons.Material.Filled.Check" 
-                                             Color="Color.Success" 
-                                             Size="Size.Small"
-                                             OnClick="() => Approve(context.Id)"
-                                             Title="Duyệt" />
-                                <MudIconButton Icon="@Icons.Material.Filled.Close" 
-                                             Color="Color.Error" 
-                                             Size="Size.Small"
-                                             OnClick="() => Reject(context.Id)"
-                                             Title="Từ chối" />
-                            }
-                        </div>
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
-        }
-    </MudCardContent>
-</MudCard>
+                    </div>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_technicianLoading)
+                {
+                    <MudProgressLinear Indeterminate="true" Class="my-4" />
+                }
+                else if (_technicianRatings?.Any() != true)
+                {
+                    <MudAlert Severity="Severity.Info">Chưa có đánh giá kỹ thuật viên nào</MudAlert>
+                }
+                else
+                {
+                    <MudTable Items="_technicianRatings" Dense="true" Hover="true">
+                        <HeaderContent>
+                            <MudTh>Kỹ thuật viên</MudTh>
+                            <MudTh>Khách hàng</MudTh>
+                            <MudTh>Đánh giá</MudTh>
+                            <MudTh>Nội dung</MudTh>
+                            <MudTh>Trạng thái</MudTh>
+                            <MudTh>Ngày tạo</MudTh>
+                            <MudTh>Thao tác</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <div class="d-flex align-center">
+                                    <MudAvatar Size="Size.Small" Color="Color.Secondary" Class="mr-2">
+                                        @context.TechnicianName[0]
+                                    </MudAvatar>
+                                    <div>
+                                        <MudText Typo="Typo.body2" Class="fw-bold">@context.TechnicianName</MudText>
+                                        <MudText Typo="Typo.caption">ID: @context.TechnicianId</MudText>
+                                    </div>
+                                </div>
+                            </MudTd>
+                            <MudTd>@context.UserName</MudTd>
+                            <MudTd>
+                                <div class="d-flex align-center">
+                                    <MudRating SelectedValue="context.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
+                                    <MudText Typo="Typo.body2" Class="ml-2">@context.Rating/5</MudText>
+                                </div>
+                            </MudTd>
+                            <MudTd>
+                                <MudText Typo="Typo.body2" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                                    @context.Content
+                                </MudText>
+                            </MudTd>
+                            <MudTd>
+                                @if (context.IsApproved)
+                                {
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Đã duyệt</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
+                                }
+                            </MudTd>
+                            <MudTd>@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                            <MudTd>
+                                <div class="d-flex gap-1">
+                                    @if (!context.IsApproved)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.Check" 
+                                                     Color="Color.Success" 
+                                                     Size="Size.Small"
+                                                     OnClick="() => ApproveTechnician(context.Id)"
+                                                     Title="Duyệt" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                                     Color="Color.Error" 
+                                                     Size="Size.Small"
+                                                     OnClick="() => RejectTechnician(context.Id)"
+                                                     Title="Từ chối" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                     Color="Color.Error" 
+                                                     Size="Size.Small"
+                                                     OnClick="() => DeleteTechnician(context.Id)"
+                                                     Title="Xóa" />
+                                    }
+                                </div>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudTabPanel>
+</MudTabs>
 
 <style>
     .fw-bold {
@@ -139,9 +247,14 @@
     private bool _loading = true;
     private int _pendingCount = 0;
 
+    private List<TechnicianRatingResponse>? _technicianRatings;
+    private bool _technicianLoading = true;
+    private int _technicianPendingCount = 0;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadAll();
+        await LoadTechnicianAll();
     }
 
     private async Task LoadAll()
@@ -186,6 +299,7 @@
             await CommentService.ApproveAsync(id);
             Snackbar.Add("Đã duyệt đánh giá", Severity.Success);
             await LoadAll();
+            StateHasChanged();
         }
         catch (Exception ex)
         {
@@ -200,6 +314,7 @@
             await CommentService.RejectAsync(id);
             Snackbar.Add("Đã từ chối đánh giá", Severity.Success);
             await LoadAll();
+            StateHasChanged();
         }
         catch (Exception ex)
         {
@@ -225,6 +340,88 @@
         if (result?.Canceled == false)
         {
             await LoadAll();
+            StateHasChanged();
+        }
+    }
+
+    // Technician ratings methods
+    private async Task LoadTechnicianAll()
+    {
+        _technicianLoading = true;
+        try
+        {
+            _technicianRatings = await TechnicianRatingService.GetAllAsync();
+            _technicianPendingCount = await TechnicianRatingService.CountPendingAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _technicianLoading = false;
+        }
+    }
+
+    private async Task LoadTechnicianPending()
+    {
+        _technicianLoading = true;
+        try
+        {
+            _technicianRatings = await TechnicianRatingService.GetPendingApprovalAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _technicianLoading = false;
+        }
+    }
+
+    private async Task ApproveTechnician(int id)
+    {
+        try
+        {
+            await TechnicianRatingService.ApproveAsync(id);
+            Snackbar.Add("Đã duyệt đánh giá kỹ thuật viên", Severity.Success);
+            await LoadTechnicianAll();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RejectTechnician(int id)
+    {
+        try
+        {
+            await TechnicianRatingService.RejectAsync(id);
+            Snackbar.Add("Đã từ chối đánh giá kỹ thuật viên", Severity.Success);
+            await LoadTechnicianAll();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteTechnician(int id)
+    {
+        try
+        {
+            await TechnicianRatingService.DeleteByIdAsync(id);
+            Snackbar.Add("Đã xóa đánh giá kỹ thuật viên", Severity.Success);
+            await LoadTechnicianAll();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }
 }

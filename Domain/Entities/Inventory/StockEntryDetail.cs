@@ -11,6 +11,7 @@ public class StockEntryDetail : Entity
     {
         public int StockEntryId { get; private set; }
         public int ProductId { get; private set; }
+        public int? VariantId { get; private set; }
         public int Quantity { get; private set; }
         public Money UnitCost { get; private set; } = null!;
         public string? Notes { get; private set; }
@@ -21,7 +22,7 @@ public class StockEntryDetail : Entity
 
         private StockEntryDetail() { } // EF Core
 
-        public static StockEntryDetail Create(int productId, int quantity, Money unitCost, int? stockEntryId = null, string? notes = null)
+        public static StockEntryDetail Create(int productId, int quantity, Money unitCost, int? stockEntryId = null, string? notes = null, int? variantId = null)
         {
             if (productId <= 0)
                 throw new ValidationException(nameof(productId), "ProductId không hợp lệ");
@@ -36,6 +37,7 @@ public class StockEntryDetail : Entity
             {
                 StockEntryId = stockEntryId ?? 0,
                 ProductId = productId,
+                VariantId = variantId,
                 Quantity = quantity,
                 UnitCost = unitCost,
                 Notes = notes?.Trim()

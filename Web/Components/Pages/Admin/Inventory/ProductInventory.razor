@@ -105,6 +105,7 @@
                 <MudTh>Tổng tồn</MudTh>
                 <MudTh>Đã đặt</MudTh>
                 <MudTh>Có sẵn</MudTh>
+                <MudTh>Phân loại</MudTh>
                 <MudTh>Chi tiết kho</MudTh>
                 <MudTh>Thao tác</MudTh>
             </HeaderContent>
@@ -126,6 +127,25 @@
                     @if (context.IsLowStock)
                     {
                         <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" title="Sắp hết hàng" />
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.Variants.Any())
+                    {
+                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                            @foreach (var variant in context.Variants)
+                            {
+                                <MudChip T="string"
+                                         Size="Size.Small" 
+                                         Color="GetStockColor(variant.AvailableStock)">
+                                    @variant.Sku: @variant.AvailableStock
+                                </MudChip>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Warning">Chưa có phân loại</MudText>
                     }
                 </MudTd>
                 <MudTd>

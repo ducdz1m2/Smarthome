@@ -23,6 +23,13 @@ namespace Infrastructure.Repositories
                 .FirstOrDefaultAsync(c => c.Id == id);
         }
 
+        public async Task<ProductComment?> GetByIdForUpdateAsync(int id)
+        {
+            return await _context.ProductComments
+                .Include(c => c.Replies)
+                .FirstOrDefaultAsync(c => c.Id == id);
+        }
+
         public async Task<List<ProductComment>> GetAllAsync()
         {
             return await _context.ProductComments

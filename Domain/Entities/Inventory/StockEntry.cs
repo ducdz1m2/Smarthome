@@ -43,12 +43,12 @@ public class StockEntry : AggregateRoot
             };
         }
 
-        public StockEntryDetail AddItem(int productId, int quantity, decimal unitCost)
+        public StockEntryDetail AddItem(int productId, int quantity, decimal unitCost, int? variantId = null)
         {
             if (IsCompleted)
                 throw new BusinessRuleViolationException("StockEntryCompleted", "Không thể thêm sản phẩm vào phiếu đã hoàn thành");
 
-            var detail = StockEntryDetail.Create(productId, quantity, Money.Vnd(unitCost));
+            var detail = StockEntryDetail.Create(productId, quantity, Money.Vnd(unitCost), variantId: variantId);
             Details.Add(detail);
             RecalculateTotal();
             return detail;
