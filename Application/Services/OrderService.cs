@@ -346,8 +346,11 @@ namespace Application.Services
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
+            // Check if order was in Pending status before confirming
+            var isWasPending = order.Status.ToString() == "Pending";
+
             // Only call Confirm() if order is in Pending status
-            if (order.Status.ToString() == "Pending")
+            if (isWasPending)
             {
                 order.Confirm();
                 await _orderRepository.SaveChangesAsync();
@@ -360,7 +363,7 @@ namespace Application.Services
             }
 
             // Only start shipping/installation flows if order was just confirmed
-            if (order.Status.ToString() == "Pending")
+            if (isWasPending)
             {
                 var hasInstallItems = order.Items.Any(i => i.RequiresInstallation);
                 var hasShipItems = order.Items.Any(i => !i.RequiresInstallation);

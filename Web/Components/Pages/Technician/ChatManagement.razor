@@ -1,4 +1,4 @@
-@page "/admin/chat"
+@page "/technician/chat"
 @using Application.DTOs.Responses
 @using Application.DTOs.Requests
 @using Application.Interfaces.Services
@@ -10,14 +10,14 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
-<div class="chat-container">
-    <div class="chat-sidebar">
-        <div class="chat-sidebar-header">
-            <MudText Typo="Typo.h6" Class="mb-0">Hỗ trợ khách hàng</MudText>
+<div class="technician-chat-container">
+    <div class="technician-chat-sidebar">
+        <div class="technician-chat-sidebar-header">
+            <MudText Typo="Typo.h6" Class="mb-0">Chat Đơn Lắp Đặt</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">@_chatRooms.Count cuộc hội thoại</MudText>
         </div>
         
-        <div class="chat-rooms-list">
+        <div class="technician-chat-rooms-list">
             @if (_chatRooms.Count == 0)
             {
                 <div class="text-center py-4">
@@ -29,24 +29,27 @@
             {
                 @foreach (var room in _chatRooms)
                 {
-                    // Get customer name from participants
                     var customerParticipant = room.Participants.FirstOrDefault(p => p.UserType == "Customer");
                     var customerName = customerParticipant?.UserName ?? room.Title;
+                    var technicianParticipant = room.Participants.FirstOrDefault(p => p.UserType == "Technician");
+                    var unreadCount = technicianParticipant?.UnreadCount ?? 0;
 
-                    // Get admin unread count from participants
-                    var adminParticipant = room.Participants.FirstOrDefault(p => p.UserType == "Admin");
-                    var unreadCount = adminParticipant?.UnreadCount ?? 0;
-
-                    <div class="@($"chat-room-item {(SelectedChatRoomId == room.Id ? "selected" : "")}")"
+                    <div class="@($"technician-chat-room-item {(SelectedChatRoomId == room.Id ? "selected" : "")}")"
                          @onclick="() => SelectChatRoom(room.Id)">
-                        <div class="chat-room-avatar">@GetInitials(customerName)</div>
-                        <div class="chat-room-info">
-                            <div class="chat-room-name">@customerName</div>
-                            <div class="chat-room-last-message">@room.LastMessage</div>
+                        <div class="technician-chat-room-avatar">@GetInitials(customerName)</div>
+                        <div class="technician-chat-room-info">
+                            <div class="technician-chat-room-name">@customerName</div>
+                            <div class="technician-chat-room-installation">
+                                @if (room.RelatedInstallationId.HasValue)
+                                {
+                                    <span>Đơn #@room.RelatedInstallationId</span>
+                                }
+                            </div>
+                            <div class="technician-chat-room-last-message">@room.LastMessage?.Content ?? ""</div>
                         </div>
                         @if (unreadCount > 0)
                         {
-                            <div class="chat-room-badge">@unreadCount</div>
+                            <div class="technician-chat-room-badge">@unreadCount</div>
                         }
                     </div>
                 }
@@ -54,10 +57,10 @@
         </div>
     </div>
     
-    <div class="chat-main">
+    <div class="technician-chat-main">
         @if (SelectedChatRoomId == 0)
         {
-            <div class="chat-empty-state">
+            <div class="technician-chat-empty-state">
                 <MudIcon Icon="@Icons.Material.Outlined.ChatBubbleOutline" Size="Size.Large" Class="mb-4" Color="Color.Secondary" />
                 <MudText Typo="Typo.h5" Class="mb-2">Chọn cuộc hội thoại</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-center">
@@ -67,17 +70,21 @@
         }
         else
         {
-            <div class="chat-header">
+            <div class="technician-chat-header">
                 <div class="d-flex align-items-center gap-3">
-                    <div class="chat-header-avatar">@GetInitials(GetSelectedRoomName())</div>
+                    <div class="technician-chat-header-avatar">@GetInitials(GetSelectedRoomName())</div>
                     <div>
                         <MudText Typo="Typo.subtitle1" Class="mb-0">@GetSelectedRoomName()</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Đang hoạt động</MudText>
+                        @if (_selectedRoom?.RelatedInstallationId.HasValue == true)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Primary">Đơn lắp đặt #@_selectedRoom.RelatedInstallationId</MudText>
+                        }
                     </div>
                 </div>
             </div>
             
-            <div class="chat-messages" @ref="_messagesContainer">
+            <div class="technician-chat-messages" @ref="_messagesContainer">
                 @if (_loadingMessages)
                 {
                     <div class="text-center py-4">
@@ -92,18 +99,14 @@
                 }
                 else
                 {
-                    Console.WriteLine($"[ChatManagement] Rendering messages - Count: {_messages.Count}, LastReadAt: {_lastReadAt}, SeparatorShown: {_separatorShown}");
                     @foreach (var msg in _messages)
                     {
-                        // Show separator for new messages (messages after last read or room open)
                         var separatorTime = _lastReadAt ?? _roomOpenTime;
                         var shouldShowSeparator = separatorTime != null && msg.SentAt > separatorTime && !_separatorShown;
-                        Console.WriteLine($"[ChatManagement] Message {msg.Id} - SentAt: {msg.SentAt}, SeparatorTime: {separatorTime}, ShouldShowSeparator: {shouldShowSeparator}");
                         
                         if (shouldShowSeparator)
                         {
-                            Console.WriteLine($"[ChatManagement] Showing separator - LastRead: {_lastReadAt}, MsgTime: {msg.SentAt}");
-                            <div class="message-separator">
+                            <div class="technician-message-separator">
                                 <div class="separator-line"></div>
                                 <div class="separator-text">Tin nhắn mới</div>
                                 <div class="separator-line"></div>
@@ -111,35 +114,35 @@
                             _separatorShown = true;
                         }
 
-                        <div class="@($"message {(msg.SenderId == CurrentUser.UserId ? "sent" : "received")}")">
-                            @if (msg.SenderId != CurrentUser.UserId)
+                        <div class="@($"technician-message {(msg.IsFromMe ? "sent" : "received")}")">
+                            @if (!msg.IsFromMe)
                             {
-                                <div class="message-avatar">@GetInitials(msg.SenderId.ToString())</div>
+                                <div class="technician-message-avatar">@GetInitials(msg.SenderId.ToString())</div>
                             }
-                            <div class="message-content">
-                                <div class="message-bubble">
+                            <div class="technician-message-content">
+                                <div class="technician-message-bubble">
                                     <MudText Typo="Typo.body2">@msg.Content</MudText>
                                 </div>
-                                <div class="message-time">@msg.SentAt.ToLocalTime().ToString("HH:mm")</div>
+                                <div class="technician-message-time">@msg.SentAt.ToLocalTime().ToString("HH:mm")</div>
                             </div>
                         </div>
                     }
                 }
             </div>
             
-            <div class="chat-input-area">
+            <div class="technician-chat-input-area">
                 <div class="d-flex gap-2">
                     <MudTextField T="string" 
                                  @bind-Value="_message" 
                                  Placeholder="Nhập tin nhắn..." 
                                  Variant="Variant.Outlined" 
                                  OnKeyDown="OnKeyPress"
-                                 Class="chat-input-field" />
+                                 Class="technician-chat-input-field" />
                     <MudButton Variant="Variant.Filled" 
                                Color="Color.Primary" 
                                OnClick="async () => await SendMessage()" 
                                Disabled="@string.IsNullOrWhiteSpace(_message)"
-                               Class="chat-send-button">
+                               Class="technician-chat-send-button">
                         <MudIcon Icon="@Icons.Material.Filled.Send" />
                     </MudButton>
                 </div>
@@ -149,13 +152,13 @@
 </div>
 
 <style>
-.chat-container {
+.technician-chat-container {
     display: flex;
     height: calc(100vh - 64px);
     background: #f5f5f5;
 }
 
-.chat-sidebar {
+.technician-chat-sidebar {
     width: 350px;
     background: white;
     border-right: 1px solid #e0e0e0;
@@ -163,18 +166,20 @@
     flex-direction: column;
 }
 
-.chat-sidebar-header {
+.technician-chat-sidebar-header {
     padding: 20px;
     border-bottom: 1px solid #e0e0e0;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
 }
 
-.chat-rooms-list {
+.technician-chat-rooms-list {
     flex: 1;
     overflow-y: auto;
     padding: 10px;
 }
 
-.chat-room-item {
+.technician-chat-room-item {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -185,24 +190,24 @@
     margin-bottom: 4px;
 }
 
-.chat-room-item:hover {
+.technician-chat-room-item:hover {
     background: #f5f5f5;
 }
 
-.chat-room-item.selected {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.technician-chat-room-item.selected {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     color: white;
 }
 
-.chat-room-item.selected .chat-room-last-message {
+.technician-chat-room-item.selected .technician-chat-room-last-message {
     color: rgba(255,255,255,0.8);
 }
 
-.chat-room-avatar {
+.technician-chat-room-avatar {
     width: 48px;
     height: 48px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     color: white;
     display: flex;
     align-items: center;
@@ -212,18 +217,28 @@
     flex-shrink: 0;
 }
 
-.chat-room-info {
+.technician-chat-room-info {
     flex: 1;
     min-width: 0;
 }
 
-.chat-room-name {
+.technician-chat-room-name {
     font-weight: 600;
     font-size: 14px;
     margin-bottom: 4px;
 }
 
-.chat-room-last-message {
+.technician-chat-room-installation {
+    font-size: 11px;
+    color: #757575;
+    margin-bottom: 4px;
+}
+
+.technician-chat-room-item.selected .technician-chat-room-installation {
+    color: rgba(255,255,255,0.9);
+}
+
+.technician-chat-room-last-message {
     font-size: 12px;
     color: #757575;
     white-space: nowrap;
@@ -231,7 +246,7 @@
     text-overflow: ellipsis;
 }
 
-.chat-room-badge {
+.technician-chat-room-badge {
     background: #f44336;
     color: white;
     border-radius: 50%;
@@ -245,14 +260,14 @@
     padding: 0 6px;
 }
 
-.chat-main {
+.technician-chat-main {
     flex: 1;
     display: flex;
     flex-direction: column;
     background: white;
 }
 
-.chat-empty-state {
+.technician-chat-empty-state {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -261,17 +276,17 @@
     padding: 40px;
 }
 
-.chat-header {
+.technician-chat-header {
     padding: 16px 24px;
     border-bottom: 1px solid #e0e0e0;
     background: white;
 }
 
-.chat-header-avatar {
+.technician-chat-header-avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     color: white;
     display: flex;
     align-items: center;
@@ -279,28 +294,28 @@
     font-weight: bold;
 }
 
-.chat-messages {
+.technician-chat-messages {
     flex: 1;
     overflow-y: auto;
     padding: 20px;
     background: #f5f5f5;
 }
 
-.message {
+.technician-message {
     display: flex;
     margin-bottom: 16px;
     gap: 8px;
 }
 
-.message.received {
+.technician-message.received {
     justify-content: flex-start;
 }
 
-.message.sent {
+.technician-message.sent {
     justify-content: flex-end;
 }
 
-.message-avatar {
+.technician-message-avatar {
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -313,38 +328,38 @@
     flex-shrink: 0;
 }
 
-.message-content {
+.technician-message-content {
     max-width: 70%;
 }
 
-.message-bubble {
+.technician-message-bubble {
     padding: 12px 16px;
     border-radius: 18px;
     margin-bottom: 4px;
 }
 
-.message.received .message-bubble {
+.technician-message.received .technician-message-bubble {
     background: white;
     border-bottom-left-radius: 4px;
 }
 
-.message.sent .message-bubble {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.technician-message.sent .technician-message-bubble {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     color: white;
     border-bottom-right-radius: 4px;
 }
 
-.message-time {
+.technician-message-time {
     font-size: 11px;
     color: #757575;
     text-align: right;
 }
 
-.message.sent .message-time {
+.technician-message.sent .technician-message-time {
     color: rgba(255,255,255,0.8);
 }
 
-.message-separator {
+.technician-message-separator {
     display: flex;
     align-items: center;
     margin: 16px 0;
@@ -364,17 +379,17 @@
     white-space: nowrap;
 }
 
-.chat-input-area {
+.technician-chat-input-area {
     padding: 16px 24px;
     border-top: 1px solid #e0e0e0;
     background: white;
 }
 
-.chat-input-field {
+.technician-chat-input-field {
     flex: 1;
 }
 
-.chat-send-button {
+.technician-chat-send-button {
     min-width: 48px;
     height: 48px;
     border-radius: 50%;
@@ -384,6 +399,7 @@
 @code {
     private List<ChatRoomResponse> _chatRooms = new();
     private List<ChatMessageResponse> _messages = new();
+    private ChatRoomResponse? _selectedRoom;
     private int SelectedChatRoomId = 0;
     private string _message = "";
     private bool _loadingMessages = false;
@@ -396,46 +412,32 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Console.WriteLine($"[ChatManagement] OnAfterRenderAsync called: firstRender={firstRender}, _initialized={_initialized}");
+        Console.WriteLine($"[TechnicianChatManagement] OnAfterRenderAsync called: firstRender={firstRender}, _initialized={_initialized}");
         
         if (firstRender && !_initialized)
         {
             try
             {
-                Console.WriteLine("[ChatManagement] Initializing SignalR...");
+                Console.WriteLine("[TechnicianChatManagement] Initializing SignalR...");
                 await SignalRService.InitializeAsync();
-                Console.WriteLine("[ChatManagement] SignalRService.InitializeAsync completed");
-                // Subscribe with async handler
                 SignalRService.OnChatMessageReceived += async (msg) => await OnMessageReceived(msg);
-                Console.WriteLine("[ChatManagement] OnChatMessageReceived event subscribed");
                 await InvokeAsync(async () => await LoadChatRooms());
                 _initialized = true;
-                Console.WriteLine("[ChatManagement] Initialization completed successfully");
+                Console.WriteLine("[TechnicianChatManagement] Initialization completed successfully");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ChatManagement] Initialization failed: {ex.Message}");
-                Console.WriteLine($"[ChatManagement] Stack trace: {ex.StackTrace}");
+                Console.WriteLine($"[TechnicianChatManagement] Initialization failed: {ex.Message}");
                 await InvokeAsync(async () => await LoadChatRooms());
             }
-        }
-        else if (SelectedChatRoomId > 0 && _messages.Count == 0)
-        {
-            // Reload messages if room is selected but messages are empty (e.g., after F5)
-            Console.WriteLine($"[ChatManagement] Room selected but messages empty, reloading messages");
-            await InvokeAsync(async () => await LoadMessages());
         }
     }
 
     private async Task OnMessageReceived(object messageObj)
     {
-        Console.WriteLine("[ChatManagement] OnMessageReceived called");
         try
         {
             var messageJson = System.Text.Json.JsonSerializer.Serialize(messageObj);
-            Console.WriteLine($"[ChatManagement] Received message: {messageJson}");
-
-            // Deserialize to check room and sender
             using var doc = System.Text.Json.JsonDocument.Parse(messageJson);
             if (doc.RootElement.TryGetProperty("chatRoomId", out var chatRoomIdElement) &&
                 doc.RootElement.TryGetProperty("userId", out var userIdElement))
@@ -444,45 +446,26 @@
                 var senderId = userIdElement.GetInt32();
                 var currentUserId = CurrentUser.UserId ?? 0;
                 
-                Console.WriteLine($"[ChatManagement] Message from user {senderId} to room {messageRoomId}, current room is {SelectedChatRoomId}, current user is {currentUserId}");
-
-                // Reload chat rooms to update badge unread count in real-time
                 await InvokeAsync(async () => await LoadChatRooms());
 
-                // Only reload messages if the message is for the currently selected room
                 if (SelectedChatRoomId > 0 && messageRoomId == SelectedChatRoomId)
                 {
-                    // If this is our own message, we already added it locally - don't reload to avoid losing it
                     if (senderId == currentUserId)
                     {
-                        Console.WriteLine("[ChatManagement] Received own message - skipping reload to keep local message");
+                        Console.WriteLine("[TechnicianChatManagement] Received own message - skipping reload");
                     }
                     else
                     {
-                        Console.WriteLine("[ChatManagement] Received message from others - reloading");
                         await InvokeAsync(async () => await LoadMessages());
                         await ScrollToBottom();
                     }
-                }
-                Console.WriteLine("[ChatManagement] Reload completed");
-            }
-            else
-            {
-                // Fallback: reload everything if we can't parse
-                await InvokeAsync(async () => await LoadChatRooms());
-                await InvokeAsync(StateHasChanged);
-                if (SelectedChatRoomId > 0)
-                {
-                    await InvokeAsync(async () => await LoadMessages());
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ChatManagement] Error processing message: {ex.Message}");
-            // Fallback: reload everything
+            Console.WriteLine($"[TechnicianChatManagement] Error processing message: {ex.Message}");
             await InvokeAsync(async () => await LoadChatRooms());
-            await InvokeAsync(StateHasChanged);
             if (SelectedChatRoomId > 0)
             {
                 await InvokeAsync(async () => await LoadMessages());
@@ -495,10 +478,10 @@
         try
         {
             var userId = CurrentUser.UserId ?? 0;
-            Console.WriteLine($"[ChatManagement] Loading chat rooms for admin user ID: {userId}");
+            Console.WriteLine($"[TechnicianChatManagement] Loading chat rooms for technician user ID: {userId}");
             
-            var rooms = await ChatService.GetAllSupportChatRoomsAsync();
-            Console.WriteLine($"[ChatManagement] Found {rooms.Count} support chat rooms from service");
+            var rooms = await ChatService.GetInstallationChatRoomsAsync(userId);
+            Console.WriteLine($"[TechnicianChatManagement] Found {rooms.Count} installation chat rooms");
             
             _chatRooms = rooms.Select(r => new ChatRoomResponse
             {
@@ -522,53 +505,44 @@
                     IsActive = p.IsActive,
                     IsBlocked = p.IsBlocked,
                     UnreadCount = p.UnreadCount,
-                    LastActivityAt = p.LastActivityAt
+                    LastActivityAt = p.LastActivityAt,
+                    LastReadAt = p.LastReadAt
                 }).ToList(),
-                LastMessage = r.LastMessage?.Content ?? "",
+                LastMessage = r.LastMessage,
                 UnreadCount = r.UnreadCount
             }).ToList();
             
-            Console.WriteLine($"[ChatManagement] Mapped {_chatRooms.Count} chat rooms to UI");
-            
             foreach (var room in _chatRooms)
             {
-                Console.WriteLine($"[ChatManagement] UI Room: Id={room.Id}, Title={room.Title}, LastMessage={room.LastMessage}");
-                
-                // Join SignalR group for each room
-                Console.WriteLine($"[ChatManagement] Joining SignalR group for room {room.Id}");
+                Console.WriteLine($"[TechnicianChatManagement] Joining SignalR group for room {room.Id}");
                 await SignalRService.JoinChatRoom(room.Id);
-                Console.WriteLine($"[ChatManagement] Joined SignalR group for room {room.Id}");
             }
             
             await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ChatManagement] Failed to load chat rooms: {ex.Message}");
-            Console.WriteLine($"[ChatManagement] Stack trace: {ex.StackTrace}");
+            Console.WriteLine($"[TechnicianChatManagement] Failed to load chat rooms: {ex.Message}");
         }
     }
 
     private async Task SelectChatRoom(int roomId)
     {
-        Console.WriteLine($"[ChatManagement] SelectChatRoom called with roomId: {roomId}");
         SelectedChatRoomId = roomId;
         _roomOpenTime = DateTime.Now;
         _separatorShown = false;
-        Console.WriteLine($"[ChatManagement] SelectedChatRoomId set to: {SelectedChatRoomId}, RoomOpenTime: {_roomOpenTime}");
+        _selectedRoom = _chatRooms.FirstOrDefault(r => r.Id == roomId);
         await InvokeAsync(StateHasChanged);
         
         try
         {
-            Console.WriteLine($"[ChatManagement] Joining SignalR chat room: {roomId}");
             await SignalRService.JoinChatRoom(roomId);
-        await InvokeAsync(async () => await LoadMessages());
-        Console.WriteLine($"[ChatManagement] SelectChatRoom completed");
-        await InvokeAsync(StateHasChanged);
+            await InvokeAsync(async () => await LoadMessages());
+            await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ChatManagement] Error in SelectChatRoom: {ex.Message}");
+            Console.WriteLine($"[TechnicianChatManagement] Error in SelectChatRoom: {ex.Message}");
         }
     }
 
@@ -580,49 +554,32 @@
         _separatorShown = false;
         try
         {
-            Console.WriteLine($"Loading messages for chat room: {SelectedChatRoomId}");
             var userId = CurrentUser.UserId ?? 0;
-            Console.WriteLine($"Loading messages with user ID: {userId}");
-            _messages = await ChatService.GetChatMessagesAsync(SelectedChatRoomId, userId, UserType.Admin);
-            Console.WriteLine($"Loaded {_messages.Count} messages");
+            _messages = await ChatService.GetChatMessagesAsync(SelectedChatRoomId, userId, UserType.Technician);
             
-            // Get LastReadAt from admin participant
-            var currentRoom = _chatRooms.FirstOrDefault(r => r.Id == SelectedChatRoomId);
-            if (currentRoom != null)
+            if (_selectedRoom != null)
             {
-                var adminParticipant = currentRoom.Participants.FirstOrDefault(p => p.UserType == "Admin");
-                _lastReadAt = adminParticipant?.LastReadAt;
-                Console.WriteLine($"[ChatManagement] LastReadAt: {_lastReadAt}");
-            }
-            
-            // Debug message order and content
-            for (int i = 0; i < _messages.Count; i++)
-            {
-                var msg = _messages[i];
-                Console.WriteLine($"[ChatManagement] Message[{i}]: Id={msg.Id}, SenderId={msg.SenderId}, Content={msg.Content}, SentAt={msg.SentAt}, IsFromMe={msg.IsFromMe}");
+                var technicianParticipant = _selectedRoom.Participants.FirstOrDefault(p => p.UserType == "Technician");
+                _lastReadAt = technicianParticipant?.LastReadAt;
             }
             
             await InvokeAsync(async () => await MarkAsRead());
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to load messages: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            Console.WriteLine($"[TechnicianChatManagement] Failed to load messages: {ex.Message}");
         }
         finally
         {
             _loadingMessages = false;
-            Console.WriteLine($"[ChatManagement] LoadMessages completed, calling StateHasChanged, message count: {_messages.Count}");
             await InvokeAsync(StateHasChanged);
-            Console.WriteLine($"[ChatManagement] StateHasChanged called");
-            // Auto-scroll to bottom after loading messages
             try
             {
                 await ScrollToBottom();
             }
             catch (Microsoft.JSInterop.JSDisconnectedException)
             {
-                Console.WriteLine("[ChatManagement] JS disconnected, skipping scroll");
+                Console.WriteLine("[TechnicianChatManagement] JS disconnected, skipping scroll");
             }
         }
     }
@@ -637,35 +594,27 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to mark as read: {ex.Message}");
+            Console.WriteLine($"[TechnicianChatManagement] Failed to mark as read: {ex.Message}");
         }
     }
 
     private async Task SendMessage()
     {
-        Console.WriteLine($"[ChatManagement] SendMessage called - Message: '{_message}', RoomId: {SelectedChatRoomId}, Sending: {_sending}");
-        
         if (string.IsNullOrWhiteSpace(_message) || SelectedChatRoomId == 0 || _sending) 
-        {
-            Console.WriteLine($"[ChatManagement] SendMessage skipped - IsNullOrWhiteSpace: {string.IsNullOrWhiteSpace(_message)}, RoomId: {SelectedChatRoomId}, Sending: {_sending}");
             return;
-        }
 
         var content = _message;
         var userId = CurrentUser.UserId ?? 0;
         _sending = true;
 
-        ChatMessageResponse? tempMessage = null;
-
         try
         {
-            // Add message to UI immediately for instant feedback
-            tempMessage = new ChatMessageResponse
+            var tempMessage = new ChatMessageResponse
             {
                 Id = _messages.Count > 0 ? _messages.Max(m => m.Id) + 1 : 1,
                 ChatRoomId = SelectedChatRoomId,
                 SenderId = userId,
-                SenderType = "Admin",
+                SenderType = "Technician",
                 SenderName = CurrentUser.UserName,
                 Content = content,
                 SentAt = DateTime.Now,
@@ -676,18 +625,11 @@
             await InvokeAsync(StateHasChanged);
             await ScrollToBottom();
 
-            // Send message via SignalR Hub (Hub will save to DB and broadcast to all clients)
-            Console.WriteLine($"[ChatManagement] Sending message via SignalR Hub to chat room {SelectedChatRoomId}");
-            await SignalRService.SendMessage(SelectedChatRoomId, userId, "Admin", content);
-            Console.WriteLine($"[ChatManagement] Message sent via SignalR Hub");
-            // Note: Will reload when receiving own message via SignalR
+            await SignalRService.SendMessage(SelectedChatRoomId, userId, "Technician", content);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ChatManagement] Failed to send message: {ex.Message}");
-            // Remove temp message if sending failed
-            _messages.Remove(tempMessage);
-            await InvokeAsync(StateHasChanged);
+            Console.WriteLine($"[TechnicianChatManagement] Failed to send message: {ex.Message}");
         }
         finally
         {
@@ -722,41 +664,10 @@
     {
         await Task.Delay(100);
         await JSRuntime.InvokeVoidAsync("eval", @"
-            const element = document.querySelector('.chat-messages');
+            const element = document.querySelector('.technician-chat-messages');
             if (element) {
                 element.scrollTop = element.scrollHeight;
             }
         ");
-    }
-
-    public class ChatRoomResponse
-    {
-        public int Id { get; set; }
-        public string Title { get; set; } = "";
-        public string Type { get; set; } = "";
-        public bool IsActive { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? ClosedAt { get; set; }
-        public int? RelatedOrderId { get; set; }
-        public int? RelatedInstallationId { get; set; }
-        public int? RelatedWarrantyClaimId { get; set; }
-        public List<ChatParticipantResponse> Participants { get; set; } = new();
-        public string LastMessage { get; set; } = "";
-        public int UnreadCount { get; set; }
-    }
-
-    public class ChatParticipantResponse
-    {
-        public int Id { get; set; }
-        public int UserId { get; set; }
-        public string UserType { get; set; } = "";
-        public string? UserName { get; set; }
-        public string? UserAvatar { get; set; }
-        public DateTime JoinedAt { get; set; }
-        public bool IsActive { get; set; }
-        public bool IsBlocked { get; set; }
-        public int UnreadCount { get; set; }
-        public DateTime? LastActivityAt { get; set; }
-        public DateTime? LastReadAt { get; set; }
     }
 }

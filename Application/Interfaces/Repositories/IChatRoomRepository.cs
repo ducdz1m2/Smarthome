@@ -14,6 +14,8 @@ public interface IChatRoomRepository
     Task<ChatRoom?> GetOneToOneRoomAsync(int user1Id, UserType user1Type, int user2Id, UserType user2Type);
     Task<List<ChatRoom>> GetActiveSupportRoomsAsync();
     Task<List<ChatRoom>> GetUnassignedSupportRoomsAsync();
+    Task<ChatRoom?> GetByInstallationIdAsync(int installationId);
+    Task<List<ChatRoom>> GetByTechnicianIdAsync(int technicianId);
     Task<bool> ExistsOneToOneAsync(int user1Id, UserType user1Type, int user2Id, UserType user2Type);
     Task AddAsync(ChatRoom chatRoom);
     void Update(ChatRoom chatRoom);

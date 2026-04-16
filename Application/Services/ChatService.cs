@@ -14,15 +14,18 @@ public class ChatService : IChatService
     private readonly IChatRoomRepository _chatRoomRepository;
     private readonly IChatMessageRepository _chatMessageRepository;
     private readonly IDomainEventDispatcher _eventDispatcher;
+    private readonly IInstallationService _installationService;
 
     public ChatService(
         IChatRoomRepository chatRoomRepository,
         IChatMessageRepository chatMessageRepository,
-        IDomainEventDispatcher eventDispatcher)
+        IDomainEventDispatcher eventDispatcher,
+        IInstallationService installationService)
     {
         _chatRoomRepository = chatRoomRepository;
         _chatMessageRepository = chatMessageRepository;
         _eventDispatcher = eventDispatcher;
+        _installationService = installationService;
     }
 
     public async Task<List<ChatRoomResponse>> GetUserChatRoomsAsync(int userId, UserType userType)
@@ -44,9 +47,9 @@ public class ChatService : IChatService
         return MapToRoomResponse(room, userId);
     }
 
-    public async Task<List<ChatMessageResponse>> GetChatMessagesAsync(int chatRoomId, int userId, int limit = 50)
+    public async Task<List<ChatMessageResponse>> GetChatMessagesAsync(int chatRoomId, int userId, UserType userType, int limit = 50)
     {
-        if (!await CanUserAccessChatRoomAsync(chatRoomId, userId, GetUserTypeFromContext()))
+        if (!await CanUserAccessChatRoomAsync(chatRoomId, userId, userType))
             throw new DomainException("Bạn không có quyền truy cập chat room này");
 
         var messages = await _chatMessageRepository.GetByChatRoomIdAsync(chatRoomId, limit);
@@ -113,6 +116,62 @@ public class ChatService : IChatService
         }
 
         return room.Id;
+    }
+
+    public async Task<int> CreateInstallationChatAsync(int customerId, int technicianId, int installationId)
+    {
+        // Check if chat room already exists for this installation
+        var existingRoom = await _chatRoomRepository.GetByInstallationIdAsync(installationId);
+        if (existingRoom != null)
+        {
+            Console.WriteLine($"Installation chat room already exists: {existingRoom.Id}");
+            return existingRoom.Id;
+        }
+
+        // Create installation chat room
+        var room = ChatRoom.CreateInstallationRoom(customerId, installationId);
+        await _chatRoomRepository.AddAsync(room);
+        await _chatRoomRepository.SaveChangesAsync();
+
+        Console.WriteLine($"Created installation chat room {room.Id} for installation {installationId}");
+
+        // Assign technician to the chat room
+        try
+        {
+            await AssignTechnicianAsync(room.Id, technicianId);
+            Console.WriteLine($"Assigned technician ID {technicianId} to chat room {room.Id}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to assign technician to installation chat room: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+
+        return room.Id;
+    }
+
+    public async Task<List<ChatRoomResponse>> GetInstallationChatRoomsAsync(int technicianId)
+    {
+        var rooms = await _chatRoomRepository.GetByTechnicianIdAsync(technicianId);
+        var responses = new List<ChatRoomResponse>();
+        foreach (var room in rooms)
+        {
+            responses.Add(await MapToRoomResponseAsync(room, technicianId));
+        }
+        return responses;
+    }
+
+    public async Task<List<ChatRoomResponse>> GetCustomerInstallationChatsAsync(int customerId)
+    {
+        var rooms = await _chatRoomRepository.GetByUserIdAsync(customerId, UserType.Customer);
+        // Filter only installation chats (rooms with RelatedInstallationId)
+        var installationRooms = rooms.Where(r => r.RelatedInstallationId.HasValue).ToList();
+        var responses = new List<ChatRoomResponse>();
+        foreach (var room in installationRooms)
+        {
+            responses.Add(await MapToRoomResponseAsync(room, customerId));
+        }
+        return responses;
     }
 
     public async Task CloseChatRoomAsync(int chatRoomId, int closedByUserId)
@@ -264,14 +323,14 @@ public class ChatService : IChatService
     }
 
     // Helper methods
-    private static ChatRoomResponse MapToRoomResponse(ChatRoom room, int currentUserId)
+    private async Task<ChatRoomResponse> MapToRoomResponseAsync(ChatRoom room, int currentUserId)
     {
-        var lastMessage = room.Messages.LastOrDefault();
+        var lastMessage = room.Messages.OrderByDescending(m => m.SentAt).FirstOrDefault();
 
-        return new ChatRoomResponse
+        var response = new ChatRoomResponse
         {
             Id = room.Id,
-            Title = room.Title,
+            Title = !string.IsNullOrEmpty(room.Title) ? room.Title : "Hỗ trợ khách hàng",
             Type = room.Type.ToString(),
             IsActive = room.IsActive,
             CreatedAt = room.CreatedAt,
@@ -288,7 +347,76 @@ public class ChatService : IChatService
                 IsActive = p.IsActive,
                 IsBlocked = p.IsBlocked,
                 UnreadCount = p.UnreadCount,
-                LastActivityAt = p.LastActivityAt
+                LastActivityAt = p.LastActivityAt,
+                LastReadAt = p.LastReadAt
+            }).ToList(),
+            LastMessage = lastMessage == null ? null : new ChatMessageSummaryResponse
+            {
+                Id = lastMessage.Id,
+                Content = lastMessage.IsDeleted ? "[Đã xóa]" : lastMessage.Content,
+                SenderId = lastMessage.SenderId,
+                SenderType = lastMessage.SenderType.ToString(),
+                SentAt = lastMessage.SentAt
+            },
+            UnreadCount = room.Participants.FirstOrDefault(p => p.UserId == currentUserId)?.UnreadCount ?? 0
+        };
+
+        // Load installation info if this is an installation chat
+        if (room.RelatedInstallationId.HasValue)
+        {
+            try
+            {
+                var installation = await _installationService.GetByIdAsync(room.RelatedInstallationId.Value);
+                if (installation != null)
+                {
+                    response.InstallationInfo = new InstallationInfoResponse
+                    {
+                        Id = installation.Id,
+                        CustomerName = installation.CustomerName,
+                        CustomerPhone = installation.CustomerPhone,
+                        ShippingAddress = installation.ShippingAddress,
+                        ScheduledDate = installation.ScheduledDate,
+                        Status = installation.Status,
+                        TechnicianName = installation.TechnicianName,
+                        TechnicianPhone = installation.TechnicianPhone
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to load installation info: {ex.Message}");
+            }
+        }
+
+        return response;
+    }
+
+    private static ChatRoomResponse MapToRoomResponse(ChatRoom room, int currentUserId)
+    {
+        var lastMessage = room.Messages.OrderByDescending(m => m.SentAt).FirstOrDefault();
+
+        return new ChatRoomResponse
+        {
+            Id = room.Id,
+            Title = !string.IsNullOrEmpty(room.Title) ? room.Title : "Hỗ trợ khách hàng",
+            Type = room.Type.ToString(),
+            IsActive = room.IsActive,
+            CreatedAt = room.CreatedAt,
+            ClosedAt = room.ClosedAt,
+            RelatedOrderId = room.RelatedOrderId,
+            RelatedInstallationId = room.RelatedInstallationId,
+            RelatedWarrantyClaimId = room.RelatedWarrantyClaimId,
+            Participants = room.Participants.Select(p => new ChatParticipantResponse
+            {
+                Id = p.Id,
+                UserId = p.UserId,
+                UserType = p.UserType.ToString(),
+                JoinedAt = p.JoinedAt,
+                IsActive = p.IsActive,
+                IsBlocked = p.IsBlocked,
+                UnreadCount = p.UnreadCount,
+                LastActivityAt = p.LastActivityAt,
+                LastReadAt = p.LastReadAt
             }).ToList(),
             LastMessage = lastMessage == null ? null : new ChatMessageSummaryResponse
             {

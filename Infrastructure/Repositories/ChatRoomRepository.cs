@@ -52,6 +52,9 @@ public class ChatRoomRepository : IChatRoomRepository
 
     public async Task<List<ChatRoom>> GetActiveSupportRoomsAsync()
         => await _context.ChatRooms
+            .Include(r => r.Participants)
+            .Include(r => r.Messages.OrderByDescending(m => m.SentAt))
+                .ThenInclude(m => m.Attachments)
             .Where(r => r.Type == ChatRoomType.Support && r.IsActive)
             .ToListAsync();
 
@@ -59,6 +62,19 @@ public class ChatRoomRepository : IChatRoomRepository
         => await _context.ChatRooms
             .Where(r => r.Type == ChatRoomType.Support && r.IsActive)
             .Where(r => !r.Participants.Any(p => p.UserType == UserType.Technician))
+            .ToListAsync();
+
+    public async Task<ChatRoom?> GetByInstallationIdAsync(int installationId)
+        => await _context.ChatRooms
+            .Include(r => r.Participants)
+            .FirstOrDefaultAsync(r => r.RelatedInstallationId == installationId);
+
+    public async Task<List<ChatRoom>> GetByTechnicianIdAsync(int technicianId)
+        => await _context.ChatRooms
+            .Include(r => r.Participants)
+            .Include(r => r.Messages.OrderByDescending(m => m.SentAt))
+                .ThenInclude(m => m.Attachments)
+            .Where(r => r.Participants.Any(p => p.UserId == technicianId && p.UserType == UserType.Technician))
             .ToListAsync();
 
     public async Task<bool> ExistsOneToOneAsync(int user1Id, UserType user1Type, int user2Id, UserType user2Type)

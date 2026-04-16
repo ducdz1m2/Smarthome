@@ -10,13 +10,16 @@ public interface IChatService
     Task<List<ChatRoomResponse>> GetUserChatRoomsAsync(int userId, UserType userType);
     Task<List<ChatRoomResponse>> GetAllSupportChatRoomsAsync();
     Task<ChatRoomResponse?> GetChatRoomByIdAsync(int id, int userId);
-    Task<List<ChatMessageResponse>> GetChatMessagesAsync(int chatRoomId, int userId, int limit = 50);
+    Task<List<ChatMessageResponse>> GetChatMessagesAsync(int chatRoomId, int userId, UserType userType, int limit = 50);
     Task<int> GetUnreadMessageCountAsync(int userId, UserType userType);
     Task<bool> CanUserAccessChatRoomAsync(int chatRoomId, int userId, UserType userType);
 
     // Chat Room management
     Task<int> CreateOneToOneChatAsync(int user1Id, UserType user1Type, int user2Id, UserType user2Type, string? title = null);
     Task<int> CreateSupportChatAsync(int customerId, int? orderId = null, int? installationId = null, int? warrantyClaimId = null);
+    Task<int> CreateInstallationChatAsync(int customerId, int technicianId, int installationId);
+    Task<List<ChatRoomResponse>> GetInstallationChatRoomsAsync(int technicianId);
+    Task<List<ChatRoomResponse>> GetCustomerInstallationChatsAsync(int customerId);
     Task CloseChatRoomAsync(int chatRoomId, int closedByUserId);
     Task MarkChatAsReadAsync(int chatRoomId, int userId);
 

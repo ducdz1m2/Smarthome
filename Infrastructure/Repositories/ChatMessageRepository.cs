@@ -24,6 +24,7 @@ public class ChatMessageRepository : IChatMessageRepository
             .Where(m => m.ChatRoomId == chatRoomId)
             .OrderByDescending(m => m.SentAt)
             .Take(limit)
+            .OrderBy(m => m.SentAt)
             .Include(m => m.Attachments)
             .ToListAsync();
 

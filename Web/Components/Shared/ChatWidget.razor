@@ -5,6 +5,7 @@
 @inject IChatService ChatService
 @inject CurrentUserService CurrentUser
 @inject IJSRuntime JSRuntime
+@implements IDisposable
 
 <div class="chat-widget">
     @if (_isOpen)
@@ -47,6 +48,17 @@
                 }
                 @foreach (var msg in _messages)
                 {
+                    // Show separator for new messages (messages after last read)
+                    if (_lastReadAt != null && msg.CreatedDate > _lastReadAt && !_separatorShown)
+                    {
+                        <div class="msg-separator">
+                            <div class="separator-line"></div>
+                            <div class="separator-text">Tin nhắn mới</div>
+                            <div class="separator-line"></div>
+                        </div>
+                        _separatorShown = true;
+                    }
+
                     <div class="msg-row @(msg.IsFromAdmin ? "" : "user")">
                         @if (msg.IsFromAdmin)
                         {
@@ -93,9 +105,9 @@
 
             <div class="chat-input-area">
                 <div class="quick-replies">
-                    <button @onclick="@(() => { _message = "Giá sản phẩm bao nhiêu?"; SendMessage(); })">💰 Hỏi giá</button>
-                    <button @onclick="@(() => { _message = "Chính sách giao hàng?"; SendMessage(); })">🚚 Giao hàng</button>
-                    <button @onclick="@(() => { _message = "Bảo hành như thế nào?"; SendMessage(); })">🛡️ Bảo hành</button>
+                    <button @onclick="SendQuickReplyPrice">💰 Hỏi giá</button>
+                    <button @onclick="SendQuickReplyShipping">🚚 Giao hàng</button>
+                    <button @onclick="SendQuickReplyWarranty">🛡️ Bảo hành</button>
                 </div>
 
                 <div class="d-flex gap-2 align-items-center">
@@ -312,6 +324,26 @@
     display: block;
 }
 
+.msg-separator {
+    display: flex;
+    align-items: center;
+    margin: 16px 0;
+    gap: 12px;
+}
+
+.separator-line {
+    flex: 1;
+    height: 1px;
+    background: #e0e0e0;
+}
+
+.separator-text {
+    font-size: 12px;
+    color: #999;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
 .msg-image img {
     max-width: 200px;
     max-height: 200px;
@@ -417,53 +449,118 @@
     private List<ChatMessageDto> _messages = new();
     private int _unreadCount = 0;
     private ElementReference _messagesContainer;
+    private DateTime? _lastReadAt = null;
     private string _sessionId = "default";
+    private bool _initialized = false;
+    private bool _separatorShown = false;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            try
+            {
+                Console.WriteLine("[ChatWidget] Initializing SignalR...");
+                await SignalRService.InitializeAsync();
+                SignalRService.OnChatMessageReceived += async (msg) => await OnMessageReceived(msg);
+                await InvokeAsync(async () => await LoadMessages());
+                _initialized = true;
+                Console.WriteLine("[ChatWidget] SignalR initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ChatWidget] Initialization failed: {ex.Message}");
+                Console.WriteLine($"[ChatWidget] Stack trace: {ex.StackTrace}");
+                await InvokeAsync(async () => await LoadMessages());
+            }
+        }
+    }
+
+    private async Task OnMessageReceived(object messageObj)
     {
         try
         {
-            await SignalRService.InitializeAsync();
-            SignalRService.OnChatMessageReceived += OnMessageReceived;
-            await LoadMessages();
+            var messageJson = System.Text.Json.JsonSerializer.Serialize(messageObj);
+            Console.WriteLine($"[ChatWidget] Received message JSON: {messageJson}");
+            
+            // Parse manually to avoid case sensitivity issues
+            using var doc = System.Text.Json.JsonDocument.Parse(messageJson);
+            var content = doc.RootElement.TryGetProperty("content", out var contentElem) ? contentElem.GetString() : "";
+            var userId = doc.RootElement.TryGetProperty("userId", out var userIdElem) ? userIdElem.GetInt32() : 0;
+            
+            Console.WriteLine($"[ChatWidget] Parsed message - Content: '{content}', UserId: {userId}");
+            
+            if (!string.IsNullOrEmpty(content))
+            {
+                // If this is our own message, skip to avoid losing local message
+                if (userId == CurrentUser.UserId)
+                {
+                    Console.WriteLine("[ChatWidget] Received own message via SignalR - skipping to keep local message");
+                    return;
+                }
+
+                // Add new message from others
+                Console.WriteLine("[ChatWidget] Received message from others via SignalR");
+                _messages.Add(new ChatMessageDto
+                {
+                    Id = _messages.Count + 1,
+                    SessionId = _sessionId,
+                    Content = content,
+                    IsFromAdmin = true, // Messages from others are from admin in support chat
+                    CreatedDate = DateTime.Now,
+                    MessageType = MessageType.Text
+                });
+                if (!_isOpen)
+                {
+                    _unreadCount++;
+                }
+                await InvokeAsync(StateHasChanged);
+                try
+                {
+                    await ScrollToBottom();
+                }
+                catch (Microsoft.JSInterop.JSDisconnectedException)
+                {
+                    Console.WriteLine("[ChatWidget] JS disconnected, skipping scroll");
+                }
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Chat initialization failed: {ex.Message}");
+            Console.WriteLine($"Error processing received message: {ex.Message}");
         }
     }
 
-    private void OnMessageReceived(string senderId, string content)
-    {
-        _messages.Add(new ChatMessageDto
-        {
-            Id = _messages.Count + 1,
-            SessionId = _sessionId,
-            Content = content,
-            IsFromAdmin = true,
-            CreatedDate = DateTime.Now,
-            MessageType = MessageType.Text
-        });
-        if (!_isOpen)
-        {
-            _unreadCount++;
-        }
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void Toggle()
+    private async Task Toggle()
     {
         _isOpen = !_isOpen;
         if (_isOpen)
         {
             _unreadCount = 0;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
+            // Scroll to bottom after opening chat
+            await Task.Delay(100);
+            try
+            {
+                await ScrollToBottom();
+            }
+            catch (Microsoft.JSInterop.JSDisconnectedException)
+            {
+                Console.WriteLine("[ChatWidget] JS disconnected, skipping scroll");
+            }
         }
     }
 
     private async Task LoadMessages()
     {
+        if (_loading)
+        {
+            Console.WriteLine("[ChatWidget] LoadMessages already in progress, skipping");
+            return;
+        }
+        
         _loading = true;
+        _separatorShown = false;
         try
         {
             var userId = CurrentUser.UserId;
@@ -476,9 +573,19 @@
                 if (chatRooms.Count > 0)
                 {
                     _chatRoomId = chatRooms.First().Id;
-                    Console.WriteLine($"Found chat room: {_chatRoomId}");
+                    Console.WriteLine($"[ChatWidget] Found chat room: {_chatRoomId}");
                     
-                    var messages = await ChatService.GetChatMessagesAsync(_chatRoomId, userId.Value);
+                    // Get LastReadAt from customer participant
+                    var customerParticipant = chatRooms.First().Participants.FirstOrDefault(p => p.UserType == "Customer");
+                    _lastReadAt = customerParticipant?.LastReadAt;
+                    Console.WriteLine($"[ChatWidget] LastReadAt: {_lastReadAt}");
+                    
+                    // Join SignalR group for this chat room (in case page was reloaded)
+                    Console.WriteLine($"[ChatWidget] Joining SignalR group for existing chat room {_chatRoomId}");
+                    await SignalRService.JoinChatRoom(_chatRoomId);
+                    Console.WriteLine($"[ChatWidget] Joined SignalR group for existing room");
+                    
+                    var messages = await ChatService.GetChatMessagesAsync(_chatRoomId, userId.Value, Domain.Enums.UserType.Customer);
                     _messages = messages.Select(m => new ChatMessageDto
                     {
                         Id = m.Id,
@@ -486,7 +593,7 @@
                         UserId = m.SenderId,
                         SenderName = m.SenderId == userId ? "Bạn" : "Admin",
                         Content = m.Content,
-                        IsFromAdmin = m.IsFromMe,
+                        IsFromAdmin = m.SenderId != userId,
                         CreatedDate = m.SentAt,
                         MessageType = MessageType.Text
                     }).ToList();
@@ -505,7 +612,19 @@
         finally
         {
             _loading = false;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
+            // Scroll to bottom after loading messages
+            if (_messages.Count > 0)
+            {
+                try
+                {
+                    await ScrollToBottom();
+                }
+                catch (Microsoft.JSInterop.JSDisconnectedException)
+                {
+                    Console.WriteLine("[ChatWidget] JS disconnected, skipping scroll");
+                }
+            }
         }
     }
 
@@ -516,12 +635,16 @@
         if (string.IsNullOrWhiteSpace(_message) || _sending)
             return;
 
+        Console.WriteLine($"[ChatWidget] SendMessage called: {_message}");
         _sending = true;
         try
         {
             var userId = CurrentUser.UserId;
+            Console.WriteLine($"[ChatWidget] CurrentUserId: {userId}");
+            
             if (userId == null || userId == 0)
             {
+                Console.WriteLine($"[ChatWidget] User not logged in, adding message locally");
                 // Add message locally if user not logged in
                 _messages.Add(new ChatMessageDto
                 {
@@ -534,36 +657,66 @@
                     MessageType = MessageType.Text
                 });
                 _message = "";
-                await ScrollToBottom();
+                await InvokeAsync(StateHasChanged);
+                try
+                {
+                    await ScrollToBottom();
+                }
+                catch (Microsoft.JSInterop.JSDisconnectedException)
+                {
+                    Console.WriteLine("[ChatWidget] JS disconnected, skipping scroll");
+                }
                 return;
             }
 
             // Create or get support chat room
             if (_chatRoomId == 0)
             {
+                Console.WriteLine($"[ChatWidget] Creating support chat room for user {userId}");
                 _chatRoomId = await ChatService.CreateSupportChatAsync(userId.Value);
-                Console.WriteLine($"Created support chat room: {_chatRoomId}");
+                Console.WriteLine($"[ChatWidget] Created support chat room: {_chatRoomId}");
                 
                 // Join SignalR group for this chat room
+                Console.WriteLine($"[ChatWidget] Joining SignalR group for chat room {_chatRoomId}");
                 await SignalRService.JoinChatRoom(_chatRoomId);
+                Console.WriteLine($"[ChatWidget] Joined SignalR group");
             }
 
-            // Send message using ChatService
-            var request = new SendMessageRequest
+            // Add message locally first
+            Console.WriteLine($"[ChatWidget] Adding message locally before sending");
+            _messages.Add(new ChatMessageDto
             {
+                Id = _messages.Count + 1,
+                SessionId = _sessionId,
+                UserId = userId.Value,
+                SenderName = "Bạn",
                 Content = _message,
-                Attachments = null
-            };
-            await ChatService.SendMessageAsync(_chatRoomId, userId.Value, Domain.Enums.UserType.Customer, request);
+                IsFromAdmin = false,
+                CreatedDate = DateTime.Now,
+                MessageType = MessageType.Text
+            });
+            
+            // Send message via SignalR Hub (Hub will save to DB and broadcast)
+            Console.WriteLine($"[ChatWidget] Sending message via SignalR Hub to chat room {_chatRoomId}");
+            await SignalRService.SendMessage(_chatRoomId, userId.Value, "Customer", _message);
+            Console.WriteLine($"[ChatWidget] Message sent via SignalR Hub");
             
             _message = "";
-            await LoadMessages();
-            await ScrollToBottom();
+            await InvokeAsync(StateHasChanged);
+            try
+                {
+                    await ScrollToBottom();
+                }
+                catch (Microsoft.JSInterop.JSDisconnectedException)
+                {
+                    Console.WriteLine("[ChatWidget] JS disconnected, skipping scroll");
+                }
+            // Note: Will reload when receiving own message via SignalR
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to send message: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            Console.WriteLine($"[ChatWidget] Failed to send message: {ex.Message}");
+            Console.WriteLine($"[ChatWidget] Stack trace: {ex.StackTrace}");
             // Add message locally even if sending fails
             _messages.Add(new ChatMessageDto
             {
@@ -576,20 +729,49 @@
                 MessageType = MessageType.Text
             });
             _message = "";
+            await InvokeAsync(StateHasChanged);
+            try
+            {
+                await ScrollToBottom();
+            }
+            catch (Microsoft.JSInterop.JSDisconnectedException)
+            {
+                Console.WriteLine("[ChatWidget] JS disconnected, skipping scroll");
+            }
+
+            // Reload to sync with server state
+            await InvokeAsync(async () => await LoadMessages());
         }
         finally
         {
             _sending = false;
-            StateHasChanged();
         }
     }
 
-    private void OnKeyPress(KeyboardEventArgs e)
+    private async Task OnKeyPress(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
         {
-            SendMessage();
+            await SendMessage();
         }
+    }
+
+    private async Task SendQuickReplyPrice()
+    {
+        _message = "Giá sản phẩm bao nhiêu?";
+        await SendMessage();
+    }
+
+    private async Task SendQuickReplyShipping()
+    {
+        _message = "Chính sách giao hàng?";
+        await SendMessage();
+    }
+
+    private async Task SendQuickReplyWarranty()
+    {
+        _message = "Bảo hành như thế nào?";
+        await SendMessage();
     }
 
     private async Task ScrollToBottom()
@@ -609,5 +791,11 @@
         if (bytes < 1024) return $"{bytes} B";
         if (bytes < 1024 * 1024) return $"{bytes / 1024} KB";
         return $"{bytes / (1024 * 1024)} MB";
+    }
+
+    public void Dispose()
+    {
+        Console.WriteLine("[ChatWidget] Disposing...");
+        // Note: Cannot unsubscribe async lambda, but component disposal will clean up
     }
 }

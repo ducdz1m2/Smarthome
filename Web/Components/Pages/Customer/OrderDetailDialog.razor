@@ -318,6 +318,16 @@
                         </MudCard>
                     </MudItem>
                 }
+
+                <!-- Chat with Technician -->
+                @if (_hasInstallation && _installationBooking != null && _installationBooking.TechnicianId.HasValue)
+                {
+                    <MudItem xs="12" Class="mt-4">
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Liên hệ kỹ thuật viên</MudText>
+                        <TechnicianChatWidget InstallationId="@_installationBooking.Id" />
+                    </MudItem>
+                }
             </MudGrid>
         }
     </DialogContent>
@@ -410,6 +420,7 @@
     private TechnicianRatingResponse? _technicianRating;
     private List<ProductCommentResponse>? _reviews;
     private WarrantyRequestResponse? _warrantyRequest;
+    private InstallationBookingResponse? _installationBooking;
 
     protected override async Task OnInitializedAsync()
     {
@@ -436,6 +447,19 @@
 
                 // Check if order has installation items
                 _hasInstallation = _order.Items.Any(i => i.RequiresInstallation);
+
+                // Load installation booking if order has installation items
+                if (_hasInstallation)
+                {
+                    try
+                    {
+                        _installationBooking = await InstallationService.GetByOrderIdAsync(OrderId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to load installation booking: {ex.Message}");
+                    }
+                }
 
                 // Load reviews for this order's products
                 await LoadReviewsAsync();

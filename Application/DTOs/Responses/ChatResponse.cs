@@ -14,6 +14,9 @@ public class ChatRoomResponse
     public int? RelatedInstallationId { get; set; }
     public int? RelatedWarrantyClaimId { get; set; }
 
+    // Installation info (for installation chats)
+    public InstallationInfoResponse? InstallationInfo { get; set; }
+
     // Participants
     public List<ChatParticipantResponse> Participants { get; set; } = new();
 
@@ -22,6 +25,18 @@ public class ChatRoomResponse
 
     // Unread count for current user
     public int UnreadCount { get; set; }
+}
+
+public class InstallationInfoResponse
+{
+    public int Id { get; set; }
+    public string CustomerName { get; set; } = string.Empty;
+    public string CustomerPhone { get; set; } = string.Empty;
+    public string ShippingAddress { get; set; } = string.Empty;
+    public DateTime ScheduledDate { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string TechnicianName { get; set; } = string.Empty;
+    public string TechnicianPhone { get; set; } = string.Empty;
 }
 
 public class ChatParticipantResponse
@@ -36,6 +51,7 @@ public class ChatParticipantResponse
     public bool IsBlocked { get; set; }
     public int UnreadCount { get; set; }
     public DateTime? LastActivityAt { get; set; }
+    public DateTime? LastReadAt { get; set; }
 }
 
 public class ChatMessageResponse

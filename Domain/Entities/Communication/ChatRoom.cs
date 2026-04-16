@@ -68,6 +68,23 @@ public class ChatRoom : AggregateRoot
         return room;
     }
 
+    public static ChatRoom CreateInstallationRoom(int customerId, int installationId)
+    {
+        var room = new ChatRoom
+        {
+            Title = $"Lắp đặt #{installationId}",
+            Type = ChatRoomType.Support,
+            RelatedInstallationId = installationId,
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+
+        room._participants.Add(ChatParticipant.Create(room.Id, customerId, UserType.Customer));
+
+        room.AddDomainEvent(new ChatRoomCreatedEvent(room.Id, customerId, null));
+        return room;
+    }
+
     public void AddMessage(int senderId, UserType senderType, string content, List<ChatAttachment>? attachments = null)
     {
         if (!IsActive)
