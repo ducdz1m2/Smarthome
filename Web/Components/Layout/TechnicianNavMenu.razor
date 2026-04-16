@@ -1,5 +1,7 @@
+@using Web.Services
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@inject IAuthService AuthService
 
 <MudNavMenu>
     <MudNavLink Href="/technician" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Tổng quan</MudNavLink>
@@ -17,8 +19,10 @@
 </MudNavMenu>
 
 @code {
-    private void Logout()
+    private async Task Logout()
     {
+        // Clear JWT token from localStorage and session
+        await AuthService.SignOutAsync();
         NavigationManager.NavigateTo("/login", forceLoad: true);
         Snackbar.Add("Đã đăng xuất", Severity.Success);
     }

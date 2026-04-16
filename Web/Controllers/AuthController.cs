@@ -1,9 +1,6 @@
-using System.Security.Claims;
 using Application.DTOs.Requests;
 using Application.Interfaces.Services;
 using Web.Services;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Web.Controllers;
@@ -30,15 +27,6 @@ public class AuthController : ControllerBase
         {
             var response = await _identityService.LoginAsync(request);
 
-            // Store user info in CurrentUserService and set cookie
-            await _authService.SignInAsync(
-                response.User!.Id.ToString(),
-                response.User.UserName,
-                response.User.Email,
-                response.User.FullName,
-                response.User.Roles,
-                request.RememberMe);
-
             _logger.LogInformation("User {UserName} logged in successfully", response.User.UserName);
 
             // Determine redirect URL based on role
@@ -51,6 +39,8 @@ public class AuthController : ControllerBase
             return Ok(new
             {
                 Success = true,
+                Token = response.Token,
+                ExpiresAt = response.ExpiresAt,
                 User = response.User,
                 RedirectUrl = redirectUrl
             });
@@ -69,20 +59,13 @@ public class AuthController : ControllerBase
         {
             var response = await _identityService.RegisterAsync(request);
 
-            // Store user info in CurrentUserService and set cookie
-            await _authService.SignInAsync(
-                response.User.Id.ToString(),
-                response.User.UserName,
-                response.User.Email,
-                response.User.FullName,
-                response.User.Roles,
-                true);
-
             _logger.LogInformation("User {UserName} registered and logged in successfully", response.User.UserName);
 
             return Ok(new
             {
                 Success = true,
+                Token = response.Token,
+                ExpiresAt = response.ExpiresAt,
                 User = response.User,
                 RedirectUrl = "/"
             });

@@ -1,0 +1,352 @@
+@page "/admin/chat"
+@using Application.DTOs.Responses
+@using Application.DTOs.Requests
+@using Application.Interfaces.Services
+@using Domain.Enums
+@using Web.Services
+@inject IChatService ChatService
+@inject SignalRService SignalRService
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<MudPaper Class="pa-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Hỗ trợ khách hàng</MudText>
+    
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-3" Style="height: 600px; overflow-y: auto;">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Cuộc hội thoại</MudText>
+                @if (_chatRooms.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-center py-4">
+                        Chưa có cuộc hội thoại nào
+                    </MudText>
+                }
+                else
+                {
+                    @foreach (var room in _chatRooms)
+                    {
+                        <MudPaper Class="@($"pa-2 mb-2 cursor-pointer {(SelectedChatRoomId == room.Id ? "selected-room" : "")}")"
+                                 OnClick="@(() => SelectChatRoom(room.Id))" Elevation="0">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="room-avatar">@GetInitials(room.Title)</div>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div class="fw-bold text-truncate">@room.Title</div>
+                                    <div class="text-muted small text-truncate">@room.LastMessage</div>
+                                </div>
+                                @if (room.UnreadCount > 0)
+                                {
+                                    <MudChip Size="Size.Small" Color="Color.Error" Text="@room.UnreadCount.ToString()" T="string" />
+                                }
+                            </div>
+                        </MudPaper>
+                    }
+                }
+            </MudPaper>
+        </MudItem>
+        
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-3" Style="height: 600px; display: flex; flex-direction: column;">
+                @if (SelectedChatRoomId == 0)
+                {
+                    <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                        <MudIcon Icon="@Icons.Material.Outlined.ChatBubble" Size="Size.Large" Class="mb-3" />
+                        <MudText Typo="Typo.h6">Chọn cuộc hội thoại</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-center">
+                            Vui lòng chọn một cuộc hội thoại từ danh sách bên trái
+                        </MudText>
+                    </div>
+                }
+                else
+                {
+                    <div class="chat-header">
+                        <MudText Typo="Typo.subtitle1">@GetSelectedRoomName()</MudText>
+                    </div>
+                    
+                    <div class="chat-messages flex-grow-1 overflow-auto pa-3" @ref="_messagesContainer">
+                        @if (_loadingMessages)
+                        {
+                            <MudProgressCircular Color="Color.Primary" Class="ma-auto" />
+                        }
+                        else if (_messages.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-center py-4">
+                                Chưa có tin nhắn nào
+                            </MudText>
+                        }
+                        else
+                        {
+                            @foreach (var msg in _messages)
+                            {
+                                <div class="@($"message-row {(msg.SenderId == CurrentUser.UserId ? "my-message" : "other-message")}")">
+                                    <MudPaper Class="@($"pa-2 {(msg.SenderId == CurrentUser.UserId ? "my-bubble" : "other-bubble")}")" Elevation="1">
+                                        <MudText Typo="Typo.body2">@msg.Content</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@msg.SentAt.ToString("HH:mm")</MudText>
+                                    </MudPaper>
+                                </div>
+                            }
+                        }
+                    </div>
+                    
+                    <div class="chat-input pa-2">
+                        <div class="d-flex gap-2">
+                            <MudTextField T="string" @bind-Value="_message" 
+                                         Placeholder="Nhập tin nhắn..." 
+                                         Variant="Variant.Outlined" 
+                                         OnKeyDown="OnKeyPress"
+                                         Class="flex-grow-1" />
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                                       OnClick="SendMessage" 
+                                       Disabled="@string.IsNullOrWhiteSpace(_message)">
+                                <MudIcon Icon="@Icons.Material.Filled.Send" />
+                            </MudButton>
+                        </div>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<style>
+.selected-room {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+}
+
+.selected-room .text-muted {
+    color: rgba(255,255,255,0.7) !important;
+}
+
+.room-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.chat-header {
+    padding: 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.chat-messages {
+    background: #f5f5f5;
+    border-radius: 8px;
+}
+
+.message-row {
+    display: flex;
+    margin-bottom: 8px;
+}
+
+.my-message {
+    justify-content: flex-end;
+}
+
+.other-message {
+    justify-content: flex-start;
+}
+
+.my-bubble {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    max-width: 70%;
+}
+
+.other-bubble {
+    background: white;
+    max-width: 70%;
+}
+</style>
+
+@code {
+    private List<ChatRoomResponse> _chatRooms = new();
+    private List<ChatMessageResponse> _messages = new();
+    private int SelectedChatRoomId = 0;
+    private string _message = "";
+    private bool _loadingMessages = false;
+    private ElementReference _messagesContainer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await SignalRService.InitializeAsync();
+            SignalRService.OnChatMessageReceived += OnMessageReceived;
+            await LoadChatRooms();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR initialization failed: {ex.Message}");
+            await LoadChatRooms();
+        }
+    }
+
+    private void OnMessageReceived(string senderId, string content)
+    {
+        InvokeAsync(async () =>
+        {
+            await LoadChatRooms();
+            if (SelectedChatRoomId > 0)
+            {
+                await LoadMessages();
+            }
+        });
+    }
+
+    private async Task LoadChatRooms()
+    {
+        try
+        {
+            var userId = CurrentUser.UserId ?? 0;
+            Console.WriteLine($"Loading chat rooms for admin user ID: {userId}");
+            
+            // For admins, load all support chat rooms (not just assigned to this admin)
+            // This allows any admin to see all customer support chats
+            var allRooms = await ChatService.GetAllSupportChatRoomsAsync();
+            Console.WriteLine($"Found {allRooms.Count} support chat rooms");
+            
+            _chatRooms = allRooms.Select(r => 
+            {
+                var customerParticipant = r.Participants.FirstOrDefault(p => p.UserType == "Customer");
+                var customerUserId = customerParticipant?.UserId;
+                var customerName = customerParticipant?.UserName ?? $"Khách hàng #{customerUserId ?? 0}";
+                
+                return new ChatRoomResponse
+                {
+                    Id = r.Id,
+                    Title = r.Type == "Support" ? customerName : r.Title,
+                    LastMessage = r.LastMessage?.Content ?? "Chưa có tin nhắn",
+                    UnreadCount = r.UnreadCount
+                };
+            }).ToList();
+            
+            if (_chatRooms.Count == 0)
+            {
+                Console.WriteLine("No support chat rooms found. Customers need to send messages first.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load chat rooms: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    private async Task SelectChatRoom(int roomId)
+    {
+        Console.WriteLine($"Selecting chat room: {roomId}");
+        SelectedChatRoomId = roomId;
+        try
+        {
+            await SignalRService.JoinChatRoom(roomId);
+            Console.WriteLine($"Joined SignalR chat room: {roomId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to join SignalR chat room: {ex.Message}");
+        }
+        await LoadMessages();
+    }
+
+    private async Task LoadMessages()
+    {
+        if (SelectedChatRoomId == 0) return;
+
+        Console.WriteLine($"Loading messages for chat room: {SelectedChatRoomId}");
+        _loadingMessages = true;
+        try
+        {
+            var userId = CurrentUser.UserId ?? 0;
+            Console.WriteLine($"Loading messages with user ID: {userId}");
+            _messages = await ChatService.GetChatMessagesAsync(SelectedChatRoomId, userId);
+            Console.WriteLine($"Loaded {_messages.Count} messages");
+            await MarkAsRead();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load messages: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+        finally
+        {
+            _loadingMessages = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task MarkAsRead()
+    {
+        try
+        {
+            var userId = CurrentUser.UserId ?? 0;
+            await ChatService.MarkChatAsReadAsync(SelectedChatRoomId, userId);
+            await LoadChatRooms();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to mark as read: {ex.Message}");
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_message) || SelectedChatRoomId == 0) return;
+
+        try
+        {
+            var userId = CurrentUser.UserId ?? 0;
+            var request = new SendMessageRequest
+            {
+                Content = _message,
+                Attachments = null
+            };
+
+            await ChatService.SendMessageAsync(SelectedChatRoomId, userId, UserType.Admin, request);
+            _message = "";
+            await LoadMessages();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to send message: {ex.Message}");
+        }
+    }
+
+    private void OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            SendMessage();
+        }
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ');
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return name.Substring(0, Math.Min(2, name.Length)).ToUpper();
+    }
+
+    private string GetSelectedRoomName()
+    {
+        var room = _chatRooms.FirstOrDefault(r => r.Id == SelectedChatRoomId);
+        return room?.Title ?? "";
+    }
+
+    public class ChatRoomResponse
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public string LastMessage { get; set; } = "";
+        public int UnreadCount { get; set; }
+    }
+}

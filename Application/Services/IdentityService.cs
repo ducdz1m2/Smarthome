@@ -370,6 +370,8 @@ namespace Application.Services
 
         private AuthResponse GenerateAuthResponse(ApplicationUser user, IList<string> roles)
         {
+            var jwt = _configuration.GetSection("JwtSettings");
+            var expiresInDays = int.Parse(jwt["ExpiresInDays"] ?? "7");
             var token = GenerateJwtToken(user, roles);
             var refreshToken = GenerateRefreshToken();
 
@@ -377,16 +379,18 @@ namespace Application.Services
             {
                 Token = token,
                 RefreshToken = refreshToken,
-                ExpiresAt = DateTime.UtcNow.AddHours(8),
+                ExpiresAt = DateTime.UtcNow.AddDays(expiresInDays),
                 User = MapToUserResponse(user, roles)
             };
         }
 
         private string GenerateJwtToken(ApplicationUser user, IList<string> roles)
         {
-            var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? "YourSuperSecretKey12345678901234567890");
-            var issuer = _configuration["Jwt:Issuer"] ?? "SmarthomeApp";
-            var audience = _configuration["Jwt:Audience"] ?? "SmarthomeClient";
+            var jwt = _configuration.GetSection("JwtSettings");
+            var key = Encoding.UTF8.GetBytes(jwt["SecretKey"] ?? "YourSuperSecretKey12345678901234567890");
+            var issuer = jwt["Issuer"] ?? "SmarthomeApp";
+            var audience = jwt["Audience"] ?? "SmarthomeClient";
+            var expiresInDays = int.Parse(jwt["ExpiresInDays"] ?? "7");
 
             var claims = new List<Claim>
             {
@@ -405,7 +409,7 @@ namespace Application.Services
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddHours(8),
+                Expires = DateTime.UtcNow.AddDays(expiresInDays),
                 Issuer = issuer,
                 Audience = audience,
                 SigningCredentials = new SigningCredentials(

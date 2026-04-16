@@ -6,7 +6,7 @@ public class CurrentUserService
     public string? UserName { get; private set; }
     public string? Email { get; private set; }
     public string? FullName { get; private set; }
-    public int? TechnicianId { get; private set; }
+    public int? TechnicianId { get; internal set; }
     public List<string> Roles { get; private set; } = new();
 
     public void SetUser(int userId, string userName, string email, string fullName, IEnumerable<string> roles, int? technicianId = null)

@@ -1,5 +1,7 @@
+@using Web.Services
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@inject IAuthService AuthService
 
 <MudNavMenu>
     <MudNavLink Href="/admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Tổng quan</MudNavLink>
@@ -33,6 +35,10 @@
         <MudNavLink Href="/admin/technicians" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Engineering">Kỹ thuật viên</MudNavLink>
     </MudNavGroup>
     
+    <MudNavGroup Title="Hỗ trợ khách hàng" Icon="@Icons.Material.Filled.SupportAgent">
+        <MudNavLink Href="/admin/chat" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.ChatBubble">Chat hỗ trợ</MudNavLink>
+    </MudNavGroup>
+    
     <MudNavGroup Title="Nội dung" Icon="@Icons.Material.Filled.Article">
         <MudNavLink Href="/admin/banners" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Image">Banner</MudNavLink>
     </MudNavGroup>
@@ -47,10 +53,10 @@
 </MudNavMenu>
 
 @code {
-    private void Logout()
+    private async Task Logout()
     {
-        // Clear any stored auth state if needed
-        // For now just redirect to login
+        // Clear JWT token from localStorage and session
+        await AuthService.SignOutAsync();
         NavigationManager.NavigateTo("/login", forceLoad: true);
         Snackbar.Add("Đã đăng xuất", Severity.Success);
     }

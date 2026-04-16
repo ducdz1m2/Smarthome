@@ -3,12 +3,15 @@
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @using Web.Services
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IIdentityService IdentityService
 @inject ITechnicianProfileService TechnicianService
 @inject CurrentUserService CurrentUserService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject LocalAuthStateProvider LocalAuthStateProvider
 
 @* For file upload *@
 @using System.Net.Http
@@ -129,6 +132,15 @@
     {
         if (firstRender)
         {
+            Console.WriteLine($"[Profile] OnAfterRenderAsync - firstRender: {firstRender}");
+            
+            // Check localStorage from browser
+            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "JWTToken");
+            Console.WriteLine($"[Profile] JWTToken in localStorage: {(token != null ? "exists" : "null")}");
+            
+            // Log to browser console
+            await JSRuntime.InvokeVoidAsync("console.log", $"[Profile] JWTToken: {(token != null ? "exists" : "null")}");
+            
             await LoadUserProfile();
         }
     }
@@ -139,9 +151,13 @@
         {
             // Get current authenticated user from CurrentUserService
             Console.WriteLine($"[Profile] IsAuthenticated: {CurrentUserService.IsAuthenticated}");
+            Console.WriteLine($"[Profile] UserId: {CurrentUserService.UserId}");
+            Console.WriteLine($"[Profile] UserName: {CurrentUserService.UserName}");
+            Console.WriteLine($"[Profile] Roles: {string.Join(", ", CurrentUserService.Roles)}");
 
             if (!CurrentUserService.IsAuthenticated || !CurrentUserService.UserId.HasValue)
             {
+                Console.WriteLine($"[Profile] User not authenticated or no UserId");
                 Snackbar.Add("Không tìm thấy thông tin người dùng", Severity.Error);
                 return;
             }

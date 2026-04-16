@@ -31,6 +31,12 @@ public class ChatService : IChatService
         return rooms.Select(r => MapToRoomResponse(r, userId)).ToList();
     }
 
+    public async Task<List<ChatRoomResponse>> GetAllSupportChatRoomsAsync()
+    {
+        var rooms = await _chatRoomRepository.GetActiveSupportRoomsAsync();
+        return rooms.Select(r => MapToRoomResponse(r, 0)).ToList();
+    }
+
     public async Task<ChatRoomResponse?> GetChatRoomByIdAsync(int id, int userId)
     {
         var room = await _chatRoomRepository.GetByIdWithParticipantsAsync(id);
@@ -89,6 +95,22 @@ public class ChatService : IChatService
         var room = ChatRoom.CreateSupportRoom(customerId, orderId, installationId, warrantyClaimId);
         await _chatRoomRepository.AddAsync(room);
         await _chatRoomRepository.SaveChangesAsync();
+
+        Console.WriteLine($"Created support chat room {room.Id} for customer {customerId}");
+
+        // Assign admin to support chat room (using admin ID = 1 as default)
+        // In production, this should get the first available admin or assign based on routing logic
+        try
+        {
+            await AssignAdminAsync(room.Id, 1);
+            Console.WriteLine($"Assigned admin ID 1 to chat room {room.Id}");
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail if admin assignment fails
+            Console.WriteLine($"Failed to assign admin to support chat room: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
 
         return room.Id;
     }

@@ -10,7 +10,6 @@
 @inject IAuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
-@inject IHttpContextAccessor HttpContextAccessor
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="height: 100vh;">
     <MudPaper Elevation="3" Class="pa-6" Style="width: 400px;">
@@ -84,31 +83,46 @@
         _loading = true;
         try
         {
-            // Validate credentials
+            Console.WriteLine($"[Login] Attempting login for user: {_request.UserName}");
+            
+            // Validate credentials and get JWT token
             var response = await IdentityService.LoginAsync(_request);
 
-            // Store user info in CurrentUserService and set cookie
-            await AuthService.SignInAsync(
-                response.User!.Id.ToString(),
-                response.User.UserName,
-                response.User.Email,
-                response.User.FullName,
-                response.User.Roles,
-                _request.RememberMe);
+            Console.WriteLine($"[Login] Token received: {response.Token?.Substring(0, Math.Min(50, response.Token?.Length ?? 0))}...");
+            Console.WriteLine($"[Login] User: {response.User?.UserName}, Roles: [{string.Join(", ", response.User?.Roles ?? [])}]");
+
+            // Store JWT token in localStorage for API calls
+            await AuthService.SetTokenAsync(response.Token);
+
+            // Verify token was saved
+            var savedToken = await AuthService.GetTokenAsync();
+            Console.WriteLine($"[Login] Token saved: {(savedToken != null ? "yes" : "no")}");
 
             Snackbar.Add("Đăng nhập thành công!", Severity.Success);
 
             // Redirect based on role
             string redirectUrl = "/";
             if (response.User!.Roles.Contains("Admin"))
+            {
+                Console.WriteLine($"[Login] Redirecting to /admin");
                 redirectUrl = "/admin";
+            }
             else if (response.User!.Roles.Contains("Technician"))
+            {
+                Console.WriteLine($"[Login] Redirecting to /technician");
                 redirectUrl = "/technician";
+            }
+            else
+            {
+                Console.WriteLine($"[Login] Redirecting to /");
+            }
 
             NavigationManager.NavigateTo(redirectUrl, forceLoad: true);
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[Login] Error: {ex.Message}");
+            Console.WriteLine($"[Login] Stack trace: {ex.StackTrace}");
             Snackbar.Add($"Đăng nhập thất bại: {ex.Message}", Severity.Error);
         }
         finally

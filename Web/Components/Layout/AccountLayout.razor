@@ -1,8 +1,10 @@
 @inherits LayoutComponentBase
+@using Web.Services
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject IIdentityService IdentityService
 @inject IJSRuntime JSRuntime
+@inject IAuthService AuthService
 
 <MudThemeProvider />
 <MudPopoverProvider />
@@ -140,8 +142,10 @@
         return relativeUri.Equals(href.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
     }
 
-    private void Logout()
+    private async Task Logout()
     {
+        // Clear JWT token from localStorage and session
+        await AuthService.SignOutAsync();
         NavigationManager.NavigateTo("/login", forceLoad: true);
         Snackbar.Add("Đã đăng xuất", Severity.Success);
     }

@@ -1,0 +1,19 @@
+@page "/access-denied"
+@layout MainLayout
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="height: 100vh;">
+    <MudPaper Elevation="3" Class="pa-6 text-center" Style="width: 400px;">
+        <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" Color="Color.Error" Class="mb-4" />
+        <MudText Typo="Typo.h4" Class="mb-4">Không có quyền truy cập</MudText>
+        <MudText Typo="Typo.body1" Class="mb-4">
+            Bạn không có quyền truy cập vào trang này. Vui lòng liên hệ với quản trị viên nếu bạn nghĩ đây là lỗi.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mb-3">
+            Về trang chủ
+        </MudButton>
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.body2">
+            <MudLink Href="/login">Đăng xuất</MudLink>
+        </MudText>
+    </MudPaper>
+</MudContainer>

@@ -1,7 +1,11 @@
 ﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using Web.Services
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject LocalAuthStateProvider LocalAuthStateProvider
 @implements IDisposable
 
 <MudThemeProvider />
@@ -42,6 +46,7 @@
             @Body
         </MudContainer>
     </MudMainContent>
+    <ChatWidget />
 </MudLayout>
 
 @code {
@@ -57,6 +62,17 @@
     {
         if (firstRender)
         {
+            // Initialize authentication state
+            Console.WriteLine($"[MainLayout] Initializing authentication state");
+            try
+            {
+                await LocalAuthStateProvider.GetAuthenticationStateAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MainLayout] Error initializing auth state: {ex.Message}");
+            }
+
             // Listen for storage changes
             await JSRuntime.InvokeVoidAsync("eval", @"
                 window.addEventListener('storage', function(e) {

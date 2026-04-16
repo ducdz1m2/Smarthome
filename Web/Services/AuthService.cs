@@ -3,12 +3,14 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using Application.Interfaces.Services;
+using Microsoft.JSInterop;
 
 namespace Web.Services;
 
 public interface IAuthService
 {
-    Task SignInAsync(string userId, string userName, string email, string fullName, IEnumerable<string> roles, bool rememberMe = false);
+    Task<string?> GetTokenAsync();
+    Task SetTokenAsync(string token);
     Task SignOutAsync();
     Task<bool> IsAuthenticatedAsync();
     Task<string?> GetUserIdAsync();
@@ -23,115 +25,87 @@ public class AuthService : IAuthService
     private readonly AuthenticationStateProvider _authStateProvider;
     private readonly CurrentUserService _currentUserService;
     private readonly ITechnicianProfileService _technicianProfileService;
+    private readonly IJSRuntime _jsRuntime;
 
-    public AuthService(IHttpContextAccessor httpContextAccessor, AuthenticationStateProvider authStateProvider, CurrentUserService currentUserService, ITechnicianProfileService technicianProfileService)
+    public AuthService(IHttpContextAccessor httpContextAccessor, AuthenticationStateProvider authStateProvider, CurrentUserService currentUserService, ITechnicianProfileService technicianProfileService, IJSRuntime jsRuntime)
     {
         _httpContextAccessor = httpContextAccessor;
         _authStateProvider = authStateProvider;
         _currentUserService = currentUserService;
         _technicianProfileService = technicianProfileService;
+        _jsRuntime = jsRuntime;
     }
 
-    public async Task SignInAsync(string userId, string userName, string email, string fullName, IEnumerable<string> roles, bool rememberMe = false)
+    public async Task<string?> GetTokenAsync()
+    {
+        // Read from session for LocalAuthStateProvider
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext != null)
+        {
+            return httpContext.Session.GetString("JWTToken");
+        }
+        return null;
+    }
+
+    public async Task SetTokenAsync(string token)
     {
         var httpContext = _httpContextAccessor.HttpContext;
-        if (httpContext == null) return;
-
-        // Get technician ID if user is a technician
-        int? technicianId = null;
-        if (roles.Contains("Technician"))
+        if (httpContext != null && !httpContext.Response.HasStarted)
         {
-            try
-            {
-                var technicians = await _technicianProfileService.GetAvailableAsync();
-                var technician = technicians.FirstOrDefault(t => t.UserId == int.Parse(userId));
-                technicianId = technician?.Id;
-            }
-            catch
-            {
-                // Ignore errors - technicianId will remain null
-            }
+            // Save to session for LocalAuthStateProvider (only if response hasn't started)
+            httpContext.Session.SetString("JWTToken", token);
         }
 
-        // Store user info in CurrentUserService for Blazor components
-        _currentUserService.SetUser(int.Parse(userId), userName, email, fullName, roles, technicianId);
-
-        // Only set cookie if response hasn't started
-        if (!httpContext.Response.HasStarted)
-        {
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, userId),
-                new(ClaimTypes.Name, userName),
-                new(ClaimTypes.Email, email),
-                new(ClaimTypes.GivenName, fullName)
-            };
-
-            foreach (var role in roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
-
-            var authProperties = new AuthenticationProperties
-            {
-                IsPersistent = rememberMe,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
-            };
-
-            await httpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                claimsPrincipal,
-                authProperties);
-        }
+        // Always save to localStorage for HttpClient (JwtTokenMessageHandler)
+        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "JWTToken", token);
 
         // Notify Blazor authentication state changed
-        if (_authStateProvider is ServerAuthStateProvider serverAuthStateProvider)
+        if (_authStateProvider is LocalAuthStateProvider localAuthStateProvider)
         {
-            serverAuthStateProvider.NotifyAuthenticationStateChanged();
+            localAuthStateProvider.NotifyAuthenticationStateChanged();
         }
     }
 
     public async Task SignOutAsync()
     {
         var httpContext = _httpContextAccessor.HttpContext;
-        if (httpContext == null) return;
+        if (httpContext != null)
+        {
+            // Remove from session
+            httpContext.Session.Remove("JWTToken");
+        }
 
-        await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        // Remove from localStorage
+        await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "JWTToken");
 
         // Clear user info from CurrentUserService
         _currentUserService.Clear();
 
-        if (_authStateProvider is ServerAuthStateProvider serverAuthStateProvider)
+        if (_authStateProvider is LocalAuthStateProvider localAuthStateProvider)
         {
-            serverAuthStateProvider.NotifyAuthenticationStateChanged();
+            localAuthStateProvider.NotifyAuthenticationStateChanged();
         }
     }
 
     public async Task<bool> IsAuthenticatedAsync()
     {
-        var authState = await _authStateProvider.GetAuthenticationStateAsync();
-        return authState.User.Identity?.IsAuthenticated ?? false;
+        var token = await GetTokenAsync();
+        return !string.IsNullOrEmpty(token);
     }
 
     public async Task<string?> GetUserIdAsync()
     {
-        var authState = await _authStateProvider.GetAuthenticationStateAsync();
-        return authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return _currentUserService.UserId?.ToString();
     }
 
     public async Task<string?> GetUserNameAsync()
     {
-        var authState = await _authStateProvider.GetAuthenticationStateAsync();
-        return authState.User.Identity?.Name;
+        return _currentUserService.UserName;
     }
 
     public async Task<IEnumerable<string>> GetRolesAsync()
     {
-        var authState = await _authStateProvider.GetAuthenticationStateAsync();
-        return authState.User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+        return _currentUserService.Roles ?? Enumerable.Empty<string>();
     }
 
     public async Task<int?> GetTechnicianIdAsync()
@@ -145,46 +119,27 @@ public class AuthService : IAuthService
             return _currentUserService.TechnicianId.Value;
         }
 
-        Console.WriteLine($"[GetTechnicianIdAsync] Not in CurrentUserService, fetching from database...");
-
-        // If not, reload from database
-        var userId = await GetUserIdAsync();
-        Console.WriteLine($"[GetTechnicianIdAsync] UserId: {userId}");
-        
-        if (userId == null)
+        // If not, try to fetch it
+        if (_currentUserService.UserId.HasValue)
         {
-            Console.WriteLine($"[GetTechnicianIdAsync] UserId is null, returning null");
-            return null;
-        }
-
-        try
-        {
-            var technicians = await _technicianProfileService.GetAvailableAsync();
-            Console.WriteLine($"[GetTechnicianIdAsync] Found {technicians.Count} technicians");
-            
-            var technician = technicians.FirstOrDefault(t => t.UserId == int.Parse(userId));
-            Console.WriteLine($"[GetTechnicianIdAsync] Technician found: {technician != null}, ID: {technician?.Id}");
-            
-            // Update CurrentUserService with the fetched technician ID
-            if (technician != null)
+            try
             {
-                _currentUserService.SetUser(
-                    _currentUserService.UserId ?? 0,
-                    _currentUserService.UserName ?? "",
-                    _currentUserService.Email ?? "",
-                    _currentUserService.FullName ?? "",
-                    _currentUserService.Roles,
-                    technician.Id
-                );
-                Console.WriteLine($"[GetTechnicianIdAsync] Updated CurrentUserService with TechnicianId: {technician.Id}");
+                var technicians = await _technicianProfileService.GetAvailableAsync();
+                var technician = technicians.FirstOrDefault(t => t.UserId == _currentUserService.UserId.Value);
+                if (technician != null)
+                {
+                    Console.WriteLine($"[GetTechnicianIdAsync] Found in database: {technician.Id}");
+                    _currentUserService.TechnicianId = technician.Id;
+                    return technician.Id;
+                }
             }
-            
-            return technician?.Id;
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GetTechnicianIdAsync] Error: {ex.Message}");
+            }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[GetTechnicianIdAsync] Error: {ex.Message}");
-            return null;
-        }
+
+        Console.WriteLine($"[GetTechnicianIdAsync] Not found");
+        return null;
     }
 }

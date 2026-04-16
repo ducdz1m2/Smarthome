@@ -38,15 +38,40 @@ public class ServerAuthStateProvider : AuthenticationStateProvider, IDisposable
             return Task.FromResult(new AuthenticationState(anonymous));
         }
 
-        // Check HttpContext.User directly (set by authentication middleware)
+        // Check HttpContext.User directly (set by JWT Bearer middleware)
         if (httpContext.User?.Identity?.IsAuthenticated == true)
         {
             Console.WriteLine($"[ServerAuthStateProvider] User authenticated via HttpContext.User: {httpContext.User.Identity.Name}");
+            
+            // Sync user data to CurrentUserService
+            var currentUserService = _serviceProvider.GetService<CurrentUserService>();
+            if (currentUserService != null)
+            {
+                var userIdClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userName = httpContext.User.Identity.Name;
+                var email = httpContext.User.FindFirst(ClaimTypes.Email)?.Value;
+                var fullName = httpContext.User.FindFirst(ClaimTypes.GivenName)?.Value;
+                var technicianIdClaim = httpContext.User.FindFirst("TechnicianId")?.Value;
+                var roles = httpContext.User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+                
+                if (int.TryParse(userIdClaim, out var userId))
+                {
+                    var technicianId = int.TryParse(technicianIdClaim, out var techId) ? techId : (int?)null;
+                    currentUserService.SetUser(userId, userName ?? "", email ?? "", fullName ?? "", roles, technicianId);
+                    Console.WriteLine($"[ServerAuthStateProvider] Synced user to CurrentUserService: UserId={userId}, UserName={userName}");
+                }
+            }
+            
             return Task.FromResult(new AuthenticationState(httpContext.User));
         }
 
-        // Return unauthenticated state
+        // Return unauthenticated state and clear CurrentUserService
         Console.WriteLine($"[ServerAuthStateProvider] User not authenticated");
+        var authService = _serviceProvider.GetService<CurrentUserService>();
+        if (authService != null)
+        {
+            authService.Clear();
+        }
         var anonymousUser = new ClaimsPrincipal(new ClaimsIdentity());
         return Task.FromResult(new AuthenticationState(anonymousUser));
     }

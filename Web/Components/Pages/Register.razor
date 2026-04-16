@@ -2,13 +2,11 @@
 @layout EmptyLayout
 @using Application.DTOs.Requests
 @using Application.Interfaces.Services
-@using System.Security.Claims
-@using Microsoft.AspNetCore.Authentication
-@using Microsoft.AspNetCore.Authentication.Cookies
+@using Web.Services
 @inject IIdentityService IdentityService
+@inject IAuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
-@inject IHttpContextAccessor HttpContextAccessor
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="height: 100vh;">
     <MudPaper Elevation="3" Class="pa-6" Style="width: 450px;">
@@ -117,41 +115,13 @@
         _loading = true;
         try
         {
-            // Create user
+            // Create user and get JWT token
+            // AuthController will set authentication cookie for Blazor Server
             var response = await IdentityService.RegisterAsync(_request);
-            
-            // Set cookie using HttpContext
-            var httpContext = HttpContextAccessor.HttpContext;
-            if (httpContext != null && !httpContext.Response.HasStarted)
-            {
-                var claims = new List<Claim>
-                {
-                    new(ClaimTypes.NameIdentifier, response.User.Id.ToString()),
-                    new(ClaimTypes.Name, response.User.UserName),
-                    new(ClaimTypes.Email, response.User.Email),
-                    new(ClaimTypes.GivenName, response.User.FullName)
-                };
 
-                foreach (var role in response.User.Roles)
-                {
-                    claims.Add(new Claim(ClaimTypes.Role, role));
-                }
+            // Store JWT token in localStorage for API calls
+            await AuthService.SetTokenAsync(response.Token);
 
-                var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-                var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
-
-                var authProperties = new AuthenticationProperties
-                {
-                    IsPersistent = true,
-                    ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
-                };
-
-                await httpContext.SignInAsync(
-                    CookieAuthenticationDefaults.AuthenticationScheme,
-                    claimsPrincipal,
-                    authProperties);
-            }
-            
             Snackbar.Add("Đăng ký thành công!", Severity.Success);
             NavigationManager.NavigateTo("/", forceLoad: true);
         }

@@ -8,6 +8,7 @@ public interface IChatService
 {
     // Query methods
     Task<List<ChatRoomResponse>> GetUserChatRoomsAsync(int userId, UserType userType);
+    Task<List<ChatRoomResponse>> GetAllSupportChatRoomsAsync();
     Task<ChatRoomResponse?> GetChatRoomByIdAsync(int id, int userId);
     Task<List<ChatMessageResponse>> GetChatMessagesAsync(int chatRoomId, int userId, int limit = 50);
     Task<int> GetUnreadMessageCountAsync(int userId, UserType userType);

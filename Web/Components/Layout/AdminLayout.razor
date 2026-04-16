@@ -1,6 +1,9 @@
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using Web.Services
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <MudThemeProvider />
 <MudPopoverProvider />
@@ -39,11 +42,53 @@
 @code {
     bool _drawerOpen = true;
     private string? _avatarUrl;
+    private bool _isAuthorized = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            Console.WriteLine($"[AdminLayout] OnAfterRenderAsync - checking authorization");
+            
+            // Check authorization
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            
+            Console.WriteLine($"[AdminLayout] User.Identity?.IsAuthenticated: {user.Identity?.IsAuthenticated}");
+            Console.WriteLine($"[AdminLayout] User.Identity?.Name: {user.Identity?.Name}");
+            
+            // Check if user has Admin role first (regardless of authentication status)
+            var roles = user.FindAll("role").Select(c => c.Value).ToList();
+            Console.WriteLine($"[AdminLayout] User roles: [{string.Join(", ", roles)}]");
+            
+            if (!roles.Contains("Admin"))
+            {
+                Console.WriteLine($"[AdminLayout] User does not have Admin role");
+                // If authenticated but wrong role, redirect to access-denied
+                if (user.Identity?.IsAuthenticated ?? false)
+                {
+                    Console.WriteLine($"[AdminLayout] User authenticated but wrong role, redirecting to access-denied");
+                    NavigationManager.NavigateTo("/access-denied", forceLoad: true);
+                }
+                else
+                {
+                    Console.WriteLine($"[AdminLayout] User not authenticated, redirecting to login");
+                    NavigationManager.NavigateTo("/login", forceLoad: true);
+                }
+                return;
+            }
+
+            // Check if user is authenticated
+            if (!user.Identity?.IsAuthenticated ?? true)
+            {
+                Console.WriteLine($"[AdminLayout] User not authenticated, redirecting to login");
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+                return;
+            }
+
+            Console.WriteLine($"[AdminLayout] User authorized as Admin");
+            _isAuthorized = true;
+            
             await LoadAvatar();
         }
     }
