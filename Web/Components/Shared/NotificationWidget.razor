@@ -1,0 +1,256 @@
+@using Web.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@using MudBlazor.Components
+@inject SignalRService SignalRService
+@inject CurrentUserService CurrentUserService
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@implements IDisposable
+
+<MudIconButton @onclick="ToggleNotifications" Color="Color.Inherit" Class="@Class">
+    <MudBadge Content="@_unreadCount" Color="Color.Error" Overlap="true" Visible="@(_unreadCount > 0)">
+        <MudIcon Icon="@Icons.Material.Filled.Notifications" />
+    </MudBadge>
+</MudIconButton>
+
+<MudPopover Open="@_isOpen" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="mt-2">
+    <MudPaper Class="notification-popup" Style="width: 350px; max-height: 500px;">
+        <MudCard>
+            <MudCardHeader Class="py-3">
+                <CardHeaderContent>
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.h6">Thông báo</MudText>
+                        @if (_unreadCount > 0)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="MarkAllAsRead">Đánh dấu đã đọc</MudButton>
+                        }
+                    </div>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent Class="pa-0" Style="max-height: 400px; overflow-y: auto;">
+                @if (_notifications.Count == 0)
+                {
+                    <MudText Class="pa-4 text-center" Color="Color.Secondary">Không có thông báo</MudText>
+                }
+                else
+                {
+                    @foreach (var notification in _notifications.OrderByDescending(n => n.CreatedAt))
+                    {
+                        <MudListItem T="string" 
+                            Class="@(!notification.IsRead ? "unread-notification" : "")" 
+                            OnClick="() => NavigateToNotification(notification)"
+                            Style="cursor: pointer;">
+                            <MudListItemAvatar>
+                                <MudAvatar Size="Size.Small" Color="@(GetNotificationColor(notification.Type))">
+                                    <MudIcon Icon="@GetNotificationIcon(notification.Icon)" Size="Size.Small" />
+                                </MudAvatar>
+                            </MudListItemAvatar>
+                            <MudListItemContent>
+                                <MudListItemText Typo="Typo.subtitle2" Class="fw-bold">@notification.Title</MudListItemText>
+                                <MudListItemText Typo="Typo.body2" Class="text-truncate">@notification.Message</MudListItemText>
+                                <MudListItemText Typo="Typo.caption" Color="Color.Secondary">@notification.TimeAgo</MudListItemText>
+                            </MudListItemContent>
+                            @if (!notification.IsRead)
+                            {
+                                <MudListItemAction>
+                                    <div class="notification-dot"></div>
+                                </MudListItemAction>
+                            }
+                        </MudListItem>
+                    }
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudPaper>
+</MudPopover>
+
+<style>
+    .notification-popup {
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .unread-notification {
+        background-color: #f5f5f5;
+    }
+    .notification-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: var(--mud-palette-error);
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string? Class { get; set; }
+
+    private bool _isOpen = false;
+    private int _unreadCount = 0;
+    private List<NotificationDto> _notifications = new();
+
+    public class NotificationDto
+    {
+        public int Id { get; set; }
+        public string Type { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Message { get; set; } = "";
+        public string? ActionUrl { get; set; }
+        public string Icon { get; set; } = "";
+        public bool IsRead { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string TimeAgo { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        SignalRService.OnNotificationReceived += OnNotificationReceived;
+        
+        // Wait for authentication state to be loaded
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        await Task.Delay(100); // Small delay to ensure CurrentUserService is populated
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Initialize SignalR first
+                await SignalRService.InitializeAsync();
+                Console.WriteLine($"[NotificationWidget] SignalR initialized");
+
+                // Wait for CurrentUserService to be populated with retry mechanism
+                int maxRetries = 5;
+                for (int i = 0; i < maxRetries; i++)
+                {
+                    await Task.Delay(200); // Wait 200ms between retries
+                    
+                    Console.WriteLine($"[NotificationWidget] Retry {i + 1}/{maxRetries}: IsAuthenticated={CurrentUserService.IsAuthenticated}, UserId={CurrentUserService.UserId}");
+                    
+                    if (CurrentUserService.IsAuthenticated && CurrentUserService.UserId.HasValue)
+                    {
+                        // Join user-specific notification group
+                        await SignalRService.JoinUserNotificationGroup(CurrentUserService.UserId.Value.ToString());
+                        Console.WriteLine($"[NotificationWidget] Joined notification group for user {CurrentUserService.UserId}");
+
+                        // Join admin notification group if user is admin
+                        if (CurrentUserService.Roles.Contains("Admin"))
+                        {
+                            await SignalRService.JoinAdminNotificationGroup();
+                            Console.WriteLine($"[NotificationWidget] Joined admin notification group");
+                        }
+
+                        return; // Success, exit retry loop
+                    }
+                }
+
+                Console.WriteLine($"[NotificationWidget] Failed to join notification group after {maxRetries} retries");
+                Console.WriteLine($"[NotificationWidget] Final state: IsAuthenticated={CurrentUserService.IsAuthenticated}, UserId={CurrentUserService.UserId}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NotificationWidget] Error initializing notifications: {ex.Message}");
+                Console.WriteLine($"[NotificationWidget] Stack trace: {ex.StackTrace}");
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        SignalRService.OnNotificationReceived -= OnNotificationReceived;
+    }
+
+    private void OnNotificationReceived(object notification)
+    {
+        try
+        {
+            var notif = System.Text.Json.JsonSerializer.Deserialize<NotificationDto>(notification.ToString() ?? "");
+            if (notif != null)
+            {
+                _notifications.Insert(0, notif);
+                _unreadCount++;
+                
+                // Show snackbar notification
+                Snackbar.Add(notif.Title, Severity.Info);
+                
+                Console.WriteLine($"[NotificationWidget] Received notification: {notif.Title}");
+                InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[NotificationWidget] Error processing notification: {ex.Message}");
+        }
+    }
+
+    private void ToggleNotifications()
+    {
+        _isOpen = !_isOpen;
+    }
+
+    private async Task MarkAllAsRead()
+    {
+        foreach (var notif in _notifications)
+        {
+            notif.IsRead = true;
+        }
+        _unreadCount = 0;
+        StateHasChanged();
+    }
+
+    private void NavigateToNotification(NotificationDto notification)
+    {
+        _isOpen = false;
+        if (!string.IsNullOrEmpty(notification.ActionUrl))
+        {
+            NavigationManager.NavigateTo(notification.ActionUrl);
+        }
+    }
+
+    private static Color GetNotificationColor(string type)
+    {
+        return type.ToLower() switch
+        {
+            "ordercreated" or "orderconfirmed" or "ordershipped" or "orderdelivered" => Color.Primary,
+            "installationscheduled" or "installationassigned" => Color.Info,
+            "warrantyclaimupdated" => Color.Warning,
+            "newmessage" => Color.Secondary,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetNotificationIcon(string icon)
+    {
+        return icon.ToLower() switch
+        {
+            "shopping-cart" => Icons.Material.Filled.ShoppingCart,
+            "check-circle" => Icons.Material.Filled.CheckCircle,
+            "truck" => Icons.Material.Filled.LocalShipping,
+            "box-open" => Icons.Material.Filled.Inbox,
+            "times-circle" => Icons.Material.Filled.Cancel,
+            "user-cog" => Icons.Material.Filled.Person,
+            "tools" => Icons.Material.Filled.Build,
+            "shield-alt" => Icons.Material.Filled.Shield,
+            "comment" => Icons.Material.Filled.Chat,
+            _ => Icons.Material.Filled.Notifications
+        };
+    }
+
+    private static string FormatTimeAgo(DateTime dateTime)
+    {
+        var span = DateTime.UtcNow - dateTime;
+
+        if (span.TotalMinutes < 1)
+            return "Vừa xong";
+        if (span.TotalHours < 1)
+            return $"{(int)span.TotalMinutes} phút trước";
+        if (span.TotalDays < 1)
+            return $"{(int)span.TotalHours} giờ trước";
+        if (span.TotalDays < 7)
+            return $"{(int)span.TotalDays} ngày trước";
+        return dateTime.ToString("dd/MM/yyyy");
+    }
+}

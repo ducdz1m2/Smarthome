@@ -74,7 +74,7 @@
     private Dictionary<int, int> _ratings = new();
     private Dictionary<int, string> _comments = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _isEditMode = ExistingCommentId.HasValue;
         
@@ -87,7 +87,7 @@
 
         if (_isEditMode)
         {
-            LoadExistingReviewAsync();
+            await LoadExistingReviewAsync();
         }
     }
 

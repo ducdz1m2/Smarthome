@@ -1,10 +1,12 @@
 @page "/products/{ProductId:int}"
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Domain.Enums
 @inject IProductService ProductService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
+@inject Web.Services.RecommendationApiService RecommendationApiService
 
 @if (_isLoading)
 {
@@ -317,6 +319,9 @@ else
             </MudTabPanel>
         </MudTabs>
 
+        <!-- Recommended Products -->
+        <RecommendedProducts />
+
         <!-- Related Products -->
         <div class="mt-8">
             <MudText Typo="Typo.h5" Class="fw-bold mb-4">Sản phẩm liên quan</MudText>
@@ -466,6 +471,12 @@ else
     {
         await LoadProductAsync();
         await CheckWishlistStatus();
+        
+        // Log view behavior
+        if (_product != null)
+        {
+            _ = Task.Run(() => RecommendationApiService.LogUserBehaviorAsync(ProductId, BehaviorType.View));
+        }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -638,6 +649,9 @@ else
             await JSRuntime.InvokeVoidAsync("localStorage.setItem", "cart",
                 System.Text.Json.JsonSerializer.Serialize(cartItems));
 
+            // Log add to cart behavior
+            _ = Task.Run(() => RecommendationApiService.LogUserBehaviorAsync(ProductId, BehaviorType.AddToCart));
+
             Snackbar.Add($"Đã thêm {_quantity} sản phẩm vào giỏ hàng!", Severity.Success);
         }
         catch (Exception ex)
@@ -663,6 +677,10 @@ else
     private async Task BuyNow()
     {
         await AddToCart();
+        
+        // Log purchase behavior (will be logged again when order is completed)
+        _ = Task.Run(() => RecommendationApiService.LogUserBehaviorAsync(ProductId, BehaviorType.Purchase));
+        
         NavigationManager.NavigateTo("/cart");
     }
 
@@ -700,9 +718,12 @@ else
                 wishlist.Add(ProductId);
                 _isInWishlist = true;
                 Snackbar.Add("Đã thêm vào danh sách yêu thích!", Severity.Success);
+                
+                // Log favorite behavior
+                _ = Task.Run(() => RecommendationApiService.LogUserBehaviorAsync(ProductId, BehaviorType.Favorite));
             }
 
-            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "wishlist", 
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "wishlist",
                 System.Text.Json.JsonSerializer.Serialize(wishlist));
         }
         catch

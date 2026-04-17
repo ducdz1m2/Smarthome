@@ -4,6 +4,7 @@
 @using Application.Interfaces.Services
 @using Domain.Services
 @using Domain.Entities.Installation
+@using Web.Services
 
 @inject Application.Interfaces.Services.IOrderService OrderService
 @inject IUserAddressService UserAddressService
@@ -13,6 +14,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
+@inject CurrentUserService CurrentUserService
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
     <MudText Typo="Typo.h4" Class="mb-4">Thanh toán</MudText>
@@ -437,8 +439,7 @@
     {
         try
         {
-            // TODO: Get current user ID from authentication
-            _currentUserId = 1; // Temporary hardcoded value
+            _currentUserId = CurrentUserService.UserId ?? 0;
             _userAddresses = await UserAddressService.GetByUserIdAsync(_currentUserId);
 
             // Auto-select default address if exists
@@ -553,9 +554,8 @@
                 RequiresInstallation = i.RequiresInstallation
             }).ToList();
 
-            // TODO: Get current user ID from auth service
-            // For now, use a default user ID
-            _request.UserId = 1;
+            // Get current user ID from auth service
+            _request.UserId = CurrentUserService.UserId ?? 0;
 
             // Set shipping fee
             _request.ShippingFee = _shippingFee;

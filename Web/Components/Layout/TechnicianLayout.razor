@@ -39,7 +39,6 @@
 @code {
     bool _drawerOpen = true;
     private string? _avatarUrl;
-    private bool _isAuthorized = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -84,7 +83,6 @@
             }
 
             Console.WriteLine($"[TechnicianLayout] User authorized as Technician");
-            _isAuthorized = true;
             
             await LoadAvatar();
         }

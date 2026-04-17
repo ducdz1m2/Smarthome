@@ -19,8 +19,16 @@ public class SignalRService
         _navigationManager = navigationManager;
     }
 
+    private bool _isInitialized = false;
+
     public async Task InitializeAsync()
     {
+        if (_isInitialized)
+        {
+            Console.WriteLine($"[SignalRService] Already initialized, skipping");
+            return;
+        }
+
         var baseUrl = _navigationManager.BaseUri;
         Console.WriteLine($"[SignalRService] Initializing with base URL: {baseUrl}");
 
@@ -69,6 +77,7 @@ public class SignalRService
 
             _notificationConnection.On<object>("ReceiveNotification", (notification) =>
             {
+                Console.WriteLine($"[SignalRService] ReceiveNotification called with: {notification}");
                 OnNotificationReceived?.Invoke(notification);
             });
 
@@ -113,6 +122,7 @@ public class SignalRService
                 Console.WriteLine($"[SignalRService] Installation connection failed: {ex.Message}");
             }
 
+            _isInitialized = true;
             Console.WriteLine($"[SignalRService] All connections initialized");
         }
         catch (Exception ex)
@@ -140,16 +150,16 @@ public class SignalRService
         }
     }
 
-    public async Task SendMessage(int chatRoomId, int senderId, string senderType, string content)
+    public async Task SendMessage(int chatRoomId, int senderId, string senderType, string content, string? fileUrl = null, string? fileName = null, string? fileType = null, long? fileSize = null)
     {
-        Console.WriteLine($"[SignalRService] SendMessage called - Room:{chatRoomId}, Sender:{senderId}, Type:{senderType}, Content:{content}");
+        Console.WriteLine($"[SignalRService] SendMessage called - Room:{chatRoomId}, Sender:{senderId}, Type:{senderType}, Content:{content}, FileUrl:{fileUrl}");
         Console.WriteLine($"[SignalRService] Connection state: {_chatConnection?.State}");
         
         if (_chatConnection != null && _chatConnection.State == HubConnectionState.Connected)
         {
             try
             {
-                await _chatConnection.InvokeAsync("SendMessage", chatRoomId, senderId, senderType, content);
+                await _chatConnection.InvokeAsync("SendMessage", chatRoomId, senderId, senderType, content, fileUrl, fileName, fileType, fileSize);
                 Console.WriteLine($"[SignalRService] SendMessage invoked successfully");
             }
             catch (Exception ex)

@@ -41,6 +41,13 @@ public class LocalAuthStateProvider : AuthenticationStateProvider
                 token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "JWTToken");
                 Console.WriteLine($"[LocalAuthStateProvider] Token from localStorage: {(token != null ? "exists" : "null")}");
             }
+            catch (Microsoft.JSInterop.JSDisconnectedException)
+            {
+                // Circuit is disconnecting, return anonymous
+                Console.WriteLine($"[LocalAuthStateProvider] Circuit disconnected, returning anonymous");
+                _currentUserService.Clear();
+                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"[LocalAuthStateProvider] Error reading from localStorage: {ex.Message}");

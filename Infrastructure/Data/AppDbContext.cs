@@ -1,4 +1,5 @@
-﻿using Domain.Entities.Catalog;
+﻿using Domain.Entities;
+using Domain.Entities.Catalog;
 using Domain.Entities.Content;
 using Domain.Entities.Identity;
 using Domain.Entities.Installation;
@@ -63,6 +64,9 @@ namespace Infrastructure.Data
         // Content
         public DbSet<UserAddress> UserAddresses => Set<UserAddress>();
         public DbSet<Banner> Banners => Set<Banner>();
+
+        // ML/Recommendation
+        public DbSet<UserBehavior> UserBehaviors => Set<UserBehavior>();
 
         // Communication
         public DbSet<Domain.Entities.Communication.ChatRoom> ChatRooms => Set<Domain.Entities.Communication.ChatRoom>();

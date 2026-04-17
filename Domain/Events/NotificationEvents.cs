@@ -18,7 +18,9 @@ public record NotificationReadEvent(int NotificationId, int UserId, DateTime Rea
 
 public record BulkNotificationCreatedEvent(
     List<int> NotificationIds,
-    List<int> UserIds,
+    List<int>? UserIds,
+    UserType UserType,
     NotificationType Type,
     string Title,
-    string Message) : DomainEvent;
+    string Message,
+    string? ActionUrl = null) : DomainEvent;

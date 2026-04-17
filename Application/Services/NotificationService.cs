@@ -84,8 +84,17 @@ public class NotificationService : INotificationService
 
     public async Task CreateBulkNotificationsAsync(CreateBulkNotificationRequest request)
     {
+        Console.WriteLine($"[NotificationService] CreateBulkNotificationsAsync called for UserType: {request.UserType}, UserIds: {request.UserIds?.Count ?? 0}");
+
         var notifications = new List<Notification>();
         var notificationIds = new List<int>();
+
+        // If UserIds is null or empty, return early
+        if (request.UserIds == null || !request.UserIds.Any())
+        {
+            Console.WriteLine($"[NotificationService] UserIds is null or empty, returning early");
+            return;
+        }
 
         foreach (var userId in request.UserIds)
         {
@@ -108,13 +117,19 @@ public class NotificationService : INotificationService
 
         notificationIds = notifications.Select(n => n.Id).ToList();
 
+        Console.WriteLine($"[NotificationService] Created {notificationIds.Count} notifications with IDs: {string.Join(", ", notificationIds)}");
+
         // Dispatch bulk event
         await _eventDispatcher.DispatchAsync(new BulkNotificationCreatedEvent(
             notificationIds,
             request.UserIds,
+            request.UserType,
             request.Type,
             request.Title,
-            request.Message));
+            request.Message,
+            request.ActionUrl));
+
+        Console.WriteLine($"[NotificationService] BulkNotificationCreatedEvent dispatched");
     }
 
     public async Task MarkAsReadAsync(int notificationId, int userId)

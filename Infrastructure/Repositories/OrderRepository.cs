@@ -109,17 +109,33 @@ namespace Infrastructure.Repositories
 
         public async Task SaveChangesAsync()
         {
+            // Log all tracked entities
+            var allTracked = _context.ChangeTracker.Entries().ToList();
+            Console.WriteLine($"[OrderRepository] SaveChangesAsync called - Total tracked entities: {allTracked.Count}");
+            
+            var aggregateRoots = _context.ChangeTracker.Entries<AggregateRoot>().ToList();
+            Console.WriteLine($"[OrderRepository] Tracked AggregateRoot entities: {aggregateRoots.Count}");
+            
+            foreach (var ar in aggregateRoots)
+            {
+                Console.WriteLine($"[OrderRepository] AggregateRoot: {ar.Entity.GetType().Name}, State: {ar.State}, DomainEvents count: {ar.Entity.DomainEvents.Count()}");
+            }
+
             // Get all aggregate roots with domain events before saving
             var aggregatesWithEvents = _context.ChangeTracker.Entries<AggregateRoot>()
                 .Where(e => e.Entity.DomainEvents.Any())
                 .Select(e => e.Entity)
                 .ToList();
 
+            Console.WriteLine($"[OrderRepository] Found {aggregatesWithEvents.Count} aggregates with domain events");
+
             // Collect all domain events (cast from INotification to DomainEvent)
             var domainEvents = aggregatesWithEvents
                 .SelectMany(a => a.DomainEvents)
                 .OfType<DomainEvent>()
                 .ToList();
+
+            Console.WriteLine($"[OrderRepository] Collected {domainEvents.Count} domain events to dispatch");
 
             // Clear domain events from aggregates
             foreach (var aggregate in aggregatesWithEvents)
@@ -133,6 +149,7 @@ namespace Infrastructure.Repositories
             // Dispatch domain events after saving
             foreach (var domainEvent in domainEvents)
             {
+                Console.WriteLine($"[OrderRepository] Dispatching domain event: {domainEvent.GetType().Name}");
                 await _eventDispatcher.DispatchAsync(domainEvent);
             }
         }

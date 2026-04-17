@@ -1,0 +1,510 @@
+// Smarthome Project - Entity Relationship Diagram
+// Generated from Domain.Entities
+
+// ==================== CATALOG MODULE ====================
+
+Table categories {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  description varchar(1000)
+  parent_id int [ref: > categories.id]
+  sort_order int [default: 0]
+  is_active bool [default: true]
+  created_at datetime
+  updated_at datetime
+}
+
+Table brands {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  description varchar(1000)
+  logo_url varchar(500)
+  website varchar(500)
+  is_active bool [default: true]
+  created_at datetime
+  updated_at datetime
+}
+
+Table products {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  sku varchar(100) [not null, unique]
+  base_price decimal(18, 2) [not null]
+  stock_quantity int [default: 0]
+  frozen_stock_quantity int [default: 0]
+  description varchar(2000)
+  specs_json varchar(max)
+  is_active bool [default: true]
+  requires_installation bool [default: false]
+  category_id int [ref: > categories.id]
+  brand_id int [ref: > brands.id]
+  supplier_id int [ref: > suppliers.id]
+  created_at datetime
+  updated_at datetime
+}
+
+Table product_variants {
+  id int [pk, increment]
+  product_id int [ref: > products.id]
+  sku varchar(100) [not null, unique]
+  price decimal(18, 2) [not null]
+  stock_quantity int [default: 0]
+  frozen_stock_quantity int [default: 0]
+  attributes_json varchar(max)
+  is_active bool [default: true]
+  created_at datetime
+  updated_at datetime
+}
+
+Table product_images {
+  id int [pk, increment]
+  product_id int [ref: > products.id]
+  url varchar(500) [not null]
+  alt_text varchar(255)
+  is_main bool [default: false]
+  sort_order int [default: 0]
+  created_at datetime
+}
+
+Table product_comments {
+  id int [pk, increment]
+  product_id int [ref: > products.id]
+  user_id int [ref: > users.id]
+  order_id int [ref: > orders.id]
+  content varchar(2000) [not null]
+  rating int [not null] // 1-5
+  is_approved bool [default: false]
+  is_verified_purchase bool [default: false]
+  parent_comment_id int [ref: > product_comments.id]
+  created_at datetime
+  updated_at datetime
+}
+
+// ==================== SALES MODULE ====================
+
+Table orders {
+  id int [pk, increment]
+  order_number varchar(50) [not null, unique]
+  status varchar(50) [not null] // Pending, Confirmed, Processing, Shipped, Delivered, Cancelled
+  user_id int [ref: > users.id]
+  receiver_name varchar(255) [not null]
+  receiver_phone varchar(20) [not null]
+  shipping_address varchar(500) [not null]
+  total_amount decimal(18, 2) [not null]
+  shipping_fee decimal(18, 2) [default: 0]
+  discount_amount decimal(18, 2) [default: 0]
+  payment_method varchar(50) [not null] // Cash, BankTransfer, CreditCard, Momo
+  shipping_method varchar(50) [not null] // Standard, Express, Installation
+  status_history_json varchar(max)
+  cancel_reason varchar(500)
+  created_at datetime
+  updated_at datetime
+}
+
+Table order_items {
+  id int [pk, increment]
+  order_id int [ref: > orders.id]
+  product_id int [ref: > products.id]
+  variant_id int [ref: > product_variants.id]
+  quantity int [not null]
+  unit_price decimal(18, 2) [not null]
+  is_shipped bool [default: false]
+  is_installed bool [default: false]
+  is_reserved bool [default: false]
+  requires_installation bool [default: false]
+  warehouse_id int [ref: > warehouses.id]
+  installation_booking_id int [ref: > installation_bookings.id]
+  created_at datetime
+  updated_at datetime
+}
+
+Table cart_items {
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  product_id int [ref: > products.id]
+  variant_id int [ref: > product_variants.id]
+  quantity int [not null]
+  added_at datetime
+}
+
+Table payment_transactions {
+  id int [pk, increment]
+  order_id int [ref: > orders.id]
+  amount decimal(18, 2) [not null]
+  method varchar(50) [not null]
+  status varchar(50) [not null] // Pending, Success, Failed, Refunded
+  transaction_code varchar(100)
+  gateway_response varchar(max)
+  paid_at datetime
+  created_at datetime
+}
+
+Table return_orders {
+  id int [pk, increment]
+  original_order_id int [ref: > orders.id]
+  return_type varchar(50) [not null] // Refund, Exchange
+  reason varchar(500) [not null]
+  status varchar(50) [not null] // Pending, Approved, Received, Completed, Rejected
+  refund_amount decimal(18, 2)
+  approved_at datetime
+  received_at datetime
+  completed_at datetime
+  created_at datetime
+  updated_at datetime
+}
+
+Table return_order_items {
+  id int [pk, increment]
+  return_order_id int [ref: > return_orders.id]
+  order_item_id int [ref: > order_items.id]
+  quantity int [not null]
+  reason varchar(500)
+}
+
+Table warranties {
+  id int [pk, increment]
+  order_item_id int [ref: > order_items.id]
+  product_id int [ref: > products.id]
+  start_date datetime [not null]
+  end_date datetime [not null]
+  status varchar(50) [not null] // Active, Expired, Void
+  created_at datetime
+}
+
+Table warranty_claims {
+  id int [pk, increment]
+  warranty_id int [ref: > warranties.id]
+  claim_date datetime
+  issue varchar(1000) [not null]
+  resolution varchar(1000)
+  status varchar(50) [not null] // Pending, Assigned, InProgress, Resolved, Rejected, ReplacementApproved
+  technician_id int [ref: > technician_profiles.id]
+  created_at datetime
+  updated_at datetime
+}
+
+Table order_shipments {
+  id int [pk, increment]
+  order_id int [ref: > orders.id]
+  shipper_id int
+  carrier varchar(100) [not null] // GHN, GHTK, J&T, etc.
+  tracking_number varchar(100) [not null]
+  status varchar(50) [not null] // PendingApproval, Approved, Rejected, Assigned, Accepted, PickedUp, InTransit, Delivered, Failed
+  picked_up_at datetime
+  delivered_at datetime
+  notes varchar(500)
+  approved_at datetime
+  approved_by int
+  created_at datetime
+  updated_at datetime
+}
+
+Table order_warehouse_allocations {
+  id int [pk, increment]
+  order_item_id int [ref: > order_items.id]
+  warehouse_id int [ref: > warehouses.id]
+  allocated_quantity int [not null]
+  is_confirmed bool [default: false]
+  confirmed_at datetime
+  created_at datetime
+}
+
+// ==================== INVENTORY MODULE ====================
+
+Table warehouses {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  code varchar(50) [not null, unique]
+  address varchar(500) [not null]
+  phone varchar(20)
+  manager_name varchar(255)
+  is_active bool [default: true]
+  created_at datetime
+  updated_at datetime
+}
+
+Table product_warehouses {
+  id int [pk, increment]
+  product_id int [ref: > products.id]
+  variant_id int [ref: > product_variants.id]
+  warehouse_id int [ref: > warehouses.id]
+  quantity int [default: 0]
+  reserved_quantity int [default: 0]
+  created_at datetime
+  updated_at datetime
+}
+
+Table stock_entries {
+  id int [pk, increment]
+  entry_date datetime [not null]
+  supplier_id int [ref: > suppliers.id]
+  warehouse_id int [ref: > warehouses.id]
+  note varchar(500)
+  total_cost decimal(18, 2) [not null]
+  is_completed bool [default: false]
+  created_at datetime
+  updated_at datetime
+}
+
+Table stock_entry_details {
+  id int [pk, increment]
+  stock_entry_id int [ref: > stock_entries.id]
+  product_id int [ref: > products.id]
+  variant_id int [ref: > product_variants.id]
+  quantity int [not null]
+  unit_cost decimal(18, 2) [not null]
+  created_at datetime
+}
+
+Table suppliers {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  tax_code varchar(50)
+  address varchar(500)
+  contact_name varchar(255)
+  phone varchar(20)
+  email varchar(255)
+  bank_account varchar(50)
+  bank_name varchar(255)
+  is_active bool [default: true]
+  created_at datetime
+  updated_at datetime
+}
+
+// ==================== IDENTITY MODULE ====================
+
+Table users {
+  id int [pk, increment]
+  user_name varchar(255) [not null, unique]
+  email varchar(255) [not null, unique]
+  full_name varchar(255) [not null]
+  avatar varchar(500)
+  is_active bool [default: true]
+  last_login_at datetime
+  created_at datetime
+}
+
+Table roles {
+  id int [pk, increment]
+  name varchar(255) [not null, unique]
+  description varchar(500)
+  created_at datetime
+}
+
+Table user_roles {
+  user_id int [ref: > users.id]
+  role_id int [ref: > roles.id]
+}
+
+// ==================== INSTALLATION MODULE ====================
+
+Table technician_profiles {
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  full_name varchar(255) [not null]
+  phone_number varchar(20) [not null]
+  email varchar(255)
+  identity_card varchar(50)
+  address varchar(500)
+  date_of_birth datetime
+  employee_code varchar(50) [not null, unique]
+  hire_date datetime [not null]
+  base_salary decimal(18, 2) [not null]
+  city varchar(100) [not null]
+  districts varchar(max) // JSON array
+  skills_json varchar(max) // JSON array
+  is_available bool [default: true]
+  rating decimal(3, 2) [default: 0]
+  completed_jobs int [default: 0]
+  cancelled_jobs int [default: 0]
+  created_at datetime
+  updated_at datetime
+}
+
+Table installation_bookings {
+  id int [pk, increment]
+  order_id int [ref: > orders.id]
+  technician_id int [ref: > technician_profiles.id]
+  slot_id int [ref: > installation_slots.id]
+  status varchar(50) [not null] // Pending, Assigned, Preparing, OnTheWay, Installing, Completed, Cancelled, Rescheduled
+  scheduled_date datetime [not null]
+  estimated_duration int // minutes
+  materials_prepared bool [default: false]
+  on_the_way_at datetime
+  started_at datetime
+  completed_at datetime
+  customer_rating int
+  customer_signature varchar(500)
+  notes varchar(1000)
+  is_uninstall bool [default: false]
+  is_warranty bool [default: false]
+  created_at datetime
+  updated_at datetime
+}
+
+Table installation_slots {
+  id int [pk, increment]
+  technician_id int [ref: > technician_profiles.id]
+  date datetime [not null]
+  start_time time [not null]
+  end_time time [not null]
+  is_booked bool [default: false]
+  booking_id int [ref: > installation_bookings.id]
+  created_at datetime
+}
+
+Table installation_materials {
+  id int [pk, increment]
+  installation_booking_id int [ref: > installation_bookings.id]
+  product_id int [ref: > products.id]
+  quantity_taken int [not null]
+  created_at datetime
+}
+
+// ==================== COMMUNICATION MODULE ====================
+
+Table chat_rooms {
+  id int [pk, increment]
+  title varchar(255) [not null]
+  type varchar(50) [not null] // OneToOne, Support
+  related_order_id int [ref: > orders.id]
+  related_installation_id int [ref: > installation_bookings.id]
+  related_warranty_claim_id int [ref: > warranty_claims.id]
+  created_at datetime
+  closed_at datetime
+  is_active bool [default: true]
+}
+
+Table chat_messages {
+  id int [pk, increment]
+  chat_room_id int [ref: > chat_rooms.id]
+  sender_id int [ref: > users.id]
+  sender_type varchar(50) [not null] // Customer, Admin, Technician
+  content varchar(2000) [not null]
+  sent_at datetime
+  edited_at datetime
+  is_deleted bool [default: false]
+  deleted_at datetime
+  deleted_by varchar(255)
+}
+
+Table chat_participants {
+  id int [pk, increment]
+  chat_room_id int [ref: > chat_rooms.id]
+  user_id int [ref: > users.id]
+  user_type varchar(50) [not null] // Customer, Admin, Technician
+  is_blocked bool [default: false]
+  blocked_reason varchar(500)
+  last_activity_at datetime
+  unread_count int [default: 0]
+  joined_at datetime
+}
+
+Table chat_attachments {
+  id int [pk, increment]
+  chat_message_id int [ref: > chat_messages.id]
+  file_name varchar(255) [not null]
+  file_url varchar(500) [not null]
+  file_type varchar(100)
+  file_size bigint
+  uploaded_at datetime
+}
+
+Table notifications {
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  user_type varchar(50) [not null] // Customer, Admin, Technician
+  type varchar(50) [not null]
+  title varchar(255) [not null]
+  message varchar(1000) [not null]
+  action_url varchar(500)
+  icon varchar(100)
+  is_read bool [default: false]
+  read_at datetime
+  is_sent bool [default: false]
+  sent_at datetime
+  created_at datetime
+  send_error varchar(500)
+  related_entity_id int
+  related_entity_type varchar(100)
+}
+
+// ==================== CONTENT MODULE ====================
+
+Table banners {
+  id int [pk, increment]
+  title varchar(255) [not null]
+  subtitle varchar(500)
+  image_url varchar(500) [not null]
+  link_url varchar(500)
+  position varchar(50) [not null] // HomeTop, HomeMiddle, ProductPage
+  sort_order int [default: 0]
+  start_date datetime
+  end_date datetime
+  is_active bool [default: true]
+  click_count int [default: 0]
+  created_at datetime
+  updated_at datetime
+}
+
+Table user_addresses {
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  label varchar(100) [not null] // Home, Office
+  receiver_name varchar(255) [not null]
+  receiver_phone varchar(20) [not null]
+  address varchar(500) [not null]
+  is_default bool [default: false]
+  created_at datetime
+  updated_at datetime
+}
+
+// ==================== PROMOTIONS MODULE ====================
+
+Table coupons {
+  id int [pk, increment]
+  code varchar(50) [not null, unique]
+  discount_type varchar(50) [not null] // FixedAmount, Percentage
+  discount_value decimal(18, 2) [not null]
+  min_order_amount decimal(18, 2)
+  max_discount_amount decimal(18, 2)
+  expiry_date datetime [not null]
+  max_usage int [not null]
+  used_count int [default: 0]
+  is_active bool [default: true]
+  created_at datetime
+  updated_at datetime
+}
+
+Table promotions {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  description varchar(1000)
+  discount_percent decimal(5, 2) [not null]
+  start_date datetime [not null]
+  end_date datetime [not null]
+  min_order_amount decimal(18, 2)
+  is_active bool [default: true]
+  priority int [default: 0]
+  created_at datetime
+  updated_at datetime
+}
+
+Table promotion_products {
+  id int [pk, increment]
+  promotion_id int [ref: > promotions.id]
+  product_id int [ref: > products.id]
+  custom_discount decimal(5, 2)
+}
+
+// ==================== ANALYTICS MODULE ====================
+
+Table user_behaviors {
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  product_id int [ref: > products.id]
+  behavior_type varchar(50) [not null] // View, Click, AddToCart, Purchase, Rating
+  timestamp datetime
+  rating decimal(3, 2) // 0-5 for collaborative filtering
+  additional_data varchar(max) // JSON
+}

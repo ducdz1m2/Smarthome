@@ -4,6 +4,8 @@
 @using Application.Interfaces.Services
 @using Web.Services
 @using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@using MudBlazor.Components
 @inject IIdentityService IdentityService
 @inject ITechnicianProfileService TechnicianService
 @inject CurrentUserService CurrentUserService
@@ -128,21 +130,22 @@
 
     private bool _isUploading = false;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (firstRender)
-        {
-            Console.WriteLine($"[Profile] OnAfterRenderAsync - firstRender: {firstRender}");
-            
-            // Check localStorage from browser
-            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "JWTToken");
-            Console.WriteLine($"[Profile] JWTToken in localStorage: {(token != null ? "exists" : "null")}");
-            
-            // Log to browser console
-            await JSRuntime.InvokeVoidAsync("console.log", $"[Profile] JWTToken: {(token != null ? "exists" : "null")}");
-            
-            await LoadUserProfile();
-        }
+        Console.WriteLine($"[Profile] OnInitializedAsync called");
+        
+        // Get authentication state first to ensure CurrentUserService is populated
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        
+        Console.WriteLine($"[Profile] AuthState - IsAuthenticated: {user.Identity?.IsAuthenticated}");
+        Console.WriteLine($"[Profile] AuthState - UserName: {user.Identity?.Name}");
+        
+        // Wait a moment to ensure CurrentUserService is populated
+        await Task.Delay(100);
+        
+        // Now load the profile
+        await LoadUserProfile();
     }
 
     private async Task LoadUserProfile()

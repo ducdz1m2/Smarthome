@@ -2,34 +2,149 @@ namespace Web.Services;
 
 public class CurrentUserService
 {
-    public int? UserId { get; private set; }
-    public string? UserName { get; private set; }
-    public string? Email { get; private set; }
-    public string? FullName { get; private set; }
-    public int? TechnicianId { get; internal set; }
-    public List<string> Roles { get; private set; } = new();
+    private readonly object _lock = new();
+    private int? _userId;
+    private string _userName = "";
+    private string _email = "";
+    private string _fullName = "";
+    private List<string> _roles = new();
+    private int? _technicianId;
+
+    public int? UserId
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _userId;
+            }
+        }
+        private set
+        {
+            lock (_lock)
+            {
+                _userId = value;
+            }
+        }
+    }
+
+    public string UserName
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _userName;
+            }
+        }
+        private set
+        {
+            lock (_lock)
+            {
+                _userName = value;
+            }
+        }
+    }
+
+    public string Email
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _email;
+            }
+        }
+        private set
+        {
+            lock (_lock)
+            {
+                _email = value;
+            }
+        }
+    }
+
+    public string FullName
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _fullName;
+            }
+        }
+        private set
+        {
+            lock (_lock)
+            {
+                _fullName = value;
+            }
+        }
+    }
+
+    public List<string> Roles
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return new List<string>(_roles);
+            }
+        }
+        private set
+        {
+            lock (_lock)
+            {
+                _roles = value.ToList();
+            }
+        }
+    }
+
+    public int? TechnicianId
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _technicianId;
+            }
+        }
+        set
+        {
+            lock (_lock)
+            {
+                _technicianId = value;
+            }
+        }
+    }
 
     public void SetUser(int userId, string userName, string email, string fullName, IEnumerable<string> roles, int? technicianId = null)
     {
-        Console.WriteLine($"[CurrentUserService] SetUser called: UserId={userId}, UserName={userName}, TechnicianId={technicianId}");
-        UserId = userId;
-        UserName = userName;
-        Email = email;
-        FullName = fullName;
-        TechnicianId = technicianId;
-        Roles = roles.ToList();
-        Console.WriteLine($"[CurrentUserService] IsAuthenticated after SetUser: {IsAuthenticated}");
+        lock (_lock)
+        {
+            Console.WriteLine($"[CurrentUserService] SetUser called: UserId={userId}, UserName={userName}, TechnicianId={technicianId}");
+            _userId = userId;
+            _userName = userName;
+            _email = email;
+            _fullName = fullName;
+            _roles = roles.ToList();
+            _technicianId = technicianId;
+            Console.WriteLine($"[CurrentUserService] IsAuthenticated after SetUser: {IsAuthenticated}");
+        }
     }
 
     public void Clear()
     {
-        Console.WriteLine($"[CurrentUserService] Clear called");
-        UserId = null;
-        UserName = null;
-        Email = null;
-        FullName = null;
-        TechnicianId = null;
-        Roles = new List<string>();
+        lock (_lock)
+        {
+            Console.WriteLine($"[CurrentUserService] Clear called");
+            _userId = null;
+            _userName = "";
+            _email = "";
+            _fullName = "";
+            _roles = new();
+            _technicianId = null;
+        }
     }
 
     public bool IsAuthenticated => UserId.HasValue;

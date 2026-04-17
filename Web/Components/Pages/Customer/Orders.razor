@@ -159,6 +159,9 @@
                 var nonRejected = returnOrders.FirstOrDefault(r => r.Status != "Rejected");
                 _returnOrders[order.Id] = nonRejected ?? returnOrders.OrderByDescending(r => r.CreatedAt).FirstOrDefault();
 
+                // Small delay to prevent DbContext threading issues
+                await Task.Delay(10);
+
                 // Load warranty requests for each order
                 var warrantyRequests = await WarrantyRequestService.GetByOrderIdAsync(order.Id);
                 // Get the most recent warranty request (not rejected if possible)

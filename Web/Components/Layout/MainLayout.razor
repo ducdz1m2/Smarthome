@@ -6,6 +6,7 @@
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject LocalAuthStateProvider LocalAuthStateProvider
+@inject CurrentUserService CurrentUserService
 @implements IDisposable
 
 <MudThemeProvider />
@@ -19,14 +20,35 @@
         <MudHidden Breakpoint="Breakpoint.MdAndUp">
             <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Inherit" />
         </MudHidden>
-        <MudButton href="/" Variant="Variant.Text">Trang chủ</MudButton>
-        <MudButton href="/products" Variant="Variant.Text">Sản phẩm</MudButton>
         
-        @* Giỏ hàng với số lượng động *@
-        <MudBadge Content="@_cartCount" Color="Color.Secondary" Overlap="true" Class="mx-4" Visible="@(_cartCount > 0)">
-            <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" />
-        </MudBadge>
+        @if (CurrentUserService.Roles.Contains("Admin"))
+        {
+            <MudButton href="/admin" Variant="Variant.Text" Color="Color.Secondary">Quản trị</MudButton>
+        }
+        else if (CurrentUserService.Roles.Contains("Technician"))
+        {
+            <MudButton href="/technician" Variant="Variant.Text" Color="Color.Secondary">Kỹ thuật viên</MudButton>
+        }
+        else
+        {
+            <MudButton href="/" Variant="Variant.Text">Trang chủ</MudButton>
+            <MudButton href="/products" Variant="Variant.Text">Sản phẩm</MudButton>
+        }
         
+        @* Giỏ hàng với số lượng động - chỉ hiển thị cho customer *@
+        @if (!CurrentUserService.Roles.Contains("Admin") && !CurrentUserService.Roles.Contains("Technician"))
+        {
+            <MudBadge Content="@_cartCount" Color="Color.Secondary" Overlap="true" Class="mx-4" Visible="@(_cartCount > 0)">
+                <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" />
+            </MudBadge>
+        }
+
+        @* Notification widget - hiển thị cho tất cả user đã đăng nhập *@
+        @if (CurrentUserService.IsAuthenticated)
+        {
+            <NotificationWidget Class="mx-2" />
+        }
+
         @* Nút tài khoản với avatar *@
         <MudIconButton Href="/profile" Title="Quản lý tài khoản">
             @if (!string.IsNullOrEmpty(_avatarUrl))
@@ -74,17 +96,29 @@
             }
 
             // Listen for storage changes
-            await JSRuntime.InvokeVoidAsync("eval", @"
-                window.addEventListener('storage', function(e) {
-                    if (e.key === 'cart') {
-                        window.dotNetHelper?.invokeMethodAsync('UpdateCartCountFromJs');
-                    }
-                    if (e.key === 'userAvatar') {
-                        // Reload page to update avatar across all layouts
-                        window.location.reload();
-                    }
-                });
-            ");
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("eval", @"
+                    window.addEventListener('storage', function(e) {
+                        if (e.key === 'cart') {
+                            window.dotNetHelper?.invokeMethodAsync('UpdateCartCountFromJs');
+                        }
+                        if (e.key === 'userAvatar') {
+                            // Reload page to update avatar across all layouts
+                            window.location.reload();
+                        }
+                    });
+                ");
+            }
+            catch (Microsoft.JSInterop.JSDisconnectedException)
+            {
+                // Ignore - circuit is disconnecting
+                Console.WriteLine("[MainLayout] Circuit disconnected, skipping JS interop");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MainLayout] Error setting up storage listener: {ex.Message}");
+            }
             await LoadAvatar();
         }
     }

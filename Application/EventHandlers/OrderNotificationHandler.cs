@@ -20,6 +20,9 @@ public class OrderNotificationHandler :
 
     public async Task HandleAsync(OrderCreatedEvent domainEvent, CancellationToken cancellationToken = default)
     {
+        Console.WriteLine($"[OrderNotificationHandler] OrderCreatedEvent handler called for Order #{domainEvent.OrderNumber}, UserId: {domainEvent.UserId}");
+
+        // Notify customer
         await _notificationService.CreateNotificationAsync(new DTOs.Requests.CreateNotificationRequest
         {
             UserId = domainEvent.UserId,
@@ -32,6 +35,29 @@ public class OrderNotificationHandler :
             RelatedEntityId = domainEvent.OrderId,
             RelatedEntityType = "Order"
         });
+
+        Console.WriteLine($"[OrderNotificationHandler] Customer notification created");
+
+        // Notify all admins about new order
+        // Get admin user IDs (assuming admin has UserId = 1)
+        var adminUserIds = new List<int> { 1 };
+        
+        Console.WriteLine($"[OrderNotificationHandler] Creating bulk notification for admins: {string.Join(", ", adminUserIds)}");
+        
+        await _notificationService.CreateBulkNotificationsAsync(new DTOs.Requests.CreateBulkNotificationRequest
+        {
+            UserIds = adminUserIds,
+            UserType = UserType.Admin,
+            Type = NotificationType.OrderCreated,
+            Title = "Đơn hàng mới",
+            Message = $"Khách hàng đã đặt đơn hàng #{domainEvent.OrderNumber}. Hãy kiểm tra và xử lý.",
+            ActionUrl = $"/admin/orders/{domainEvent.OrderId}",
+            Icon = "shopping-cart",
+            RelatedEntityId = domainEvent.OrderId,
+            RelatedEntityType = "Order"
+        });
+
+        Console.WriteLine($"[OrderNotificationHandler] Bulk notification created for admins");
     }
 
     public async Task HandleAsync(OrderConfirmedEvent domainEvent, CancellationToken cancellationToken = default)

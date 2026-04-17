@@ -4,6 +4,7 @@ using Application.Interfaces.Services;
 using Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Web.Services;
 
 namespace Web.Controllers;
 
@@ -12,10 +13,12 @@ namespace Web.Controllers;
 public class ChatController : ControllerBase
 {
     private readonly IChatService _chatService;
+    private readonly IFileUploadService _fileUploadService;
 
-    public ChatController(IChatService chatService)
+    public ChatController(IChatService chatService, IFileUploadService fileUploadService)
     {
         _chatService = chatService;
+        _fileUploadService = fileUploadService;
     }
 
     [HttpGet("rooms")]
@@ -160,6 +163,38 @@ public class ChatController : ControllerBase
     {
         await _chatService.AssignAdminAsync(id, request.AdminId);
         return Ok();
+    }
+
+    [HttpPost("upload")]
+    [Authorize]
+    public async Task<ActionResult> UploadFile(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No file uploaded");
+
+        try
+        {
+            var tempUrl = await _fileUploadService.UploadTempAsync(file);
+            return Ok(new
+            {
+                fileUrl = tempUrl,
+                fileName = file.FileName,
+                fileType = file.ContentType,
+                fileSize = file.Length
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Upload failed: {ex.Message}");
+        }
     }
 }
 

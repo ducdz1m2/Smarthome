@@ -3,23 +3,23 @@ using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Catalog;
-using Domain.Entities.Installation;
 using Domain.Entities.Sales;
 using Domain.Enums;
 using Domain.Exceptions;
+using Domain.Services;
 
 namespace Application.Services
 {
-    public class OrderService : Application.Interfaces.Services.IOrderService
+    public class OrderService : Interfaces.Services.IOrderService
     {
         private readonly IOrderRepository _orderRepository;
         private readonly IProductRepository _productRepository;
-        private readonly Application.Interfaces.Services.IInstallationService _installationService;
+        private readonly Interfaces.Services.IInstallationService _installationService;
         private readonly IInstallationSlotService _installationSlotService;
         private readonly ITechnicianProfileService _technicianProfileService;
         private readonly IShipmentService _shipmentService;
         private readonly IOrderShipmentRepository _orderShipmentRepository;
-        private readonly Domain.Services.IShippingService _shippingService;
+        private readonly IShippingService _shippingService;
         private readonly IProductWarehouseRepository _productWarehouseRepository;
         private readonly IOrderWarehouseAllocationRepository _orderWarehouseAllocationRepository;
         private readonly IWarehouseService _warehouseService;
@@ -28,12 +28,12 @@ namespace Application.Services
         public OrderService(
             IOrderRepository orderRepository,
             IProductRepository productRepository,
-            Application.Interfaces.Services.IInstallationService installationService,
+            Interfaces.Services.IInstallationService installationService,
             IInstallationSlotService installationSlotService,
             ITechnicianProfileService technicianProfileService,
             IShipmentService shipmentService,
             IOrderShipmentRepository orderShipmentRepository,
-            Domain.Services.IShippingService shippingService,
+            IShippingService shippingService,
             IProductWarehouseRepository productWarehouseRepository,
             IOrderWarehouseAllocationRepository orderWarehouseAllocationRepository,
             IWarehouseService warehouseService,
@@ -102,6 +102,8 @@ namespace Application.Services
 
         public async Task<int> CreateAsync(CreateOrderRequest request)
         {
+            Console.WriteLine($"[OrderService] CreateAsync called for UserId: {request.UserId}");
+
             var order = Order.Create(
                 request.UserId,
                 request.ReceiverName,
@@ -112,6 +114,8 @@ namespace Application.Services
                 request.ShippingCity,
                 request.ShippingFee
             );
+
+            Console.WriteLine($"[OrderService] Order created with OrderNumber: {order.OrderNumber}, DomainEvents count: {order.DomainEvents.Count()}");
 
             decimal regularItemsTotal = 0;
             foreach (var item in request.Items)
@@ -146,7 +150,9 @@ namespace Application.Services
             // If only installation items, shipping fee is 0 (free shipping)
 
             await _orderRepository.AddAsync(order);
+            Console.WriteLine($"[OrderService] About to call SaveChangesAsync");
             await _orderRepository.SaveChangesAsync();
+            Console.WriteLine($"[OrderService] SaveChangesAsync completed");
 
             // Handle warehouse allocations
             await HandleWarehouseAllocationsAsync(order, request);

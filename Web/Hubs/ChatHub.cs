@@ -13,14 +13,23 @@ namespace Web.Hubs
             _chatService = chatService;
         }
 
-        public async Task SendMessage(int chatRoomId, int senderId, string senderType, string content)
+        public async Task SendMessage(int chatRoomId, int senderId, string senderType, string content, string? fileUrl = null, string? fileName = null, string? fileType = null, long? fileSize = null)
         {
-            Console.WriteLine($"[ChatHub] SendMessage called: chatRoomId={chatRoomId}, senderId={senderId}, senderType={senderType}, content={content}");
+            Console.WriteLine($"[ChatHub] SendMessage called: chatRoomId={chatRoomId}, senderId={senderId}, senderType={senderType}, content={content}, fileUrl={fileUrl}");
             
             var request = new Application.DTOs.Requests.SendMessageRequest
             {
                 Content = content,
-                Attachments = null
+                Attachments = fileUrl != null ? new List<Application.DTOs.Requests.ChatAttachmentRequest>
+                {
+                    new Application.DTOs.Requests.ChatAttachmentRequest
+                    {
+                        FileUrl = fileUrl,
+                        FileName = fileName,
+                        FileType = fileType,
+                        FileSize = fileSize
+                    }
+                } : null
             };
 
             // Parse string to UserType enum
@@ -42,6 +51,10 @@ namespace Web.Hubs
                     UserId = senderId,
                     SenderType = senderType.ToString(),
                     Content = content,
+                    FileUrl = fileUrl,
+                    FileName = fileName,
+                    FileType = fileType,
+                    FileSize = fileSize,
                     SentAt = DateTime.Now
                 });
                 Console.WriteLine($"[ChatHub] Message broadcasted to group chat_{chatRoomId}");

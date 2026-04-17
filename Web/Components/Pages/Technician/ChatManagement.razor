@@ -9,6 +9,8 @@
 @inject CurrentUserService CurrentUser
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+@inject IHttpClientFactory HttpClientFactory
+@inject JwtTokenHandler JwtTokenHandler
 
 <div class="technician-chat-container">
     <div class="technician-chat-sidebar">
@@ -121,7 +123,27 @@
                             }
                             <div class="technician-message-content">
                                 <div class="technician-message-bubble">
-                                    <MudText Typo="Typo.body2">@msg.Content</MudText>
+                                    @if (msg.Attachments != null && msg.Attachments.Any())
+                                    {
+                                        @foreach (var attachment in msg.Attachments)
+                                        {
+                                            @if (!string.IsNullOrEmpty(attachment.FileType) && attachment.FileType.StartsWith("image/"))
+                                            {
+                                                <img src="@attachment.FileUrl" alt="@attachment.FileName" style="max-width: 100%; max-height: 300px; border-radius: 8px;" />
+                                            }
+                                            else
+                                            {
+                                                <div class="file-attachment">
+                                                    <span>📎</span>
+                                                    <a href="@attachment.FileUrl" target="_blank">@attachment.FileName</a>
+                                                </div>
+                                            }
+                                        }
+                                    }
+                                    @if (!string.IsNullOrEmpty(msg.Content))
+                                    {
+                                        <MudText Typo="Typo.body2">@msg.Content</MudText>
+                                    }
                                 </div>
                                 <div class="technician-message-time">@msg.SentAt.ToLocalTime().ToString("HH:mm")</div>
                             </div>
@@ -131,7 +153,21 @@
             </div>
             
             <div class="technician-chat-input-area">
+                @if (!string.IsNullOrEmpty(_filePreviewUrl))
+                {
+                    <div class="file-preview">
+                        <img src="@_filePreviewUrl" alt="Preview" style="max-width: 100%; max-height: 100px; border-radius: 8px;" />
+                        <button type="button" class="remove-file" @onclick="RemoveFile">✕</button>
+                    </div>
+                }
                 <div class="d-flex gap-2">
+                    <InputFile class="d-none technician-chat-file-input" OnChange="OnFileSelected" accept="image/*,.pdf,.doc,.docx" />
+                    <button class="technician-chat-attach" @onclick="TriggerFileSelect" aria-label="Đính kèm file">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4.502 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+                            <path d="M14.002 13a2 2 0 0 1-2 2h-10a2 2 0 0 1-2-2V5A2 2 0 0 1 2 3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-1.998 2zM14 2H4a1 1 0 0 0-1 1h9.002a2 2 0 0 1 2 2v7A1 1 0 0 0 15 11V3a1 1 0 0 0-1-1zM2.002 4a1 1 0 0 0-1 1v8l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71a.5.5 0 0 1 .577-.094l1.777 1.947V5a1 1 0 0 0-1-1h-10z"/>
+                        </svg>
+                    </button>
                     <MudTextField T="string" 
                                  @bind-Value="_message" 
                                  Placeholder="Nhập tin nhắn..." 
@@ -141,7 +177,7 @@
                     <MudButton Variant="Variant.Filled" 
                                Color="Color.Primary" 
                                OnClick="async () => await SendMessage()" 
-                               Disabled="@string.IsNullOrWhiteSpace(_message)"
+                               Disabled="@(!CanSendMessage)"
                                Class="technician-chat-send-button">
                         <MudIcon Icon="@Icons.Material.Filled.Send" />
                     </MudButton>
@@ -394,6 +430,44 @@
     height: 48px;
     border-radius: 50%;
 }
+
+.file-preview {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 8px;
+}
+
+.remove-file {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.technician-chat-attach {
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.technician-chat-attach:hover {
+    background: #e0e0e0;
+}
 </style>
 
 @code {
@@ -409,6 +483,10 @@
     private DateTime? _lastReadAt = null;
     private DateTime? _roomOpenTime = null;
     private bool _separatorShown = false;
+    private IBrowserFile? _selectedFile;
+    private string _filePreviewUrl = "";
+
+    private bool CanSendMessage => !_sending && (!string.IsNullOrWhiteSpace(_message) || _selectedFile != null);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -600,12 +678,42 @@
 
     private async Task SendMessage()
     {
-        if (string.IsNullOrWhiteSpace(_message) || SelectedChatRoomId == 0 || _sending) 
+        if (SelectedChatRoomId == 0 || _sending) 
+            return;
+
+        if (string.IsNullOrWhiteSpace(_message) && _selectedFile == null)
             return;
 
         var content = _message;
         var userId = CurrentUser.UserId ?? 0;
         _sending = true;
+
+        // Upload file if selected
+        string? fileUrl = null;
+        string? fileName = null;
+        string? fileType = null;
+        long? fileSize = null;
+
+        if (_selectedFile != null)
+        {
+            fileUrl = await UploadFileAsync(_selectedFile);
+            if (fileUrl != null)
+            {
+                fileName = _selectedFile.Name;
+                fileType = _selectedFile.ContentType;
+                fileSize = _selectedFile.Size;
+            }
+            else
+            {
+                Console.WriteLine("[TechnicianChatManagement] File upload failed");
+                if (string.IsNullOrWhiteSpace(_message))
+                {
+                    Console.WriteLine("[TechnicianChatManagement] Cannot send message: no content and file upload failed");
+                    _sending = false;
+                    return;
+                }
+            }
+        }
 
         try
         {
@@ -618,14 +726,26 @@
                 SenderName = CurrentUser.UserName,
                 Content = content,
                 SentAt = DateTime.Now,
-                IsFromMe = true
+                IsFromMe = true,
+                Attachments = fileUrl != null ? new List<ChatAttachmentResponse>
+                {
+                    new ChatAttachmentResponse
+                    {
+                        FileUrl = fileUrl,
+                        FileName = fileName,
+                        FileType = fileType,
+                        FileSize = fileSize
+                    }
+                } : new()
             };
             _messages.Add(tempMessage);
             _message = "";
+            _selectedFile = null;
+            _filePreviewUrl = "";
             await InvokeAsync(StateHasChanged);
             await ScrollToBottom();
 
-            await SignalRService.SendMessage(SelectedChatRoomId, userId, "Technician", content);
+            await SignalRService.SendMessage(SelectedChatRoomId, userId, "Technician", content, fileUrl, fileName, fileType, fileSize);
         }
         catch (Exception ex)
         {
@@ -642,6 +762,78 @@
         if (e.Key == "Enter")
         {
             await SendMessage();
+        }
+    }
+
+    private async Task TriggerFileSelect()
+    {
+        await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('.technician-chat-file-input').click()");
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            _selectedFile = file;
+            
+            if (_isImageFile(file))
+            {
+                using var stream = file.OpenReadStream(file.Size);
+                using var ms = new System.IO.MemoryStream();
+                await stream.CopyToAsync(ms);
+                var bytes = ms.ToArray();
+                _filePreviewUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(bytes)}";
+            }
+            
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void RemoveFile()
+    {
+        _selectedFile = null;
+        _filePreviewUrl = "";
+    }
+
+    private bool _isImageFile(IBrowserFile file)
+    {
+        var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        return imageExtensions.Contains(extension);
+    }
+
+    private async Task<string?> UploadFileAsync(IBrowserFile file)
+    {
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            var token = await JwtTokenHandler.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+            
+            var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(file.OpenReadStream());
+            content.Add(fileContent, "file", file.Name);
+
+            var uploadUrl = $"{Navigation.BaseUri}api/chat/upload";
+            var response = await httpClient.PostAsync(uploadUrl, content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(responseContent);
+                return doc.RootElement.TryGetProperty("fileUrl", out var fileUrlElem) ? fileUrlElem.GetString() : null;
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[TechnicianChatManagement] Upload failed: {ex.Message}");
+            return null;
         }
     }
 

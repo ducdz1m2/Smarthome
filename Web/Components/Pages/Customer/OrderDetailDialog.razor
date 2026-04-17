@@ -440,10 +440,16 @@
                 var returnOrders = await ReturnOrderService.GetByOrderIdAsync(OrderId);
                 _hasReturnOrder = returnOrders.Any();
 
+                // Small delay to prevent DbContext threading issues
+                await Task.Delay(10);
+
                 // Check if order has warranty request
                 var warrantyRequests = await WarrantyRequestService.GetByOrderIdAsync(OrderId);
                 _hasWarrantyRequest = warrantyRequests.Any();
                 _warrantyRequest = warrantyRequests.OrderByDescending(w => w.CreatedAt).FirstOrDefault();
+
+                // Small delay to prevent DbContext threading issues
+                await Task.Delay(10);
 
                 // Check if order has installation items
                 _hasInstallation = _order.Items.Any(i => i.RequiresInstallation);
@@ -460,6 +466,9 @@
                         Console.WriteLine($"Failed to load installation booking: {ex.Message}");
                     }
                 }
+
+                // Small delay to prevent DbContext threading issues
+                await Task.Delay(10);
 
                 // Load reviews for this order's products
                 await LoadReviewsAsync();

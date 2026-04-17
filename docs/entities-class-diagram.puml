@@ -1,0 +1,867 @@
+@startuml Smarthome Entities Class Diagram
+
+' ============================================
+' BASE CLASSES
+' ============================================
+class Entity <<abstract>> {
+    +int Id {PK}
+}
+note right of Entity
+  Base entity class
+  Contains primary key
+end note
+
+class AggregateRoot <<abstract>> {
+  +AddDomainEvent(event)
+  +GetDomainEvents()
+}
+AggregateRoot --|> Entity
+
+' ============================================
+' CATALOG MODULE
+' ============================================
+package Catalog {
+    class Product {
+        +int Id {PK}
+        +string Name
+        +Sku Sku
+        +Money BasePrice
+        +int StockQuantity
+        +int FrozenStockQuantity
+        +string? Description
+        +string SpecsJson
+        +bool IsActive
+        +bool RequiresInstallation
+        +int CategoryId {FK}
+        +int BrandId {FK}
+        +int? SupplierId {FK}
+        --
+        +Create(name, sku, basePrice, categoryId, brandId, supplierId)
+        +Update(name, basePrice, description)
+        +AddVariant(sku, price, attributes)
+        +AddImage(url, isMain, sortOrder)
+    }
+    note right of Product
+      Product aggregate root
+      Represents a product in catalog
+    end note
+
+    class Category {
+        +int Id {PK}
+        +string Name
+        +string? Description
+        +int? ParentId {FK}
+        +int SortOrder
+        +bool IsActive
+        --
+        +Create(name, parentId, sortOrder, description)
+        +MoveTo(newParentId)
+        +AddChild(name)
+    }
+    note right of Category
+      Product category with hierarchy support
+    end note
+
+    class Brand {
+        +int Id {PK}
+        +string Name
+        +string? Description
+        +string? LogoUrl
+        +string? Website
+        +bool IsActive
+        --
+        +Create(name, description, logoUrl, website)
+    }
+    note right of Brand
+      Product manufacturer/brand
+    end note
+
+    class ProductVariant {
+        +int Id {PK}
+        +int ProductId {FK}
+        +Sku Sku
+        +Money Price
+        +int StockQuantity
+        +int FrozenStockQuantity
+        +string AttributesJson
+        +bool IsActive
+        --
+        +AddStock(quantity)
+        +ReserveStock(quantity)
+        +DeductStock(quantity)
+    }
+    note right of ProductVariant
+      Product variant with attributes (size, color, etc.)
+    end note
+
+    class ProductImage {
+        +int Id {PK}
+        +int ProductId {FK}
+        +string Url
+        +string? AltText
+        +bool IsMain
+        +int SortOrder
+        --
+        +SetAsMain()
+        +UpdateSortOrder(newOrder)
+    }
+    note right of ProductImage
+      Product image with main/secondary support
+    end note
+
+    class ProductComment {
+        +int Id {PK}
+        +int ProductId {FK}
+        +int UserId {FK}
+        +int OrderId {FK}
+        +string Content
+        +int Rating (1-5)
+        +bool IsApproved
+        +bool IsVerifiedPurchase
+        +int? ParentCommentId {FK}
+        --
+        +Approve()
+        +Reject()
+        +UpdateContent(newContent)
+    }
+    note right of ProductComment
+      Customer review/comment on product
+      Supports nested replies
+    end note
+
+    Product --|> AggregateRoot
+    Category --|> Entity
+    Brand --|> Entity
+    ProductVariant --|> Entity
+    ProductImage --|> Entity
+    ProductComment --|> Entity
+
+    Product "1" --> "*" ProductVariant
+    Product "1" --> "*" ProductImage
+    Product "1" --> "*" ProductComment
+    Category "1" --> "*" Category : Parent
+    Category "1" --> "*" Product
+    Brand "1" --> "*" Product
+    ProductComment "1" --> "0..*" ProductComment : Parent
+}
+
+' ============================================
+' SALES MODULE
+' ============================================
+package Sales {
+    class Order {
+        +int Id {PK}
+        +string OrderNumber
+        +OrderStatus Status
+        +int UserId {FK}
+        +string ReceiverName
+        +PhoneNumber ReceiverPhone
+        +Address ShippingAddress
+        +Money TotalAmount
+        +Money ShippingFee
+        +Money DiscountAmount
+        +PaymentMethod PaymentMethod
+        +ShippingMethod ShippingMethod
+        +string StatusHistoryJson
+        +string? CancelReason
+        --
+        +AddItem(productId, variantId, quantity, unitPrice)
+        +Confirm()
+        +ApplyShippingFee(fee)
+        +ApplyDiscount(discount)
+        +Complete()
+        +Cancel(reason, cancelledByUserId)
+    }
+    note right of Order
+      Order aggregate root
+      Supports both shipping and installation flows
+    end note
+
+    class OrderItem {
+        +int Id {PK}
+        +int OrderId {FK}
+        +int ProductId {FK}
+        +int? VariantId {FK}
+        +int Quantity
+        +Money UnitPrice
+        +bool IsShipped
+        +bool IsInstalled
+        +bool IsReserved
+        +bool RequiresInstallation
+        +int? WarehouseId {FK}
+        +int? InstallationBookingId {FK}
+        --
+        +MarkAsShipped()
+        +MarkAsInstalled()
+        +AssignInstallation(bookingId)
+        +Reserve()
+    }
+    note right of OrderItem
+      Order line item
+      Can be shipped or installed
+    end note
+
+    class CartItem {
+        +int Id {PK}
+        +int UserId {FK}
+        +int ProductId {FK}
+        +int? VariantId {FK}
+        +int Quantity
+        +DateTime AddedAt
+        --
+        +UpdateQuantity(newQuantity)
+    }
+    note right of CartItem
+      Shopping cart item
+    end note
+
+    class PaymentTransaction {
+        +int Id {PK}
+        +int OrderId {FK}
+        +Money Amount
+        +PaymentMethod Method
+        +PaymentTransactionStatus Status
+        +string? TransactionCode
+        +string? GatewayResponse
+        +DateTime? PaidAt
+        --
+        +MarkSuccess(transactionCode, gatewayResponse)
+        +MarkFailed(reason)
+        +MarkRefunded(refundTransactionCode)
+    }
+    note right of PaymentTransaction
+      Payment transaction tracking
+    end note
+
+    class ReturnOrder {
+        +int Id {PK}
+        +int OriginalOrderId {FK}
+        +ReturnType ReturnType
+        +string Reason
+        +ReturnOrderStatus Status
+        +Money? RefundAmount
+        +DateTime? ApprovedAt
+        +DateTime? ReceivedAt
+        +DateTime? CompletedAt
+        --
+        +AddItem(orderItemId, quantity, itemReason)
+        +Approve(refundAmount)
+        +MarkReceived()
+        +Complete()
+    }
+    note right of ReturnOrder
+      Product return request
+    end note
+
+    class ReturnOrderItem {
+        +int Id {PK}
+        +int ReturnOrderId {FK}
+        +int OrderItemId {FK}
+        +int Quantity
+        +string Reason
+    }
+    note right of ReturnOrderItem
+      Items in return order
+    end note
+
+    class Warranty {
+        +int Id {PK}
+        +int OrderItemId {FK}
+        +int ProductId {FK}
+        +DateTime StartDate
+        +DateTime EndDate
+        +WarrantyStatus Status
+        --
+        +IsValid(date)
+        +Extend(additionalMonths)
+        +CreateClaim(issue)
+    }
+    note right of Warranty
+      Product warranty
+    end note
+
+    class WarrantyClaim {
+        +int Id {PK}
+        +int WarrantyId {FK}
+        +DateTime ClaimDate
+        +string Issue
+        +string? Resolution
+        +WarrantyClaimStatus Status
+        +int? TechnicianId {FK}
+        --
+        +AssignTechnician(technicianId)
+        +Resolve(resolution, isApproved)
+    }
+    note right of WarrantyClaim
+      Warranty claim for repair/replacement
+    end note
+
+    class OrderShipment {
+        +int Id {PK}
+        +int OrderId {FK}
+        +int? ShipperId {FK}
+        +string Carrier
+        +string TrackingNumber
+        +OrderShipmentStatus Status
+        +DateTime? PickedUpAt
+        +DateTime? DeliveredAt
+        +string? Notes
+        +DateTime? ApprovedAt
+        +int? ApprovedBy {FK}
+        --
+        +Approve(approvedBy)
+        +AssignShipper(shipperId)
+        +MarkPickedUp()
+        +MarkDelivered()
+    }
+    note right of OrderShipment
+      Order shipping tracking
+    end note
+
+    class OrderWarehouseAllocation {
+        +int Id {PK}
+        +int OrderItemId {FK}
+        +int WarehouseId {FK}
+        +int AllocatedQuantity
+        +bool IsConfirmed
+        +DateTime? ConfirmedAt
+        --
+        +Confirm()
+    }
+    note right of OrderWarehouseAllocation
+      Maps order items to warehouse stock
+    end note
+
+    Order --|> AggregateRoot
+    ReturnOrder --|> AggregateRoot
+    Warranty --|> AggregateRoot
+    OrderItem --|> Entity
+    CartItem --|> Entity
+    PaymentTransaction --|> Entity
+    ReturnOrderItem --|> Entity
+    WarrantyClaim --|> Entity
+    OrderShipment --|> Entity
+    OrderWarehouseAllocation --|> Entity
+
+    Order "1" --> "*" OrderItem
+    Order "1" --> "*" OrderShipment
+    OrderItem "1" --> "*" OrderWarehouseAllocation
+    ReturnOrder "1" --> "*" ReturnOrderItem
+    Warranty "1" --> "*" WarrantyClaim
+}
+
+' ============================================
+' INVENTORY MODULE
+' ============================================
+package Inventory {
+    class Warehouse {
+        +int Id {PK}
+        +string Name
+        +string Code
+        +Address Address
+        +PhoneNumber? Phone
+        +string? ManagerName
+        +bool IsActive
+        --
+        +Create(name, code, address, phone, managerName)
+        +Update(name, address, phone, managerName)
+    }
+    note right of Warehouse
+      Warehouse aggregate root
+      Storage location for inventory
+    end note
+
+    class ProductWarehouse {
+        +int Id {PK}
+        +int ProductId {FK}
+        +int? VariantId {FK}
+        +int WarehouseId {FK}
+        +int Quantity
+        +int ReservedQuantity
+        --
+        +Receive(quantity)
+        +Dispatch(quantity)
+        +Reserve(quantity)
+        +Release(quantity)
+    }
+    note right of ProductWarehouse
+      Tracks product stock in specific warehouse
+    end note
+
+    class StockEntry {
+        +int Id {PK}
+        +DateTime EntryDate
+        +int SupplierId {FK}
+        +int WarehouseId {FK}
+        +string? Note
+        +decimal TotalCost
+        +bool IsCompleted
+        --
+        +AddItem(productId, quantity, unitCost, variantId)
+        +Complete()
+    }
+    note right of StockEntry
+      Stock receiving transaction
+    end note
+
+    class StockEntryDetail {
+        +int Id {PK}
+        +int StockEntryId {FK}
+        +int ProductId {FK}
+        +int? VariantId {FK}
+        +int Quantity
+        +Money UnitCost
+        --
+        +GetTotalCost()
+    }
+    note right of StockEntryDetail
+      Items in stock entry
+    end note
+
+    class Supplier {
+        +int Id {PK}
+        +string Name
+        +string? TaxCode
+        +Address? Address
+        +string? ContactName
+        +PhoneNumber? Phone
+        +Email? Email
+        +string? BankAccount
+        +string? BankName
+        +bool IsActive
+        --
+        +Create(name, taxCode, address, contactName, phone, email)
+        +UpdateBankInfo(bankAccount, bankName)
+    }
+    note right of Supplier
+      Product supplier/vendor
+    end note
+
+    Warehouse --|> AggregateRoot
+    StockEntry --|> AggregateRoot
+    Supplier --|> AggregateRoot
+    ProductWarehouse --|> Entity
+    StockEntryDetail --|> Entity
+
+    Warehouse "1" --> "*" ProductWarehouse
+    Supplier "1" --> "*" StockEntry
+    Warehouse "1" --> "*" StockEntry
+    StockEntry "1" --> "*" StockEntryDetail
+}
+
+' ============================================
+' IDENTITY MODULE
+' ============================================
+package Identity {
+    class ApplicationUser {
+        +int Id {PK}
+        +string UserName
+        +string Email
+        +string FullName
+        +string? Avatar
+        +bool IsActive
+        +DateTime? LastLoginAt
+        +DateTime CreatedAt
+    }
+    note right of ApplicationUser
+      Application user (extends IdentityUser)
+    end note
+
+    class ApplicationRole {
+        +int Id {PK}
+        +string Name
+        +string? Description
+        +DateTime CreatedAt
+    }
+    note right of ApplicationRole
+      Application role (extends IdentityRole)
+    end note
+
+    ApplicationUser --|> "IdentityUser<int>"
+    ApplicationRole --|> "IdentityRole<int>"
+}
+
+' ============================================
+' INSTALLATION MODULE
+' ============================================
+package Installation {
+    class InstallationBooking {
+        +int Id {PK}
+        +int OrderId {FK}
+        +int TechnicianId {FK}
+        +int SlotId {FK}
+        +InstallationStatus Status
+        +DateTime ScheduledDate
+        +TimeSpan EstimatedDuration
+        +bool MaterialsPrepared
+        +DateTime? OnTheWayAt
+        +DateTime? StartedAt
+        +DateTime? CompletedAt
+        +int? CustomerRating
+        +string? CustomerSignature
+        +string? Notes
+        +bool IsUninstall
+        +bool IsWarranty
+        --
+        +Accept()
+        +StartTravel()
+        +StartInstallation()
+        +Complete(customerSignature, customerRating)
+        +Reschedule(newSlotId, newDate)
+    }
+    note right of InstallationBooking
+      Installation appointment aggregate root
+    end note
+
+    class InstallationSlot {
+        +int Id {PK}
+        +int TechnicianId {FK}
+        +DateTime Date
+        +TimeSpan StartTime
+        +TimeSpan EndTime
+        +bool IsBooked
+        +int? BookingId {FK}
+        --
+        +Book(bookingId)
+        +Release()
+    }
+    note right of InstallationSlot
+      Time slot for installation
+    end note
+
+    class TechnicianProfile {
+        +int Id {PK}
+        +int? UserId {FK}
+        +string FullName
+        +PhoneNumber PhoneNumber
+        +Email? Email
+        +string? IdentityCard
+        +Address? Address
+        +DateTime? DateOfBirth
+        +string EmployeeCode
+        +DateTime HireDate
+        +Money BaseSalary
+        +string City
+        +string Districts (JSON)
+        +string SkillsJson (JSON)
+        +bool IsAvailable
+        +double Rating
+        +int CompletedJobs
+        +int CancelledJobs
+        --
+        +AddSkill(skill)
+        +CanHandle(district, requiredSkill)
+        +CompleteJob(customerRating)
+    }
+    note right of TechnicianProfile
+      Technician profile with skills and service areas
+    end note
+
+    class InstallationMaterial {
+        +int Id {PK}
+        +int InstallationBookingId {FK}
+        +int ProductId {FK}
+        +int QuantityTaken
+    }
+    note right of InstallationMaterial
+      Materials used in installation
+    end note
+
+    InstallationBooking --|> AggregateRoot
+    TechnicianProfile --|> AggregateRoot
+    InstallationSlot --|> Entity
+    InstallationMaterial --|> Entity
+
+    TechnicianProfile "1" --> "*" InstallationSlot
+    TechnicianProfile "1" --> "*" InstallationBooking
+    InstallationSlot "1" --> "0..1" InstallationBooking
+    InstallationBooking "1" --> "*" InstallationMaterial
+}
+
+' ============================================
+' COMMUNICATION MODULE
+' ============================================
+package Communication {
+    class ChatRoom {
+        +int Id {PK}
+        +string Title
+        +ChatRoomType Type
+        +int? RelatedOrderId {FK}
+        +int? RelatedInstallationId {FK}
+        +int? RelatedWarrantyClaimId {FK}
+        +DateTime CreatedAt
+        +DateTime? ClosedAt
+        +bool IsActive
+        --
+        +AddMessage(senderId, senderType, content, attachments)
+        +Join(userId, userType)
+        +Leave(userId)
+        +AssignTechnician(technicianId)
+        +Close()
+    }
+    note right of ChatRoom
+      Chat room aggregate root
+      Supports 1:1 and support chats
+    end note
+
+    class ChatMessage {
+        +int Id {PK}
+        +int ChatRoomId {FK}
+        +int SenderId {FK}
+        +UserType SenderType
+        +string Content
+        +DateTime SentAt
+        +DateTime? EditedAt
+        +bool IsDeleted
+        +DateTime? DeletedAt
+        +string? DeletedBy
+        --
+        +Edit(newContent)
+        +Delete(deletedBy)
+    }
+    note right of ChatMessage
+      Chat message with edit/delete support
+    end note
+
+    class ChatParticipant {
+        +int Id {PK}
+        +int ChatRoomId {FK}
+        +int UserId {FK}
+        +UserType UserType
+        +bool IsBlocked
+        +string? BlockedReason
+        +DateTime? LastActivityAt
+        +int UnreadCount
+        --
+        +MarkAsRead()
+        +Block(reason)
+        +Leave()
+    }
+    note right of ChatParticipant
+      Participant in chat room
+    end note
+
+    class ChatAttachment {
+        +int Id {PK}
+        +int ChatMessageId {FK}
+        +string FileName
+        +string FileUrl
+        +string? FileType
+        +long? FileSize
+        +DateTime UploadedAt
+    }
+    note right of ChatAttachment
+      File attachment for chat message
+    end note
+
+    class Notification {
+        +int Id {PK}
+        +int UserId {FK}
+        +UserType UserType
+        +NotificationType Type
+        +string Title
+        +string Message
+        +string? ActionUrl
+        +string? Icon
+        +bool IsRead
+        +DateTime? ReadAt
+        +bool IsSent
+        +DateTime? SentAt
+        +DateTime CreatedAt
+        +string? SendError
+        +int? RelatedEntityId
+        +string? RelatedEntityType
+        --
+        +MarkAsRead()
+        +MarkAsSent()
+        +MarkSendFailed(error)
+    }
+    note right of Notification
+      System notification for users
+    end note
+
+    ChatRoom --|> AggregateRoot
+    ChatMessage --|> Entity
+    ChatParticipant --|> Entity
+    ChatAttachment --|> Entity
+    Notification --|> Entity
+
+    ChatRoom "1" --> "*" ChatMessage
+    ChatRoom "1" --> "*" ChatParticipant
+    ChatMessage "1" --> "*" ChatAttachment
+}
+
+' ============================================
+' CONTENT MODULE
+' ============================================
+package Content {
+    class Banner {
+        +int Id {PK}
+        +string Title
+        +string? Subtitle
+        +WebsiteUrl ImageUrl
+        +WebsiteUrl? LinkUrl
+        +string Position
+        +int SortOrder
+        +DateTime? StartDate
+        +DateTime? EndDate
+        +bool IsActive
+        +int ClickCount
+        --
+        +Update(title, subtitle, linkUrl, position, sortOrder, startDate, endDate)
+        +IncrementClick()
+        +IsVisible()
+    }
+    note right of Banner
+      Promotional banner
+    end note
+
+    class UserAddress {
+        +int Id {PK}
+        +int UserId {FK}
+        +string Label
+        +string ReceiverName
+        +PhoneNumber ReceiverPhone
+        +Address Address
+        +bool IsDefault
+        --
+        +Update(label, receiverName, receiverPhone, address)
+        +SetAsDefault()
+    }
+    note right of UserAddress
+      User's saved address
+    end note
+
+    Banner --|> Entity
+    UserAddress --|> AggregateRoot
+}
+
+' ============================================
+' PROMOTIONS MODULE
+' ============================================
+package Promotions {
+    class Coupon {
+        +int Id {PK}
+        +string Code
+        +DiscountType DiscountType
+        +Money DiscountValue
+        +Money? MinOrderAmount
+        +Money? MaxDiscountAmount
+        +DateTime ExpiryDate
+        +int MaxUsage
+        +int UsedCount
+        +bool IsActive
+        --
+        +IsValid(orderAmount)
+        +CalculateDiscount(orderAmount)
+        +IncrementUsage()
+    }
+    note right of Coupon
+      Discount coupon code
+    end note
+
+    class Promotion {
+        +int Id {PK}
+        +string Name
+        +string? Description
+        +Percentage DiscountPercent
+        +DateTime StartDate
+        +DateTime EndDate
+        +Money? MinOrderAmount
+        +bool IsActive
+        +int Priority
+        --
+        +AddProduct(productId, customDiscount)
+        +CalculateDiscount(originalPrice, productId)
+        +IsActiveNow()
+    }
+    note right of Promotion
+      Sales promotion campaign
+    end note
+
+    class PromotionProduct {
+        +int Id {PK}
+        +int PromotionId {FK}
+        +int ProductId {FK}
+        +Percentage? CustomDiscount
+        --
+        +GetEffectiveDiscount(defaultDiscount)
+    }
+    note right of PromotionProduct
+      Product in promotion with optional custom discount
+    end note
+
+    Coupon --|> AggregateRoot
+    Promotion --|> AggregateRoot
+    PromotionProduct --|> Entity
+
+    Promotion "1" --> "*" PromotionProduct
+}
+
+' ============================================
+' SHIPPING MODULE (NOT USED - Only IShippingService with simple logic)
+' ============================================
+' Note: ShippingZone and ShippingRate entities exist but are not used in production
+' The system uses IShippingService with simple prototype logic instead
+
+' ============================================
+' USER BEHAVIOR (ML/Recommendation)
+' ============================================
+package Analytics {
+    class UserBehavior {
+        +int Id {PK}
+        +int UserId {FK}
+        +int ProductId {FK}
+        +BehaviorType BehaviorType
+        +DateTime Timestamp
+        +float Rating (0-5)
+        +string? AdditionalData (JSON)
+    }
+    note right of UserBehavior
+      User behavior tracking for ML recommendation
+      Supports collaborative filtering
+    end note
+
+    UserBehavior --|> Entity
+}
+
+' ============================================
+' CROSS-MODULE RELATIONSHIPS
+' ============================================
+' Product -> Supplier
+Product "0..1" --> "0..*" Supplier
+
+' Order -> User
+Order "1" --> "0..1" ApplicationUser
+
+' OrderItem -> Product
+OrderItem "1" --> "0..1" Product
+
+' CartItem -> Product
+CartItem "1" --> "0..1" Product
+
+' ProductComment -> User
+ProductComment "1" --> ApplicationUser
+
+' InstallationBooking -> Order
+InstallationBooking "1" --> "0..1" Order
+
+' Notification -> User
+Notification "1" --> ApplicationUser
+
+' ChatMessage -> User
+ChatMessage "1" --> ApplicationUser
+
+' UserAddress -> User
+UserAddress "1" --> ApplicationUser
+
+' UserBehavior -> User
+UserBehavior "1" --> ApplicationUser
+
+' UserBehavior -> Product
+UserBehavior "1" --> Product
+
+' TechnicianProfile -> User
+TechnicianProfile "0..1" --> ApplicationUser
+
+@enduml

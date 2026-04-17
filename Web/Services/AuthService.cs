@@ -42,9 +42,22 @@ public class AuthService : IAuthService
         var httpContext = _httpContextAccessor.HttpContext;
         if (httpContext != null)
         {
-            return httpContext.Session.GetString("JWTToken");
+            var token = httpContext.Session.GetString("JWTToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                return token;
+            }
         }
-        return null;
+
+        // Fallback to localStorage if session is empty
+        try
+        {
+            return await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "JWTToken");
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public async Task SetTokenAsync(string token)
@@ -57,7 +70,19 @@ public class AuthService : IAuthService
         }
 
         // Always save to localStorage for HttpClient (JwtTokenMessageHandler)
-        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "JWTToken", token);
+        try
+        {
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "JWTToken", token);
+        }
+        catch (Microsoft.JSInterop.JSDisconnectedException)
+        {
+            // Ignore - circuit is disconnecting
+            Console.WriteLine("[AuthService] Circuit disconnected during set token, skipping localStorage save");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AuthService] Error saving token to localStorage: {ex.Message}");
+        }
 
         // Notify Blazor authentication state changed
         if (_authStateProvider is LocalAuthStateProvider localAuthStateProvider)
@@ -75,8 +100,20 @@ public class AuthService : IAuthService
             httpContext.Session.Remove("JWTToken");
         }
 
-        // Remove from localStorage
-        await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "JWTToken");
+        // Remove from localStorage (handle JS disconnection)
+        try
+        {
+            await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "JWTToken");
+        }
+        catch (Microsoft.JSInterop.JSDisconnectedException)
+        {
+            // Ignore - circuit is disconnecting
+            Console.WriteLine("[AuthService] Circuit disconnected during signout, skipping localStorage removal");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AuthService] Error removing token from localStorage: {ex.Message}");
+        }
 
         // Clear user info from CurrentUserService
         _currentUserService.Clear();

@@ -64,6 +64,9 @@ namespace Infrastructure
             // User Address repository
             services.AddScoped<IUserAddressRepository, UserAddressRepository>();
 
+            // User repository
+            services.AddScoped<Domain.Repositories.IUserRepository, UserRepository>();
+
             // Return Order & Shipment repositories
             services.AddScoped<IReturnOrderRepository, ReturnOrderRepository>();
             services.AddScoped<IOrderShipmentRepository, OrderShipmentRepository>();
@@ -76,6 +79,11 @@ namespace Infrastructure
             services.AddScoped<IChatRoomRepository, ChatRoomRepository>();
             services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
             services.AddScoped<INotificationRepository, NotificationRepository>();
+
+            // ML/Recommendation
+            services.AddScoped<IUserBehaviorRepository, UserBehaviorRepository>();
+            services.AddScoped<Application.Interfaces.IUserSimilarityService, Infrastructure.Services.ML.UserSimilarityService>();
+            services.AddScoped<Application.Services.RecommendationService>();
 
             // Shipping service
             services.AddScoped<Domain.Services.IShippingService, Services.ShippingService>();

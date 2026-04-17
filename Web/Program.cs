@@ -13,6 +13,9 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Domain.Events;
+using Application.Interfaces.Repositories;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,13 +98,30 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<Web.Services.SignalRService>();
 
+// Register Push Notification Handlers
+builder.Services.AddScoped<IDomainEventHandler<NotificationCreatedEvent>, Web.EventHandlers.PushNotificationHandler>();
+builder.Services.AddScoped<IDomainEventHandler<BulkNotificationCreatedEvent>, Web.EventHandlers.PushNotificationHandler>();
+
+// Register Speech services
+builder.Services.AddScoped<SpeechService>();
+builder.Services.AddScoped<SpeechRecognitionService>();
+
+// Register Recommendation service
+builder.Services.AddScoped<RecommendationService>();
+builder.Services.AddScoped<RecommendationApiService>();
+
 // Add HttpClient for API calls with JWT token handler
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<JwtTokenHandler>();
-builder.Services.AddScoped(sp => 
+builder.Services.AddScoped(sp =>
 {
     var navigationManager = sp.GetRequiredService<NavigationManager>();
     var tokenHandler = sp.GetRequiredService<JwtTokenHandler>();
-    var httpClient = new HttpClient(new JwtTokenMessageHandler(tokenHandler)) { BaseAddress = new Uri(navigationManager.BaseUri) };
+    var handler = new JwtTokenMessageHandler(tokenHandler)
+    {
+        InnerHandler = new HttpClientHandler()
+    };
+    var httpClient = new HttpClient(handler) { BaseAddress = new Uri(navigationManager.BaseUri) };
     return httpClient;
 });
 
@@ -128,6 +148,30 @@ app.UseHttpsRedirection();
 
 // Serve static files from wwwroot/uploads
 app.UseStaticFiles();
+
+// Serve chat uploads
+var chatUploadsPath = Path.Combine(builder.Environment.WebRootPath, "uploads", "chat");
+if (!Directory.Exists(chatUploadsPath))
+{
+    Directory.CreateDirectory(chatUploadsPath);
+}
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(chatUploadsPath),
+    RequestPath = "/uploads/chat"
+});
+
+// Serve temp uploads
+var tempUploadsPath = Path.Combine(builder.Environment.WebRootPath, "uploads", "temp");
+if (!Directory.Exists(tempUploadsPath))
+{
+    Directory.CreateDirectory(tempUploadsPath);
+}
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(tempUploadsPath),
+    RequestPath = "/uploads/temp"
+});
 
 app.UseAntiforgery();
 app.UseAuthentication();
