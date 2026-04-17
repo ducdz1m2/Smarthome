@@ -57,9 +57,14 @@
                 }
                 @foreach (var msg in _messages)
                 {
-                    // Show separator for new messages (messages after last read)
-                    if (_lastReadAt != null && msg.CreatedDate > _lastReadAt && !_separatorShown)
+                    // Debug logging for separator logic
+                    var isAfterLastRead = _lastReadAt != null && msg.CreatedDate > _lastReadAt;
+                    Console.WriteLine($"[ChatWidget] Msg {msg.Id}: CreatedDate={msg.CreatedDate}, LastReadAt={_lastReadAt}, IsAfterLastRead={isAfterLastRead}, SeparatorShown={_separatorShown}");
+                    
+                    // Show separator for the first message after opening the chat
+                    if (isAfterLastRead && !_separatorShown)
                     {
+                        Console.WriteLine($"[ChatWidget] *** SHOWING SEPARATOR *** for msg {msg.Id}");
                         <div class="msg-separator">
                             <div class="separator-line"></div>
                             <div class="separator-text">Tin nhắn mới</div>
@@ -656,6 +661,7 @@
     private bool _isAdmin = false;
     private IBrowserFile? _selectedFile;
     private string _filePreviewUrl = "";
+    private Action<object>? _onMessageReceivedHandler;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -680,7 +686,9 @@
             {
                 Console.WriteLine("[ChatWidget] Initializing SignalR...");
                 await SignalRService.InitializeAsync();
-                SignalRService.OnChatMessageReceived += async (msg) => await OnMessageReceived(msg);
+                _onMessageReceivedHandler = (msg) => _ = OnMessageReceived(msg);
+                SignalRService.OnChatMessageReceived += _onMessageReceivedHandler;
+                Console.WriteLine("[ChatWidget] OnChatMessageReceived event subscribed");
                 await InvokeAsync(async () => await LoadMessages());
                 Console.WriteLine("[ChatWidget] SignalR initialized successfully");
             }
@@ -700,18 +708,11 @@
             var messageJson = System.Text.Json.JsonSerializer.Serialize(messageObj);
             Console.WriteLine($"[ChatWidget] Received message JSON: {messageJson}");
             
-            // Parse manually to avoid case sensitivity issues
+            // Parse to check if it's from others
             using var doc = System.Text.Json.JsonDocument.Parse(messageJson);
-            var content = doc.RootElement.TryGetProperty("content", out var contentElem) ? contentElem.GetString() : "";
             var userId = doc.RootElement.TryGetProperty("userId", out var userIdElem) ? userIdElem.GetInt32() : 0;
             
-            // Parse attachment fields
-            var fileUrl = doc.RootElement.TryGetProperty("fileUrl", out var fileUrlElem) ? fileUrlElem.GetString() : null;
-            var fileName = doc.RootElement.TryGetProperty("fileName", out var fileNameElem) ? fileNameElem.GetString() : null;
-            var fileType = doc.RootElement.TryGetProperty("fileType", out var fileTypeElem) ? fileTypeElem.GetString() : null;
-            var fileSize = doc.RootElement.TryGetProperty("fileSize", out var fileSizeElem) ? fileSizeElem.GetInt64() : (long?)null;
-            
-            Console.WriteLine($"[ChatWidget] Parsed message - Content: '{content}', UserId: {userId}, FileUrl: {fileUrl}");
+            Console.WriteLine($"[ChatWidget] Parsed message - UserId: {userId}, CurrentUserId: {CurrentUser.UserId}");
             
             // If this is our own message, skip to avoid losing local message
             if (userId == CurrentUser.UserId)
@@ -720,37 +721,24 @@
                 return;
             }
 
-            // Add message if it has content or attachments
-            if (!string.IsNullOrEmpty(content) || !string.IsNullOrEmpty(fileUrl))
+            // Reload messages from DB to get correct _lastReadAt and separator logic
+            Console.WriteLine("[ChatWidget] Received message from others via SignalR - reloading messages");
+            await InvokeAsync(async () => await LoadMessages());
+            
+            if (!_isOpen)
             {
-                // Add new message from others
-                Console.WriteLine("[ChatWidget] Received message from others via SignalR");
-                _messages.Add(new ChatMessageDto
-                {
-                    Id = _messages.Count + 1,
-                    SessionId = _sessionId,
-                    Content = content,
-                    IsFromAdmin = true, // Messages from others are from admin in support chat
-                    CreatedDate = DateTime.Now,
-                    MessageType = !string.IsNullOrEmpty(fileType) && fileType.StartsWith("image/") ? MessageType.Image : MessageType.Text,
-                    FileUrl = fileUrl,
-                    FileName = fileName,
-                    FileType = fileType,
-                    FileSize = fileSize
-                });
-                if (!_isOpen)
-                {
-                    _unreadCount++;
-                }
+                _unreadCount++;
+                Console.WriteLine($"[ChatWidget] Incremented badge count to {_unreadCount}");
                 await InvokeAsync(StateHasChanged);
-                try
-                {
-                    await ScrollToBottom();
-                }
-                catch (Microsoft.JSInterop.JSDisconnectedException)
-                {
-                    Console.WriteLine("[ChatWidget] JS disconnected, skipping scroll");
-                }
+            }
+            
+            try
+            {
+                await ScrollToBottom();
+            }
+            catch (Microsoft.JSInterop.JSDisconnectedException)
+            {
+                Console.WriteLine("[ChatWidget] JS disconnected, skipping scroll");
             }
         }
         catch (Exception ex)
@@ -765,7 +753,13 @@
         if (_isOpen)
         {
             _unreadCount = 0;
+            _separatorShown = false; // Reset separator flag when opening
             await InvokeAsync(StateHasChanged);
+            
+            // Reload messages to get updated LastReadAt for separator logic
+            Console.WriteLine("[ChatWidget] Chat opened - reloading messages for separator");
+            await InvokeAsync(async () => await LoadMessages());
+            
             // Scroll to bottom after opening chat
             await Task.Delay(100);
             try
@@ -775,6 +769,30 @@
             catch (Microsoft.JSInterop.JSDisconnectedException)
             {
                 Console.WriteLine("[ChatWidget] JS disconnected, skipping scroll");
+            }
+        }
+        else
+        {
+            // Chat closed - mark as read to update LastReadAt for next time
+            Console.WriteLine($"[ChatWidget] Chat closed - marking as read. _chatRoomId={_chatRoomId}, UserId={CurrentUser.UserId}");
+            try
+            {
+                var userId = CurrentUser.UserId ?? 0;
+                if (userId > 0 && _chatRoomId > 0)
+                {
+                    Console.WriteLine($"[ChatWidget] Calling MarkChatAsReadAsync for room {_chatRoomId}, user {userId}");
+                    await ChatService.MarkChatAsReadAsync(_chatRoomId, userId);
+                    Console.WriteLine($"[ChatWidget] *** SUCCESS *** Marked chat room {_chatRoomId} as read for user {userId}");
+                }
+                else
+                {
+                    Console.WriteLine($"[ChatWidget] Cannot mark as read - userId={userId}, _chatRoomId={_chatRoomId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ChatWidget] Failed to mark as read: {ex.Message}");
+                Console.WriteLine($"[ChatWidget] Stack trace: {ex.StackTrace}");
             }
         }
     }
@@ -1159,6 +1177,11 @@
     public void Dispose()
     {
         Console.WriteLine("[ChatWidget] Disposing...");
+        if (_onMessageReceivedHandler != null)
+        {
+            SignalRService.OnChatMessageReceived -= _onMessageReceivedHandler;
+            Console.WriteLine("[ChatWidget] OnChatMessageReceived event unsubscribed");
+        }
         if (_isRecording)
         {
             _ = SpeechRecognitionService.CancelRecordingAsync();

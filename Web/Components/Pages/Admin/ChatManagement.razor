@@ -4,6 +4,7 @@
 @using Application.Interfaces.Services
 @using Domain.Enums
 @using Web.Services
+@implements IAsyncDisposable
 @inject IChatService ChatService
 @inject SignalRService SignalRService
 @inject CurrentUserService CurrentUser
@@ -11,6 +12,7 @@
 @inject IJSRuntime JSRuntime
 @inject IHttpClientFactory HttpClientFactory
 @inject JwtTokenHandler JwtTokenHandler
+@inject SpeechRecognitionService SpeechRecognitionService
 
 <div class="chat-container">
     <div class="chat-sidebar">
@@ -97,14 +99,15 @@
                     Console.WriteLine($"[ChatManagement] Rendering messages - Count: {_messages.Count}, LastReadAt: {_lastReadAt}, SeparatorShown: {_separatorShown}");
                     @foreach (var msg in _messages)
                     {
-                        // Show separator for new messages (messages after last read or room open)
-                        var separatorTime = _lastReadAt ?? _roomOpenTime;
-                        var shouldShowSeparator = separatorTime != null && msg.SentAt > separatorTime && !_separatorShown;
-                        Console.WriteLine($"[ChatManagement] Message {msg.Id} - SentAt: {msg.SentAt}, SeparatorTime: {separatorTime}, ShouldShowSeparator: {shouldShowSeparator}");
+                        // Show separator for messages after LastReadAt (only if LastReadAt is set)
+                        // This helps identify where unread/new messages start
+                        var isAfterLastRead = _lastReadAt != null && msg.SentAt > _lastReadAt;
+                        var isFirstNewMessage = isAfterLastRead && !_separatorShown;
+                        Console.WriteLine($"[ChatManagement] Message {msg.Id} - SenderId: {msg.SenderId}, SentAt: {msg.SentAt}, LastReadAt: {_lastReadAt}, IsAfterLastRead: {isAfterLastRead}, IsFirstNewMessage: {isFirstNewMessage}");
                         
-                        if (shouldShowSeparator)
+                        if (isFirstNewMessage)
                         {
-                            Console.WriteLine($"[ChatManagement] Showing separator - LastRead: {_lastReadAt}, MsgTime: {msg.SentAt}");
+                            Console.WriteLine($"[ChatManagement] Showing separator - LastReadAt: {_lastReadAt}, MsgTime: {msg.SentAt}");
                             <div class="message-separator">
                                 <div class="separator-line"></div>
                                 <div class="separator-text">Tin nhắn mới</div>
@@ -159,12 +162,8 @@
                 }
                 <div class="d-flex gap-2">
                     <InputFile class="d-none admin-chat-file-input" OnChange="OnFileSelected" accept="image/*,.pdf,.doc,.docx" />
-                    <button class="chat-attach" @onclick="TriggerFileSelect" aria-label="Đính kèm file">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M4.502 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
-                            <path d="M14.002 13a2 2 0 0 1-2 2h-10a2 2 0 0 1-2-2V5A2 2 0 0 1 2 3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-1.998 2zM14 2H4a1 1 0 0 0-1 1h9.002a2 2 0 0 1 2 2v7A1 1 0 0 0 15 11V3a1 1 0 0 0-1-1zM2.002 4a1 1 0 0 0-1 1v8l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71a.5.5 0 0 1 .577-.094l1.777 1.947V5a1 1 0 0 0-1-1h-10z"/>
-                        </svg>
-                    </button>
+                    <MudIconButton Icon="@Icons.Material.Filled.AttachFile" @onclick="TriggerFileSelect" Disabled="@_sending" Title="Đính kèm file" Size="Size.Medium" />
+                    <MudIconButton Icon="@(_isRecording ? Icons.Material.Filled.Stop : Icons.Material.Filled.Mic)" @onclick="ToggleRecording" Disabled="@_sending" Title="Ghi âm" Size="Size.Medium" Color="@(_isRecording ? Color.Error : Color.Default)" />
                     <MudTextField T="string" 
                                  @bind-Value="_message" 
                                  Placeholder="Nhập tin nhắn..." 
@@ -439,20 +438,6 @@
     justify-content: center;
 }
 
-.chat-attach {
-    background: #f0f0f0;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 8px 12px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.chat-attach:hover {
-    background: #e0e0e0;
-}
 </style>
 
 @code {
@@ -467,10 +452,68 @@
     private DateTime? _lastReadAt = null;
     private DateTime? _roomOpenTime = null;
     private bool _separatorShown = false;
+    private Action<object>? _onMessageReceivedHandler;
     private IBrowserFile? _selectedFile;
     private string _filePreviewUrl = "";
+    private bool _isRecording = false;
+    private bool _isTranscribing = false;
+    private static readonly SemaphoreSlim _chatServiceLock = new SemaphoreSlim(1, 1);
 
-    private bool CanSendMessage => !_sending && (!string.IsNullOrWhiteSpace(_message) || _selectedFile != null);
+    private bool CanSendMessage => !_sending && (!_isRecording) && (!string.IsNullOrWhiteSpace(_message) || _selectedFile != null);
+
+    public async ValueTask DisposeAsync()
+    {
+        Console.WriteLine("[ChatManagement] DisposeAsync called - unsubscribing from events");
+        if (_onMessageReceivedHandler != null)
+        {
+            SignalRService.OnChatMessageReceived -= _onMessageReceivedHandler;
+            Console.WriteLine("[ChatManagement] OnChatMessageReceived event unsubscribed");
+        }
+        if (_isRecording)
+        {
+            _ = SpeechRecognitionService.CancelRecordingAsync();
+        }
+        await Task.CompletedTask;
+    }
+
+    private async Task ToggleRecording()
+    {
+        if (_isRecording)
+        {
+            // Stop recording - callback will handle the text
+            await SpeechRecognitionService.StopAndTranscribeAsync();
+        }
+        else
+        {
+            // Start recording with callback
+            _isRecording = true;
+            _isTranscribing = true;
+            await InvokeAsync(StateHasChanged);
+            
+            try
+            {
+                await SpeechRecognitionService.StartRecordingAsync(async (text) =>
+                {
+                    _isRecording = false;
+                    _isTranscribing = false;
+                    
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        _message += (string.IsNullOrEmpty(_message) ? "" : " ") + text;
+                    }
+                    
+                    await InvokeAsync(StateHasChanged);
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ChatManagement] Recording failed: {ex.Message}");
+                _isRecording = false;
+                _isTranscribing = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -483,10 +526,11 @@
                 Console.WriteLine("[ChatManagement] Initializing SignalR...");
                 await SignalRService.InitializeAsync();
                 Console.WriteLine("[ChatManagement] SignalRService.InitializeAsync completed");
-                // Subscribe with async handler
-                SignalRService.OnChatMessageReceived += async (msg) => await OnMessageReceived(msg);
+                // Subscribe with sync wrapper to avoid async void issues
+                _onMessageReceivedHandler = (msg) => _ = OnMessageReceived(msg);
+                SignalRService.OnChatMessageReceived += _onMessageReceivedHandler;
                 Console.WriteLine("[ChatManagement] OnChatMessageReceived event subscribed");
-                await InvokeAsync(async () => await LoadChatRooms());
+                await LoadChatRooms();
                 _initialized = true;
                 Console.WriteLine("[ChatManagement] Initialization completed successfully");
             }
@@ -494,7 +538,7 @@
             {
                 Console.WriteLine($"[ChatManagement] Initialization failed: {ex.Message}");
                 Console.WriteLine($"[ChatManagement] Stack trace: {ex.StackTrace}");
-                await InvokeAsync(async () => await LoadChatRooms());
+                await LoadChatRooms();
             }
         }
         else if (SelectedChatRoomId > 0 && _messages.Count == 0)
@@ -524,8 +568,38 @@
                 
                 Console.WriteLine($"[ChatManagement] Message from user {senderId} to room {messageRoomId}, current room is {SelectedChatRoomId}, current user is {currentUserId}");
 
-                // Reload chat rooms to update badge unread count in real-time
-                await InvokeAsync(async () => await LoadChatRooms());
+                // If message is from someone else and NOT currently viewing that room, increment badge
+                if (senderId != currentUserId && SelectedChatRoomId != messageRoomId)
+                {
+                    Console.WriteLine($"[ChatManagement] Trying to increment badge for room {messageRoomId}. Total rooms: {_chatRooms.Count}");
+                    var room = _chatRooms.FirstOrDefault(r => r.Id == messageRoomId);
+                    if (room != null)
+                    {
+                        Console.WriteLine($"[ChatManagement] Found room {messageRoomId}, checking participants...");
+                        var adminParticipant = room.Participants.FirstOrDefault(p => p.UserType == "Admin");
+                        if (adminParticipant != null)
+                        {
+                            adminParticipant.UnreadCount++;
+                            Console.WriteLine($"[ChatManagement] *** INCREMENTED BADGE *** for room {messageRoomId} to {adminParticipant.UnreadCount}");
+                            await InvokeAsync(StateHasChanged);
+                            Console.WriteLine($"[ChatManagement] StateHasChanged called for badge update");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[ChatManagement] Admin participant not found in room {messageRoomId}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[ChatManagement] Room {messageRoomId} not found in _chatRooms");
+                    }
+                }
+                else if (senderId != currentUserId && SelectedChatRoomId == messageRoomId)
+                {
+                    // Currently viewing the room - mark as read immediately
+                    Console.WriteLine($"[ChatManagement] Currently viewing room {messageRoomId}, marking as read without badge");
+                    _ = MarkAsRead();
+                }
 
                 // Only reload messages if the message is for the currently selected room
                 if (SelectedChatRoomId > 0 && messageRoomId == SelectedChatRoomId)
@@ -538,7 +612,7 @@
                     else
                     {
                         Console.WriteLine("[ChatManagement] Received message from others - reloading");
-                        await InvokeAsync(async () => await LoadMessages());
+                        await LoadMessages();
                         await ScrollToBottom();
                     }
                 }
@@ -547,11 +621,11 @@
             else
             {
                 // Fallback: reload everything if we can't parse
-                await InvokeAsync(async () => await LoadChatRooms());
+                await LoadChatRooms();
                 await InvokeAsync(StateHasChanged);
                 if (SelectedChatRoomId > 0)
                 {
-                    await InvokeAsync(async () => await LoadMessages());
+                    await LoadMessages();
                 }
             }
         }
@@ -559,17 +633,18 @@
         {
             Console.WriteLine($"[ChatManagement] Error processing message: {ex.Message}");
             // Fallback: reload everything
-            await InvokeAsync(async () => await LoadChatRooms());
+            await LoadChatRooms();
             await InvokeAsync(StateHasChanged);
             if (SelectedChatRoomId > 0)
             {
-                await InvokeAsync(async () => await LoadMessages());
+                await LoadMessages();
             }
         }
     }
 
     private async Task LoadChatRooms()
     {
+        await _chatServiceLock.WaitAsync();
         try
         {
             var userId = CurrentUser.UserId ?? 0;
@@ -625,6 +700,10 @@
             Console.WriteLine($"[ChatManagement] Failed to load chat rooms: {ex.Message}");
             Console.WriteLine($"[ChatManagement] Stack trace: {ex.StackTrace}");
         }
+        finally
+        {
+            _chatServiceLock.Release();
+        }
     }
 
     private async Task SelectChatRoom(int roomId)
@@ -640,9 +719,28 @@
         {
             Console.WriteLine($"[ChatManagement] Joining SignalR chat room: {roomId}");
             await SignalRService.JoinChatRoom(roomId);
-        await InvokeAsync(async () => await LoadMessages());
-        Console.WriteLine($"[ChatManagement] SelectChatRoom completed");
-        await InvokeAsync(StateHasChanged);
+            
+            // Mark chat as read to reset unread count when opening the room
+            var userId = CurrentUser.UserId ?? 0;
+            if (userId > 0)
+            {
+                await _chatServiceLock.WaitAsync();
+                try
+                {
+                    Console.WriteLine($"[ChatManagement] Marking chat room {roomId} as read for user {userId}");
+                    await ChatService.MarkChatAsReadAsync(roomId, userId);
+                }
+                finally
+                {
+                    _chatServiceLock.Release();
+                }
+            }
+            
+            // Reload chat rooms to update badge, then load messages
+            await LoadChatRooms();
+            await LoadMessages();
+            Console.WriteLine($"[ChatManagement] SelectChatRoom completed");
+            await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {
@@ -654,10 +752,11 @@
     {
         if (SelectedChatRoomId == 0) return;
 
-        _loadingMessages = true;
-        _separatorShown = false;
+        await _chatServiceLock.WaitAsync();
         try
         {
+            _loadingMessages = true;
+            _separatorShown = false;
             Console.WriteLine($"Loading messages for chat room: {SelectedChatRoomId}");
             var userId = CurrentUser.UserId ?? 0;
             Console.WriteLine($"Loading messages with user ID: {userId}");
@@ -679,8 +778,6 @@
                 var msg = _messages[i];
                 Console.WriteLine($"[ChatManagement] Message[{i}]: Id={msg.Id}, SenderId={msg.SenderId}, Content={msg.Content}, SentAt={msg.SentAt}, IsFromMe={msg.IsFromMe}");
             }
-            
-            await InvokeAsync(async () => await MarkAsRead());
         }
         catch (Exception ex)
         {
@@ -690,6 +787,7 @@
         finally
         {
             _loadingMessages = false;
+            _chatServiceLock.Release();
             Console.WriteLine($"[ChatManagement] LoadMessages completed, calling StateHasChanged, message count: {_messages.Count}");
             await InvokeAsync(StateHasChanged);
             Console.WriteLine($"[ChatManagement] StateHasChanged called");
@@ -702,6 +800,8 @@
             {
                 Console.WriteLine("[ChatManagement] JS disconnected, skipping scroll");
             }
+            // Mark as read after releasing lock and UI updated
+            _ = MarkAsRead();
         }
     }
 
@@ -710,8 +810,16 @@
         try
         {
             var userId = CurrentUser.UserId ?? 0;
-            await ChatService.MarkChatAsReadAsync(SelectedChatRoomId, userId);
-            await InvokeAsync(async () => await LoadChatRooms());
+            await _chatServiceLock.WaitAsync();
+            try
+            {
+                await ChatService.MarkChatAsReadAsync(SelectedChatRoomId, userId);
+            }
+            finally
+            {
+                _chatServiceLock.Release();
+            }
+            // Note: LoadChatRooms should be called separately if needed
         }
         catch (Exception ex)
         {

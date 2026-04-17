@@ -9,6 +9,8 @@ public class SignalRService
     private HubConnection? _notificationConnection;
     private HubConnection? _installationConnection;
     private readonly NavigationManager _navigationManager;
+    private readonly HashSet<int> _pendingRoomJoins = new();
+    private readonly object _lock = new();
 
     public event Action<object>? OnChatMessageReceived;
     public event Action<object>? OnNotificationReceived;
@@ -63,10 +65,19 @@ public class SignalRService
                 return Task.CompletedTask;
             };
 
-            _chatConnection.Reconnected += (connectionId) =>
+            _chatConnection.Reconnected += async (connectionId) =>
             {
                 Console.WriteLine($"[SignalRService] Chat reconnected with connectionId: {connectionId}");
-                return Task.CompletedTask;
+                // Re-join all pending rooms
+                lock (_lock)
+                {
+                    foreach (var roomId in _pendingRoomJoins.ToList())
+                    {
+                        Console.WriteLine($"[SignalRService] Re-joining room {roomId} after reconnection");
+                        _ = JoinChatRoomInternalAsync(roomId);
+                    }
+                }
+                await Task.CompletedTask;
             };
 
             _chatConnection.Closed += (error) =>
@@ -96,6 +107,15 @@ public class SignalRService
             {
                 await _chatConnection.StartAsync();
                 Console.WriteLine($"[SignalRService] Chat connection started");
+                // Process any pending room joins
+                lock (_lock)
+                {
+                    foreach (var roomId in _pendingRoomJoins.ToList())
+                    {
+                        Console.WriteLine($"[SignalRService] Processing pending join for room {roomId}");
+                        _ = JoinChatRoomInternalAsync(roomId);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -136,17 +156,38 @@ public class SignalRService
     public async Task JoinChatRoom(int chatRoomId)
     {
         Console.WriteLine($"[SignalRService] JoinChatRoom called with chatRoomId: {chatRoomId}");
+        
+        // Always add to pending set
+        lock (_lock)
+        {
+            _pendingRoomJoins.Add(chatRoomId);
+        }
+        
+        // Try to join immediately if connected
+        await JoinChatRoomInternalAsync(chatRoomId);
+    }
+    
+    private async Task JoinChatRoomInternalAsync(int chatRoomId)
+    {
+        Console.WriteLine($"[SignalRService] JoinChatRoomInternalAsync called with chatRoomId: {chatRoomId}");
         Console.WriteLine($"[SignalRService] Chat connection state: {_chatConnection?.State}");
         
         if (_chatConnection != null && _chatConnection.State == HubConnectionState.Connected)
         {
-            Console.WriteLine($"[SignalRService] Invoking JoinChatRoom method on server");
-            await _chatConnection.InvokeAsync("JoinChatRoom", chatRoomId);
-            Console.WriteLine($"[SignalRService] JoinChatRoom invoked successfully");
+            try
+            {
+                Console.WriteLine($"[SignalRService] Invoking JoinChatRoom method on server");
+                await _chatConnection.InvokeAsync("JoinChatRoom", chatRoomId);
+                Console.WriteLine($"[SignalRService] JoinChatRoom invoked successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SignalRService] Failed to join room {chatRoomId}: {ex.Message}");
+            }
         }
         else
         {
-            Console.WriteLine($"[SignalRService] Cannot join chat room - connection not connected");
+            Console.WriteLine($"[SignalRService] Cannot join chat room {chatRoomId} - connection not connected (will retry when connected)");
         }
     }
 

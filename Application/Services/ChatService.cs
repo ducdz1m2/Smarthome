@@ -76,6 +76,10 @@ public class ChatService : IChatService
         var room = await _chatRoomRepository.GetByIdWithParticipantsAsync(chatRoomId);
         if (room == null) return false;
 
+        // Admin can access all Support chat rooms
+        if (userType == UserType.Admin && room.Type == ChatRoomType.Support)
+            return true;
+
         return room.Participants.Any(p => p.UserId == userId && p.UserType == userType && !p.IsBlocked);
     }
 

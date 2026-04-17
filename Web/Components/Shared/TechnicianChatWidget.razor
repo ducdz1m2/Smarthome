@@ -687,6 +687,7 @@
     private bool _isAdmin = false;
     private IBrowserFile? _selectedFile;
     private string _filePreviewUrl = "";
+    private Action<object>? _onMessageReceivedHandler;
 
     [Parameter]
     public int InstallationId { get; set; }
@@ -714,7 +715,9 @@
             {
                 Console.WriteLine("[TechnicianChatWidget] Initializing...");
                 await SignalRService.InitializeAsync();
-                SignalRService.OnChatMessageReceived += async (msg) => await OnMessageReceived(msg);
+                _onMessageReceivedHandler = (msg) => _ = OnMessageReceived(msg);
+                SignalRService.OnChatMessageReceived += _onMessageReceivedHandler;
+                Console.WriteLine("[TechnicianChatWidget] OnChatMessageReceived event subscribed");
                 await InvokeAsync(async () => await LoadInstallationChat());
                 Console.WriteLine("[TechnicianChatWidget] Initialized successfully");
             }
@@ -811,54 +814,31 @@
         {
             var messageJson = System.Text.Json.JsonSerializer.Serialize(messageObj);
             using var doc = System.Text.Json.JsonDocument.Parse(messageJson);
-            var content = doc.RootElement.TryGetProperty("content", out var contentElem) ? contentElem.GetString() : "";
             var userId = doc.RootElement.TryGetProperty("userId", out var userIdElem) ? userIdElem.GetInt32() : 0;
-            
-            // Parse attachment fields
-            var fileUrl = doc.RootElement.TryGetProperty("fileUrl", out var fileUrlElem) ? fileUrlElem.GetString() : null;
-            var fileName = doc.RootElement.TryGetProperty("fileName", out var fileNameElem) ? fileNameElem.GetString() : null;
-            var fileType = doc.RootElement.TryGetProperty("fileType", out var fileTypeElem) ? fileTypeElem.GetString() : null;
-            var fileSize = doc.RootElement.TryGetProperty("fileSize", out var fileSizeElem) ? fileSizeElem.GetInt64() : (long?)null;
             
             if (userId == CurrentUser.UserId)
             {
                 return;
             }
 
-            // Add message if it has content or attachments
-            if (!string.IsNullOrEmpty(content) || !string.IsNullOrEmpty(fileUrl))
+            // Reload messages from DB to get correct _lastReadAt and separator logic
+            Console.WriteLine("[TechnicianChatWidget] Received message from others via SignalR - reloading messages");
+            await InvokeAsync(async () => await LoadMessages());
+            
+            if (!_isOpen)
             {
-                _messages.Add(new ChatMessageResponse
-                {
-                    Id = _messages.Count + 1,
-                    ChatRoomId = _chatRoomId,
-                    Content = content,
-                    IsFromMe = false,
-                    SentAt = DateTime.Now,
-                    Attachments = fileUrl != null ? new List<ChatAttachmentResponse>
-                    {
-                        new ChatAttachmentResponse
-                        {
-                            FileUrl = fileUrl,
-                            FileName = fileName,
-                            FileType = fileType,
-                            FileSize = fileSize
-                        }
-                    } : new()
-                });
-                if (!_isOpen)
-                {
-                    _unreadCount++;
-                }
+                _unreadCount++;
+                Console.WriteLine($"[TechnicianChatWidget] Incremented badge count to {_unreadCount}");
                 await InvokeAsync(StateHasChanged);
-                try
-                {
-                    await ScrollToBottom();
-                }
-                catch (Microsoft.JSInterop.JSDisconnectedException)
-                {
-                    Console.WriteLine("[TechnicianChatWidget] JS disconnected, skipping scroll");
-                }
+            }
+            
+            try
+            {
+                await ScrollToBottom();
+            }
+            catch (Microsoft.JSInterop.JSDisconnectedException)
+            {
+                Console.WriteLine("[TechnicianChatWidget] JS disconnected, skipping scroll");
             }
         }
         catch (Exception ex)
@@ -873,7 +853,13 @@
         if (_isOpen)
         {
             _unreadCount = 0;
+            _separatorShown = false; // Reset separator flag when opening
             await InvokeAsync(StateHasChanged);
+            
+            // Reload messages to get updated LastReadAt for separator logic
+            Console.WriteLine("[TechnicianChatWidget] Chat opened - reloading messages for separator");
+            await InvokeAsync(async () => await LoadMessages());
+            
             await Task.Delay(100);
             try
             {
@@ -882,6 +868,24 @@
             catch (Microsoft.JSInterop.JSDisconnectedException)
             {
                 Console.WriteLine("[TechnicianChatWidget] JS disconnected, skipping scroll");
+            }
+        }
+        else
+        {
+            // Chat closed - mark as read to update LastReadAt for next time
+            Console.WriteLine("[TechnicianChatWidget] Chat closed - marking as read");
+            try
+            {
+                var userId = CurrentUser.UserId ?? 0;
+                if (userId > 0 && _chatRoomId > 0)
+                {
+                    await ChatService.MarkChatAsReadAsync(_chatRoomId, userId);
+                    Console.WriteLine($"[TechnicianChatWidget] Marked chat room {_chatRoomId} as read for user {userId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[TechnicianChatWidget] Failed to mark as read: {ex.Message}");
             }
         }
     }
@@ -1084,6 +1088,11 @@
     public void Dispose()
     {
         Console.WriteLine("[TechnicianChatWidget] Disposing...");
+        if (_onMessageReceivedHandler != null)
+        {
+            SignalRService.OnChatMessageReceived -= _onMessageReceivedHandler;
+            Console.WriteLine("[TechnicianChatWidget] OnChatMessageReceived event unsubscribed");
+        }
         if (_isRecording)
         {
             _ = SpeechRecognitionService.CancelRecordingAsync();
