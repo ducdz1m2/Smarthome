@@ -157,12 +157,7 @@ public class ChatService : IChatService
     public async Task<List<ChatRoomResponse>> GetInstallationChatRoomsAsync(int technicianId)
     {
         var rooms = await _chatRoomRepository.GetByTechnicianIdAsync(technicianId);
-        var responses = new List<ChatRoomResponse>();
-        foreach (var room in rooms)
-        {
-            responses.Add(await MapToRoomResponseAsync(room, technicianId));
-        }
-        return responses;
+        return rooms.Select(r => MapToRoomResponse(r, technicianId)).ToList();
     }
 
     public async Task<List<ChatRoomResponse>> GetCustomerInstallationChatsAsync(int customerId)
@@ -170,12 +165,7 @@ public class ChatService : IChatService
         var rooms = await _chatRoomRepository.GetByUserIdAsync(customerId, UserType.Customer);
         // Filter only installation chats (rooms with RelatedInstallationId)
         var installationRooms = rooms.Where(r => r.RelatedInstallationId.HasValue).ToList();
-        var responses = new List<ChatRoomResponse>();
-        foreach (var room in installationRooms)
-        {
-            responses.Add(await MapToRoomResponseAsync(room, customerId));
-        }
-        return responses;
+        return installationRooms.Select(r => MapToRoomResponse(r, customerId)).ToList();
     }
 
     public async Task CloseChatRoomAsync(int chatRoomId, int closedByUserId)

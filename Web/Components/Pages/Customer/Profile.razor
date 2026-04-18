@@ -65,12 +65,12 @@
                 </div>
             }
             
-            <MudFileUpload T="IBrowserFile" 
-                           FilesChanged="UploadAvatar" 
+            <MudFileUpload T="IBrowserFile"
+                           FilesChanged="UploadAvatar"
                            Accept=".jpg,.jpeg,.png,.gif,.webp">
                 <ActivatorContent>
-                    <MudButton Variant="Variant.Filled" 
-                               Color="Color.Secondary" 
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Secondary"
                                StartIcon="@Icons.Material.Filled.CloudUpload"
                                Disabled="_isUploading"
                                Size="Size.Small">
@@ -81,12 +81,18 @@
                         }
                         else
                         {
-                            <span>@(string.IsNullOrEmpty(_editModel.Avatar) ? "Chọn ảnh" : "Đổi ảnh")</span>
+                            <span>Tải ảnh lên</span>
                         }
                     </MudButton>
                 </ActivatorContent>
+                <FileContent>
+                    @if (!string.IsNullOrEmpty(_editModel.Avatar))
+                    {
+                        <MudImage Src="@_editModel.Avatar" Alt="Avatar" ObjectFit="ObjectFit.Cover" Style="max-width: 200px; max-height: 200px;" />
+                    }
+                </FileContent>
             </MudFileUpload>
-            
+
             @if (_isUploading)
             {
                 <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-2" />

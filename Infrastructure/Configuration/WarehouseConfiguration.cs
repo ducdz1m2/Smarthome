@@ -24,8 +24,8 @@ namespace Infrastructure.Configuration
                 address.Property(a => a.PostalCode).HasColumnName("AddressPostalCode").HasMaxLength(10);
             });
             builder.Property(w => w.Phone).HasConversion(
-                phone => phone.ToString(),
-                value => Domain.ValueObjects.PhoneNumber.Create(value));
+                phone => phone!.ToString(),
+                value => Domain.ValueObjects.PhoneNumber.Create(value!));
             builder.Property(w => w.IsActive).HasDefaultValue(true);
             
             builder.HasIndex(w => w.Code).IsUnique();

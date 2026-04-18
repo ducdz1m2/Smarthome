@@ -17,8 +17,25 @@ namespace Infrastructure.Repositories
         public async Task<ProductVariant?> GetByIdAsync(int id)
         {
             return await _context.ProductVariants
+                .AsNoTracking()
                 .Include(v => v.Product)
                 .FirstOrDefaultAsync(v => v.Id == id);
+        }
+
+        public async Task<ProductVariant?> GetByIdForUpdateAsync(int id)
+        {
+            return await _context.ProductVariants
+                .Include(v => v.Product)
+                .FirstOrDefaultAsync(v => v.Id == id);
+        }
+
+        public async Task<List<ProductVariant>> GetByIdsAsync(List<int> ids)
+        {
+            return await _context.ProductVariants
+                .AsNoTracking()
+                .Include(v => v.Product)
+                .Where(v => ids.Contains(v.Id))
+                .ToListAsync();
         }
 
         public async Task<ProductVariant?> GetBySkuAsync(string sku)

@@ -133,9 +133,6 @@ namespace Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("BasePrice")
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<int>("BrandId")
                         .HasColumnType("int");
 
@@ -1003,6 +1000,9 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("PickedUpAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
@@ -1021,11 +1021,19 @@ namespace Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("VariantId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("WarehouseId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("BookingId");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("WarehouseId");
 
                     b.ToTable("InstallationMaterials", (string)null);
                 });
@@ -1422,6 +1430,96 @@ namespace Infrastructure.Migrations
                     b.HasIndex("StockEntryId");
 
                     b.ToTable("StockEntryDetails", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Inventory.StockIssue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("IssueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("IssueType")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IssuedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.ToTable("StockIssues", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Inventory.StockIssueDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StockIssueId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("VariantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("StockIssueId");
+
+                    b.ToTable("StockIssueDetails", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Inventory.Supplier", b =>
@@ -1936,8 +2034,6 @@ namespace Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("InstallationBookingId");
 
                     b.HasIndex("OrderId");
 
@@ -2843,7 +2939,14 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Domain.Entities.Inventory.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Booking");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("Domain.Entities.Installation.InstallationSlot", b =>
@@ -3134,27 +3237,13 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Entities.Sales.OrderItem", b =>
                 {
-                    b.HasOne("Domain.Entities.Installation.InstallationBooking", "InstallationBooking")
-                        .WithMany()
-                        .HasForeignKey("InstallationBookingId");
-
                     b.HasOne("Domain.Entities.Sales.Order", "Order")
                         .WithMany("Items")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Domain.Entities.Catalog.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("InstallationBooking");
-
                     b.Navigation("Order");
-
-                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Domain.Entities.Sales.OrderShipment", b =>

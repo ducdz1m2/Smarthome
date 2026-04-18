@@ -142,12 +142,12 @@ public class OrderFlowTests
 
     private static Product CreateTestProduct(string sku, decimal price)
     {
-        return Product.Create("Test Product", sku, Money.Vnd(price), 1, 1);
+        return Product.Create("Test Product", sku, 1, 1);
     }
 
     private static Product CreateTestProductWithStock(string sku, decimal price, int availableStock)
     {
-        var product = Product.Create("Test Product", sku, Money.Vnd(price), 1, 1);
+        var product = Product.Create("Test Product", sku, 1, 1);
         product.AddVariant($"{sku}-VAR", Money.Vnd(price), new Dictionary<string, string>());
         product.AddStockToVariant($"{sku}-VAR", availableStock);
         return product;

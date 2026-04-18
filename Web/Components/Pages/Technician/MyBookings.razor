@@ -1,4 +1,5 @@
 @page "/technician/bookings"
+@page "/technician/bookings/{type}"
 @using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
@@ -8,10 +9,11 @@
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 @inject IAuthService AuthService
+@inject HttpClient Http
 
 <MudText Typo="Typo.h4" Class="mb-4">Lịch công việc của tôi</MudText>
 
-<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" ActiveTab="@_activeTabIndex" ActiveTabChanged="OnTabChanged">
     <MudTabPanel Text="Lắp đặt" Icon="@Icons.Material.Filled.Build">
         @RenderBookingTable(_installationBookings, "installation")
     </MudTabPanel>
@@ -23,19 +25,87 @@
     </MudTabPanel>
 </MudTabs>
 
+<!-- Prepare Materials Dialog Overlay -->
+@if (_prepareMaterialsDialogOpen)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <MudCard Style="width: 400px; max-width: 90%;">
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">Chuẩn bị vật tư từ kho</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudSelect T="int" Label="Chọn kho" @bind-SelectedValue="_selectedWarehouseId">
+                    @if (_warehouses.Any())
+                    {
+                        @foreach (var warehouse in _warehouses)
+                        {
+                            <MudSelectItem T="int" Value="@warehouse.Id">@warehouse.Name (@warehouse.Code)</MudSelectItem>
+                        }
+                    }
+                    else
+                    {
+                        <MudSelectItem T="int" Value="0">Đang tải...</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton OnClick="(() => _prepareMaterialsDialogOpen = false)" Variant="Variant.Text">Hủy</MudButton>
+                <MudButton OnClick="PrepareMaterials" Color="Color.Primary" Variant="Variant.Filled" Disabled="@_preparingMaterials">
+                    @(_preparingMaterials ? "Đang chuẩn bị..." : "Xác nhận")
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </div>
+}
+
 @code {
+    [Parameter]
+    public string? type { get; set; }
+
     private List<InstallationBookingListResponse> _allBookings = new();
     private List<InstallationBookingListResponse> _installationBookings = new();
     private List<InstallationBookingListResponse> _warrantyBookings = new();
     private List<InstallationBookingListResponse> _uninstallBookings = new();
+    private int _activeTabIndex = 0;
+    
+    private DialogOptions dialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+    
+    // For prepare materials dialog
+    private int _selectedBookingId = 0;
+    private bool _prepareMaterialsDialogOpen = false;
+    private List<WarehouseResponse> _warehouses = new();
+    private int _selectedWarehouseId = 0;
+    private bool _preparingMaterials = false;
+    private bool _isLoading = false;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadBookings();
+        // Set active tab based on URL parameter
+        if (!string.IsNullOrEmpty(type))
+        {
+            _activeTabIndex = type.ToLower() switch
+            {
+                "installation" => 0,
+                "warranty" => 1,
+                "uninstall" => 2,
+                _ => 0
+            };
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadBookings();
+        }
     }
 
     private async Task LoadBookings()
     {
+        if (_isLoading) return;
+        _isLoading = true;
+
         try
         {
             var technicianId = await GetCurrentTechnicianId();
@@ -44,6 +114,13 @@
             Console.WriteLine($"[LoadBookings] Loading bookings for technician ID: {technicianId}");
             _allBookings = await InstallationService.GetByTechnicianAsync(technicianId);
             Console.WriteLine($"[LoadBookings] Loaded {_allBookings.Count} bookings");
+            
+            // Log status of the selected booking
+            var selectedBooking = _allBookings.FirstOrDefault(b => b.Id == _selectedBookingId);
+            if (selectedBooking != null)
+            {
+                Console.WriteLine($"[LoadBookings] Selected booking {_selectedBookingId} status: {selectedBooking.Status}");
+            }
 
             // Filter by type
             _installationBookings = _allBookings.Where(b => !b.IsWarranty && !b.IsUninstall).ToList();
@@ -57,6 +134,10 @@
             Console.WriteLine($"[LoadBookings] Error: {ex.Message}");
             Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
         }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private async Task<int> GetCurrentTechnicianId()
@@ -65,6 +146,19 @@
         var technicianId = await AuthService.GetTechnicianIdAsync();
         Console.WriteLine($"[GetCurrentTechnicianId] Technician ID: {technicianId}");
         return technicianId ?? 0;
+    }
+
+    private void OnTabChanged(int index)
+    {
+        _activeTabIndex = index;
+        var type = index switch
+        {
+            0 => "installation",
+            1 => "warranty",
+            2 => "uninstall",
+            _ => ""
+        };
+        NavigationManager.NavigateTo($"/technician/bookings/{type}");
     }
 
     private RenderFragment RenderBookingTable(List<InstallationBookingListResponse> bookings, string bookingType)
@@ -106,6 +200,11 @@
                             {
                                 <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" Class="ml-2"
                                            OnClick="() => AcceptBooking(context.Id)">Tiếp nhận</MudButton>
+                            }
+                            @if (context.Status == "Confirmed")
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Class="ml-2"
+                                           OnClick="() => OpenPrepareMaterialsDialog(context.Id)">Chuẩn bị vật tư</MudButton>
                             }
                             @if (context.Status == "Preparing")
                             {
@@ -223,6 +322,7 @@
         return status switch
         {
             "Assigned" => Color.Info,
+            "Confirmed" => Color.Primary,
             "Preparing" => Color.Primary,
             "OnTheWay" => Color.Secondary,
             "Installing" => Color.Tertiary,
@@ -251,6 +351,7 @@
         return status switch
         {
             "Assigned" => "Chờ xác nhận",
+            "Confirmed" => "Đã xác nhận",
             "Preparing" => "Đang chuẩn bị",
             "OnTheWay" => "Đang đi",
             "Installing" => "Đang lắp",
@@ -258,5 +359,92 @@
             "Cancelled" => "Đã hủy",
             _ => status
         };
+    }
+
+    private async Task OpenPrepareMaterialsDialog(int bookingId)
+    {
+        Console.WriteLine($"[OpenPrepareMaterialsDialog] Opening dialog for booking ID: {bookingId}");
+        _selectedBookingId = bookingId;
+        await LoadWarehouses();
+        Console.WriteLine($"[OpenPrepareMaterialsDialog] Warehouses loaded: {_warehouses.Count}");
+        _prepareMaterialsDialogOpen = true;
+        Console.WriteLine($"[OpenPrepareMaterialsDialog] Dialog open: {_prepareMaterialsDialogOpen}");
+        StateHasChanged();
+    }
+
+    private async Task LoadWarehouses()
+    {
+        try
+        {
+            Console.WriteLine($"[LoadWarehouses] Loading warehouses from /api/warehouses");
+            var response = await Http.GetFromJsonAsync<List<WarehouseResponse>>("/api/warehouses");
+            Console.WriteLine($"[LoadWarehouses] Response: {response?.Count ?? 0} warehouses");
+            if (response != null)
+            {
+                _warehouses = response;
+                _selectedWarehouseId = _warehouses.FirstOrDefault()?.Id ?? 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LoadWarehouses] Error: {ex.Message}");
+            Snackbar.Add($"Lỗi tải danh sách kho: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task PrepareMaterials()
+    {
+        if (_selectedWarehouseId == 0)
+        {
+            Snackbar.Add("Vui lòng chọn kho", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            _preparingMaterials = true;
+            
+            // Get booking details to get products
+            var bookingDetails = await InstallationService.GetByIdAsync(_selectedBookingId);
+            if (bookingDetails == null)
+            {
+                Snackbar.Add("Không tìm thấy lịch lắp đặt", Severity.Error);
+                return;
+            }
+
+            var request = new PrepareMaterialsRequest
+            {
+                WarehouseId = _selectedWarehouseId,
+                Items = bookingDetails.Products.Select(p => new MaterialPreparationItem
+                {
+                    ProductId = p.ProductId,
+                    VariantId = null,
+                    Quantity = p.Quantity
+                }).ToList()
+            };
+
+            await InstallationService.PrepareMaterialsFromWarehouseAsync(_selectedBookingId, request);
+            Snackbar.Add("Đã chuẩn bị vật tư thành công", Severity.Success);
+            _prepareMaterialsDialogOpen = false;
+            Console.WriteLine($"[PrepareMaterials] About to reload bookings");
+            await LoadBookings();
+            Console.WriteLine($"[PrepareMaterials] Bookings reloaded");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _preparingMaterials = false;
+        }
+    }
+
+    private class WarehouseResponse
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
     }
 }

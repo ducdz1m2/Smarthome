@@ -1,6 +1,8 @@
+using Domain.Interfaces;
+
 namespace Web.Services;
 
-public class CurrentUserService
+public class CurrentUserService : ICurrentUserService
 {
     private readonly object _lock = new();
     private int? _userId;

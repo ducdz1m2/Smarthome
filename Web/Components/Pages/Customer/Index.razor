@@ -92,7 +92,7 @@
                             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">@product.CategoryName</MudText>
                             <MudText Typo="Typo.subtitle1" Class="fw-bold text-truncate mb-2" title="@product.Name">@product.Name</MudText>
                             <div class="d-flex align-center justify-space-between">
-                                <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">@FormatPrice(product.BasePrice)</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">@GetDisplayPrice(product)</MudText>
                                 <MudIconButton Icon="@Icons.Material.Filled.AddShoppingCart" 
                                                Color="Color.Primary" 
                                                Size="Size.Small"
@@ -152,7 +152,7 @@
                             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">@product.CategoryName</MudText>
                             <MudText Typo="Typo.subtitle1" Class="fw-bold text-truncate mb-2" title="@product.Name">@product.Name</MudText>
                             <div class="d-flex align-center justify-space-between">
-                                <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">@FormatPrice(product.BasePrice)</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">@GetDisplayPrice(product)</MudText>
                                 <MudIconButton Icon="@Icons.Material.Filled.AddShoppingCart" 
                                                Color="Color.Primary" 
                                                Size="Size.Small"
@@ -302,5 +302,18 @@
     private string FormatPrice(decimal price)
     {
         return $"{price:N0} ₫";
+    }
+
+    private string GetDisplayPrice(ProductListResponse product)
+    {
+        if (product.MinPrice == 0 && product.MaxPrice == 0)
+        {
+            return "Liên hệ";
+        }
+        if (product.MinPrice == product.MaxPrice)
+        {
+            return FormatPrice(product.MinPrice);
+        }
+        return $"{FormatPrice(product.MinPrice)} - {FormatPrice(product.MaxPrice)}";
     }
 }

@@ -10,6 +10,8 @@ namespace Application.Services
 {
     public class WarrantyService : IWarrantyService
     {
+        private const int DaysPerMonth = 30;
+
         private readonly IWarrantyRepository _warrantyRepository;
         private readonly IWarrantyClaimRepository _claimRepository;
         private readonly IProductRepository _productRepository;
@@ -187,7 +189,7 @@ namespace Application.Services
                 StartDate = warranty.StartDate,
                 EndDate = warranty.EndDate,
                 Status = warranty.Status.ToString(),
-                WarrantyPeriodMonths = (warranty.EndDate - warranty.StartDate).Days / 30,
+                WarrantyPeriodMonths = (warranty.EndDate - warranty.StartDate).Days / DaysPerMonth,
                 Claims = new List<WarrantyClaimRepsonse>()
             };
         }

@@ -31,15 +31,19 @@ public class ChatRoomRepository : IChatRoomRepository
             .FirstOrDefaultAsync(r => r.Id == id);
 
     public async Task<List<ChatRoom>> GetAllAsync()
-        => await _context.ChatRooms.ToListAsync();
+        => await _context.ChatRooms
+            .AsNoTracking()
+            .ToListAsync();
 
     public async Task<List<ChatRoom>> GetByUserIdAsync(int userId, UserType userType)
         => await _context.ChatRooms
+            .AsNoTracking()
             .Where(r => r.Participants.Any(p => p.UserId == userId && p.UserType == userType))
             .ToListAsync();
 
     public async Task<List<ChatRoom>> GetByParticipantAsync(int userId, UserType userType)
         => await _context.ChatRooms
+            .AsNoTracking()
             .Where(r => r.Participants.Any(p => p.UserId == userId && p.UserType == userType))
             .ToListAsync();
 

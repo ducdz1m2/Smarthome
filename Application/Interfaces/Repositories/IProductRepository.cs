@@ -5,6 +5,7 @@ namespace Application.Interfaces.Repositories
     public interface IProductRepository
     {
         Task<Product?> GetByIdAsync(int id);
+        Task<List<Product>> GetByIdsAsync(List<int> ids);
         Task<Product?> GetByIdWithDetailsAsync(int id);
         Task<Product?> GetByIdForUpdateAsync(int id);
         Task<Product?> GetBySkuAsync(string sku);

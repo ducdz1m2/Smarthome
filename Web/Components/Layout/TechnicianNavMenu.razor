@@ -8,9 +8,9 @@
 
     <MudNavGroup Title="Lịch công việc" Expanded="true" Icon="@Icons.Material.Filled.EventNote">
         <MudNavLink Href="/technician/bookings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CalendarMonth">Tất cả</MudNavLink>
-        <MudNavLink Href="/technician/bookings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Build">Lắp đặt</MudNavLink>
-        <MudNavLink Href="/technician/bookings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Handyman">Bảo hành</MudNavLink>
-        <MudNavLink Href="/technician/bookings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Delete">Tháo dỡ</MudNavLink>
+        <MudNavLink Href="/technician/bookings?type=installation" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Build">Lắp đặt</MudNavLink>
+        <MudNavLink Href="/technician/bookings?type=warranty" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Handyman">Bảo hành</MudNavLink>
+        <MudNavLink Href="/technician/bookings?type=uninstall" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Delete">Tháo dỡ</MudNavLink>
     </MudNavGroup>
 
     <MudNavLink Href="/technician/chat" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Chat">Tin nhắn</MudNavLink>

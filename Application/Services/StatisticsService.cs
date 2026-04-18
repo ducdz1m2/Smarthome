@@ -13,6 +13,9 @@ namespace Application.Services
 {
     public class StatisticsService : IStatisticsService
     {
+        private const int LowStockThreshold = 10;
+        private const int TopProductsLimit = 10;
+
         private readonly IOrderRepository _orderRepository;
         private readonly IProductRepository _productRepository;
         private readonly ICategoryRepository _categoryRepository;
@@ -96,8 +99,7 @@ namespace Application.Services
                 .Sum(o => o.TotalAmount.Amount);
 
             var products = await _productRepository.GetAllAsync();
-            var lowStockThreshold = 10;
-            var lowStockProducts = products.Count(p => p.StockQuantity > 0 && p.StockQuantity < lowStockThreshold && p.IsActive);
+            var lowStockProducts = products.Count(p => p.StockQuantity > 0 && p.StockQuantity < LowStockThreshold && p.IsActive);
 
             return new OverviewStatsResponse
             {
@@ -164,15 +166,15 @@ namespace Application.Services
             // Top selling products - simplified version
             var products = await _productRepository.GetAllAsync();
             var topProducts = products
-                .Take(10)
+                .Take(TopProductsLimit)
                 .Select(p => new TopProductResponse
                 {
                     Id = p.Id,
                     Name = p.Name,
                     ImageUrl = p.Images?.FirstOrDefault()?.Url,
                     Quantity = p.StockQuantity,
-                    Revenue = p.BasePrice.Amount * 10, // Simplified
-                    SoldCount = 10 // Simplified
+                    Revenue = (p.Variants.Any() ? p.Variants.Average(v => v.Price.Amount) : 0) * TopProductsLimit, // Simplified
+                    SoldCount = TopProductsLimit // Simplified
                 })
                 .OrderByDescending(p => p.SoldCount)
                 .ToList();
@@ -331,7 +333,11 @@ namespace Application.Services
                 stockByWarehouse["Chưa có kho"] = products.Sum(p => p.StockQuantity);
             }
 
-            var totalValue = products.Sum(p => p.StockQuantity * p.BasePrice.Amount);
+            var totalValue = products.Sum(p =>
+            {
+                var avgVariantPrice = p.Variants.Any() ? p.Variants.Average(v => v.Price.Amount) : 0;
+                return p.StockQuantity * avgVariantPrice;
+            });
 
             return new InventoryStatsResponse
             {

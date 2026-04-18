@@ -5,6 +5,8 @@ namespace Web.Services
 {
     public class FileUploadService : IFileUploadService
     {
+        private const int MaxFileSizeMB = 5;
+        private const int BytesPerMB = 1024 * 1024;
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<FileUploadService> _logger;
         private readonly IHttpContextAccessor _httpContextAccessor;
@@ -34,8 +36,8 @@ namespace Web.Services
             if (!allowedExtensions.Contains(extension))
                 throw new InvalidOperationException("Chỉ chấp nhận file ảnh (jpg, png, gif, webp)");
 
-            if (file.Length > 5 * 1024 * 1024) // 5MB limit
-                throw new InvalidOperationException("File quá lớn. Tối đa 5MB");
+            if (file.Length > MaxFileSizeMB * BytesPerMB) 
+                throw new InvalidOperationException($"File quá lớn. Tối đa {MaxFileSizeMB}MB");
 
             var tempFolder = Path.Combine(_environment.WebRootPath, "uploads", "temp");
             if (!Directory.Exists(tempFolder))

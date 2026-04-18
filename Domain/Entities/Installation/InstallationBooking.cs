@@ -113,6 +113,14 @@ public class InstallationBooking : AggregateRoot
             Status = InstallationStatus.Rescheduled;
         }
 
+        public void SetCustomerRating(int rating)
+        {
+            if (rating < 1 || rating > 5)
+                throw new ValidationException(nameof(rating), "Đánh giá phải từ 1 đến 5 sao");
+
+            CustomerRating = rating;
+        }
+
         public void Cancel(string reason)
         {
             if (Status == InstallationStatus.Completed)
@@ -127,10 +135,18 @@ public class InstallationBooking : AggregateRoot
             if (Status != InstallationStatus.Assigned)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể tiếp nhận lịch ở trạng thái đã phân công");
 
-            Status = InstallationStatus.Preparing;
-            MaterialsPrepared = true;
+            Status = InstallationStatus.Confirmed;
 
             AddDomainEvent(new InstallationBookingConfirmedEvent(Id, DateTime.UtcNow));
+        }
+
+        public void PrepareMaterials()
+        {
+            if (Status != InstallationStatus.Confirmed)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể chuẩn bị vật tư ở trạng thái đã xác nhận");
+
+            Status = InstallationStatus.Preparing;
+            MaterialsPrepared = true;
         }
 
         public void Reject(string reason)
@@ -147,10 +163,15 @@ public class InstallationBooking : AggregateRoot
             AddDomainEvent(new InstallationCancelledEvent(Id, reason ?? "Rejected by technician"));
         }
 
-        public void AddMaterial(int productId, int quantityTaken)
+        public void AddMaterial(int productId, int quantityTaken, int? warehouseId = null, int? variantId = null)
         {
-            var material = InstallationMaterial.Create(Id, productId, quantityTaken);
+            var material = InstallationMaterial.Create(Id, productId, quantityTaken, warehouseId, variantId);
             Materials.Add(material);
+        }
+
+        public void MarkMaterialsPickedUp()
+        {
+            MaterialsPrepared = true;
         }
 
         public void SetIsUninstall(bool isUninstall)

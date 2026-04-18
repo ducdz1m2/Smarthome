@@ -3,9 +3,12 @@ using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Catalog;
+using Domain.Entities.Inventory;
 using Domain.Entities.Sales;
 using Domain.Enums;
 using Domain.Exceptions;
+using Domain.ValueObjects;
+using Domain.Interfaces;
 using Domain.Services;
 
 namespace Application.Services
@@ -24,6 +27,7 @@ namespace Application.Services
         private readonly IOrderWarehouseAllocationRepository _orderWarehouseAllocationRepository;
         private readonly IWarehouseService _warehouseService;
         private readonly IProductVariantRepository _productVariantRepository;
+        private readonly ICurrentUserService _currentUserService;
 
         public OrderService(
             IOrderRepository orderRepository,
@@ -37,7 +41,8 @@ namespace Application.Services
             IProductWarehouseRepository productWarehouseRepository,
             IOrderWarehouseAllocationRepository orderWarehouseAllocationRepository,
             IWarehouseService warehouseService,
-            IProductVariantRepository productVariantRepository)
+            IProductVariantRepository productVariantRepository,
+            ICurrentUserService currentUserService)
         {
             _orderRepository = orderRepository;
             _productRepository = productRepository;
@@ -51,6 +56,7 @@ namespace Application.Services
             _orderWarehouseAllocationRepository = orderWarehouseAllocationRepository;
             _warehouseService = warehouseService;
             _productVariantRepository = productVariantRepository;
+            _currentUserService = currentUserService;
         }
 
         public async Task<List<OrderResponse>> GetAllAsync()
@@ -124,7 +130,24 @@ namespace Application.Services
                 if (product == null)
                     throw new EntityNotFoundException("Product", item.ProductId);
 
-                var price = product.BasePrice;
+                Money price;
+                if (item.VariantId.HasValue)
+                {
+                    // Get price from variant
+                    var variant = await _productVariantRepository.GetByIdAsync(item.VariantId.Value);
+                    if (variant == null)
+                        throw new EntityNotFoundException("ProductVariant", item.VariantId.Value);
+                    price = variant.Price;
+                }
+                else
+                {
+                    // Use minimum variant price if no variant specified
+                    var variants = await _productVariantRepository.GetByProductIdAsync(item.ProductId);
+                    if (!variants.Any())
+                        throw new DomainException($"Product {item.ProductId} has no variants");
+                    price = variants.Min(v => v.Price);
+                }
+
                 order.AddItem(item.ProductId, item.VariantId, item.Quantity, price, item.RequiresInstallation);
 
                 // Calculate total for regular items (non-installation)
@@ -348,102 +371,156 @@ namespace Application.Services
 
         public async Task ConfirmAsync(int id, List<WarehouseAllocationRequest>? warehouseAllocations = null)
         {
-            var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
-            if (order == null)
+            // Load order with details to check items
+            var orderWithDetails = await _orderRepository.GetByIdWithDetailsAsync(id);
+            if (orderWithDetails == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
             // Check if order was in Pending status before confirming
-            var isWasPending = order.Status.ToString() == "Pending";
+            var isWasPending = orderWithDetails.Status.ToString() == "Pending";
+
+            // Calculate item types
+            var hasInstallItems = orderWithDetails.Items.Any(i => i.RequiresInstallation);
+            var hasShipItems = orderWithDetails.Items.Any(i => !i.RequiresInstallation);
 
             // Only call Confirm() if order is in Pending status
             if (isWasPending)
             {
-                order.Confirm();
+                // Load order with tracking for update
+                var order = await _orderRepository.GetByIdAsync(id);
+                if (order == null)
+                    throw new DomainException("Không tìm thấy đơn hàng");
+
+                order.Confirm(hasInstallItems, hasShipItems);
                 await _orderRepository.SaveChangesAsync();
             }
 
             // Handle warehouse allocations if provided
             if (warehouseAllocations != null && warehouseAllocations.Any())
             {
-                await HandleWarehouseAllocationsForConfirmationAsync(order, warehouseAllocations);
+                await HandleWarehouseAllocationsForConfirmationAsync(orderWithDetails, warehouseAllocations);
             }
 
             // Only start shipping/installation flows if order was just confirmed
             if (isWasPending)
             {
-                var hasInstallItems = order.Items.Any(i => i.RequiresInstallation);
-                var hasShipItems = order.Items.Any(i => !i.RequiresInstallation);
-
                 // For mixed orders, start both flows
                 if (hasInstallItems && hasShipItems)
                 {
                     // Start installation flow
+                    var order = await _orderRepository.GetByIdAsync(id);
+                    if (order == null)
+                        throw new DomainException("Không tìm thấy đơn hàng");
+                    
                     order.StartInstallationFlow();
                     await _orderRepository.SaveChangesAsync();
                     
                     // Create installation booking for each installation item
-                    var installItems = order.Items.Where(i => i.RequiresInstallation).ToList();
+                    var installItems = orderWithDetails.Items.Where(i => i.RequiresInstallation).ToList();
                     foreach (var installItem in installItems)
                     {
                         var request = new CreateOrderRequest
                         {
-                            ShippingDistrict = order.ShippingAddress?.District ?? "",
-                            ShippingCity = order.ShippingAddress?.City ?? "",
+                            ShippingDistrict = orderWithDetails.ShippingAddress?.District ?? "",
+                            ShippingCity = orderWithDetails.ShippingAddress?.City ?? "",
                             InstallationDate = DateTime.Today
                         };
-                        var bookingId = await CreateInstallationBookingAsync(order.Id, request);
+                        var bookingId = await CreateInstallationBookingAsync(orderWithDetails.Id, request);
                         
-                        // Link the booking to the specific order item
-                        installItem.AssignInstallation(bookingId);
+                        // Reload order to assign installation
+                        var orderForUpdate = await _orderRepository.GetByIdAsync(id);
+                        if (orderForUpdate == null)
+                            throw new DomainException("Không tìm thấy đơn hàng");
                         
-                        // Save after each booking assignment to avoid DbContext conflicts
-                        await _orderRepository.SaveChangesAsync();
+                        orderWithDetails = await _orderRepository.GetByIdWithDetailsAsync(id);
+                        if (orderWithDetails == null)
+                            throw new DomainException("Không tìm thấy đơn hàng");
+                        
+                        var updatedInstallItem = orderWithDetails.Items.FirstOrDefault(i => i.Id == installItem.Id);
+                        if (updatedInstallItem != null)
+                        {
+                            updatedInstallItem.AssignInstallation(bookingId);
+                            await _orderRepository.SaveChangesAsync();
+                        }
                     }
 
                     // Start shipping flow and create shipment
+                    order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
+                    if (order == null)
+                        throw new DomainException("Không tìm thấy đơn hàng");
+
                     order.StartShippingFlow();
                     await _orderRepository.SaveChangesAsync();
                     
-                    await CreateShipmentForOrderAsync(order);
+                    orderWithDetails = await _orderRepository.GetByIdWithDetailsAsync(id);
+                    if (orderWithDetails == null)
+                        throw new DomainException("Không tìm thấy đơn hàng");
+                    
+                    await CreateShipmentForOrderAsync(orderWithDetails);
                 }
                 // Only installation items
                 else if (hasInstallItems)
                 {
-                    order.StartInstallationFlow();
+                    var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
+                    if (order == null)
+                        throw new DomainException("Không tìm thấy đơn hàng");
+
+                    order.StartInstallationFlow(hasInstallItems);
                     await _orderRepository.SaveChangesAsync();
                     
-                    var installItems = order.Items.Where(i => i.RequiresInstallation).ToList();
+                    var installItems = orderWithDetails.Items.Where(i => i.RequiresInstallation).ToList();
                     foreach (var installItem in installItems)
                     {
                         var request = new CreateOrderRequest
                         {
-                            ShippingDistrict = order.ShippingAddress?.District ?? "",
-                            ShippingCity = order.ShippingAddress?.City ?? "",
+                            ShippingDistrict = orderWithDetails.ShippingAddress?.District ?? "",
+                            ShippingCity = orderWithDetails.ShippingAddress?.City ?? "",
                             InstallationDate = DateTime.Today
                         };
-                        var bookingId = await CreateInstallationBookingAsync(order.Id, request);
+                        var bookingId = await CreateInstallationBookingAsync(orderWithDetails.Id, request);
                         
-                        installItem.AssignInstallation(bookingId);
-                        await _orderRepository.SaveChangesAsync();
+                        order = await _orderRepository.GetByIdAsync(id);
+                        if (order == null)
+                            throw new DomainException("Không tìm thấy đơn hàng");
+                        
+                        orderWithDetails = await _orderRepository.GetByIdWithDetailsAsync(id);
+                        if (orderWithDetails == null)
+                            throw new DomainException("Không tìm thấy đơn hàng");
+                        
+                        var updatedInstallItem = orderWithDetails.Items.FirstOrDefault(i => i.Id == installItem.Id);
+                        if (updatedInstallItem != null)
+                        {
+                            updatedInstallItem.AssignInstallation(bookingId);
+                            await _orderRepository.SaveChangesAsync();
+                        }
                     }
                 }
                 // Only shipping items
                 else if (hasShipItems)
                 {
+                    var order = await _orderRepository.GetByIdAsync(id);
+                    if (order == null)
+                        throw new DomainException("Không tìm thấy đơn hàng");
+
                     order.StartShippingFlow();
                     await _orderRepository.SaveChangesAsync();
                     
-                    await CreateShipmentForOrderAsync(order);
+                    await CreateShipmentForOrderAsync(orderWithDetails);
                 }
             }
         }
 
         private async Task HandleWarehouseAllocationsForConfirmationAsync(Order order, List<WarehouseAllocationRequest> allocations)
         {
+            // Reload order with details to get items
+            var orderWithDetails = await _orderRepository.GetByIdWithDetailsAsync(order.Id);
+            if (orderWithDetails == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
             // Group allocations by order item ID
             var allocationsByItem = allocations.GroupBy(a => a.OrderItemId).ToDictionary(g => g.Key, g => g.ToList());
 
-            foreach (var orderItem in order.Items.Where(i => !i.RequiresInstallation))
+            foreach (var orderItem in orderWithDetails.Items.Where(i => !i.RequiresInstallation))
             {
                 if (allocationsByItem.TryGetValue(orderItem.Id, out var itemAllocations) && itemAllocations.Any())
                 {
@@ -485,7 +562,7 @@ namespace Application.Services
 
         public async Task StartShippingAsync(int id)
         {
-            var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
+            var order = await _orderRepository.GetByIdAsync(id);
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
@@ -495,7 +572,7 @@ namespace Application.Services
 
         public async Task MarkDeliveredAsync(int id)
         {
-            var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
+            var order = await _orderRepository.GetByIdAsync(id);
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
@@ -510,15 +587,15 @@ namespace Application.Services
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
-            // TODO: Get actual userId from authentication context
-            order.Cancel(reason, 0);
+            var userId = _currentUserService.UserId ?? 0;
+            order.Cancel(reason, userId);
             _orderRepository.Update(order);
             await _orderRepository.SaveChangesAsync();
         }
 
         public async Task CompleteAsync(int id)
         {
-            var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
+            var order = await _orderRepository.GetByIdAsync(id);
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
@@ -550,24 +627,22 @@ namespace Application.Services
                 order.ShippingAddress?.City
             }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
-            // Load product info for each order item
+            // Load product info for each order item in a single query
             var productIds = order.Items.Select(i => i.ProductId).Distinct().ToList();
-            var products = new Dictionary<int, Product>();
-            foreach (var productId in productIds)
+            var productsDict = new Dictionary<int, Product>();
+            if (productIds.Any())
             {
-                var product = await _productRepository.GetByIdAsync(productId);
-                if (product != null)
-                    products[productId] = product;
+                var products = await _productRepository.GetByIdsAsync(productIds);
+                productsDict = products.ToDictionary(p => p.Id);
             }
 
-            // Load variant info for order items that have variants
-            var variantIds = order.Items.Where(i => i.VariantId.HasValue).Select(i => i.VariantId.Value).Distinct().ToList();
-            var variants = new Dictionary<int, Domain.Entities.Catalog.ProductVariant>();
-            foreach (var variantId in variantIds)
+            // Load variant info for order items that have variants in a single query
+            var variantIds = order.Items.Where(i => i.VariantId.HasValue).Select(i => i.VariantId!.Value).Distinct().ToList();
+            var variantsDict = new Dictionary<int, Domain.Entities.Catalog.ProductVariant>();
+            if (variantIds.Any())
             {
-                var variant = await _productVariantRepository.GetByIdAsync(variantId);
-                if (variant != null)
-                    variants[variantId] = variant;
+                var variants = await _productVariantRepository.GetByIdsAsync(variantIds);
+                variantsDict = variants.ToDictionary(v => v.Id);
             }
 
             // Check if order has uninstall booking
@@ -605,11 +680,11 @@ namespace Application.Services
                 HasUninstallBooking = hasUninstallBooking,
                 Items = order.Items.Select(i =>
                 {
-                    products.TryGetValue(i.ProductId, out var product);
+                    productsDict.TryGetValue(i.ProductId, out var product);
                     Domain.Entities.Catalog.ProductVariant? variant = null;
                     if (i.VariantId.HasValue)
                     {
-                        variants.TryGetValue(i.VariantId.Value, out variant);
+                        variantsDict.TryGetValue(i.VariantId.Value, out variant);
                     }
 
                     return new OrderItemResponse

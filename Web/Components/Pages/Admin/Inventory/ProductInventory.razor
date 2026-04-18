@@ -155,11 +155,11 @@
                             @foreach (var wh in context.WarehouseStocks)
                             {
                                 <MudChip T="string"
-                                         Size="Size.Small" 
+                                         Size="Size.Small"
                                          Color="GetStockColor(wh.AvailableStock)"
                                          @onclick="() => ShowWarehouseDetails(context)"
                                          Style="cursor: pointer;">
-                                    @wh.WarehouseCode: @wh.Quantity
+                                    @wh.WarehouseCode: @wh.AvailableStock
                                 </MudChip>
                             }
                         </div>

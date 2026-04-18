@@ -151,13 +151,12 @@ public class WarrantyFlowTests
     }
 
     [Fact]
-    public void Product_Yeu_Cau_Lap_Dat_Phai_Co_Flag_RequiresInstallation()
+    public void Product_Yeu_Cau_Lap_Dat_Phi_Co_Flag_RequiresInstallation()
     {
         // Arrange & Act
         var product = Product.Create(
             name: "Smart AC",
             sku: "AC-001",
-            basePrice: Money.Vnd(15000000),
             categoryId: 1,
             brandId: 1,
             requiresInstallation: true);
@@ -167,14 +166,14 @@ public class WarrantyFlowTests
     }
 
     [Fact]
-    public void Order_Voi_San_Pham_Can_Lap_Dat_Phai_Tao_InstallationBooking()
+    public void Order_Voi_San_Pham_Can_Lap_Dat_Phi_Tao_InstallationBooking()
     {
         // Arrange
-        var order = Order.Create(1, "Customer", "0901234567", 
+        var order = Order.Create(1, "Customer", "0901234567",
             Address.Create("123 Test", "Ward 1", "Dist 1", "HCMC", "VN", "70000"));
 
-        var product = Product.Create("Smart AC", "AC-001", Money.Vnd(15000000), 1, 1, requiresInstallation: true);
-        order.AddItem(product.Id, null, 1, product.BasePrice, true);
+        var product = Product.Create("Smart AC", "AC-001", 1, 1, requiresInstallation: true);
+        order.AddItem(product.Id, null, 1, Money.Vnd(15000000), true);
 
         // Act - khi order có sản phẩm cần lắp đặt
         var requiresInstallation = order.Items.Any(i => i.RequiresInstallation);

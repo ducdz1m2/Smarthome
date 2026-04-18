@@ -16,11 +16,13 @@ public class ChatMessageRepository : IChatMessageRepository
 
     public async Task<ChatMessage?> GetByIdAsync(int id)
         => await _context.ChatMessages
+            .AsNoTracking()
             .Include(m => m.Attachments)
             .FirstOrDefaultAsync(m => m.Id == id);
 
     public async Task<List<ChatMessage>> GetByChatRoomIdAsync(int chatRoomId, int limit = 50)
         => await _context.ChatMessages
+            .AsNoTracking()
             .Where(m => m.ChatRoomId == chatRoomId)
             .OrderByDescending(m => m.SentAt)
             .Take(limit)
@@ -30,6 +32,7 @@ public class ChatMessageRepository : IChatMessageRepository
 
     public async Task<List<ChatMessage>> GetByChatRoomIdPagedAsync(int chatRoomId, int page, int pageSize)
         => await _context.ChatMessages
+            .AsNoTracking()
             .Where(m => m.ChatRoomId == chatRoomId)
             .OrderByDescending(m => m.SentAt)
             .Skip((page - 1) * pageSize)
@@ -39,16 +42,19 @@ public class ChatMessageRepository : IChatMessageRepository
 
     public async Task<List<ChatMessage>> GetUnreadMessagesAsync(int chatRoomId, int userId)
         => await _context.ChatMessages
+            .AsNoTracking()
             .Where(m => m.ChatRoomId == chatRoomId && m.SenderId != userId)
             .ToListAsync();
 
     public async Task<int> CountUnreadMessagesAsync(int chatRoomId, int userId)
         => await _context.ChatMessages
+            .AsNoTracking()
             .Where(m => m.ChatRoomId == chatRoomId && m.SenderId != userId)
             .CountAsync();
 
     public async Task<ChatMessage?> GetLastMessageAsync(int chatRoomId)
         => await _context.ChatMessages
+            .AsNoTracking()
             .Where(m => m.ChatRoomId == chatRoomId)
             .OrderByDescending(m => m.SentAt)
             .FirstOrDefaultAsync();

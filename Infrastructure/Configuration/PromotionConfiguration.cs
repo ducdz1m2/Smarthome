@@ -14,12 +14,12 @@ namespace Infrastructure.Configuration
             builder.Property(p => p.Description).HasMaxLength(1000);
             
             builder.Property(p => p.DiscountPercent).HasConversion(
-                percent => percent.Value,
-                value => Domain.ValueObjects.Percentage.Create(value));
+                percent => percent!.Value,
+                value => Domain.ValueObjects.Percentage.Create(value!));
             
             builder.Property(p => p.MinOrderAmount).HasConversion(
-                money => money.Amount,
-                value => Domain.ValueObjects.Money.Vnd(value));
+                money => money!.Amount,
+                value => Domain.ValueObjects.Money.Vnd(value!));
             builder.Property(p => p.IsActive).HasDefaultValue(true);
             builder.HasIndex(p => p.StartDate);
             builder.HasIndex(p => p.EndDate);

@@ -5,6 +5,7 @@ using Application.Interfaces.Services;
 using Domain.Entities.Sales;
 using Domain.Enums;
 using Domain.Exceptions;
+using Domain.Interfaces;
 
 namespace Application.Services;
 
@@ -12,13 +13,16 @@ public class ShipmentService : IShipmentService
 {
     private readonly IOrderShipmentRepository _shipmentRepository;
     private readonly IOrderRepository _orderRepository;
+    private readonly ICurrentUserService _currentUserService;
 
     public ShipmentService(
         IOrderShipmentRepository shipmentRepository,
-        IOrderRepository orderRepository)
+        IOrderRepository orderRepository,
+        ICurrentUserService currentUserService)
     {
         _shipmentRepository = shipmentRepository;
         _orderRepository = orderRepository;
+        _currentUserService = currentUserService;
     }
 
     public async Task<List<OrderShipmentResponse>> GetAllAsync()
@@ -173,8 +177,8 @@ public class ShipmentService : IShipmentService
         var order = await _orderRepository.GetByIdAsync(shipment.OrderId);
         if (order != null && order.Status == OrderStatus.Shipping)
         {
-            // TODO: Get actual userId from authentication context
-            order.MarkDelivered(0);
+            var userId = _currentUserService.UserId ?? 0;
+            order.MarkDelivered(userId);
             _orderRepository.Update(order);
             await _orderRepository.SaveChangesAsync();
         }

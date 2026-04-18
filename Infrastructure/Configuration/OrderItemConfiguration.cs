@@ -15,6 +15,10 @@ namespace Infrastructure.Configuration
                 value => Domain.ValueObjects.Money.Vnd(value));
             builder.HasIndex(oi => oi.OrderId);
             builder.HasIndex(oi => oi.ProductId);
+            
+            // Ignore navigation properties to prevent tracking conflicts
+            builder.Ignore(oi => oi.InstallationBooking);
+            
             builder.Ignore(oi => oi.DomainEvents);
         }
     }

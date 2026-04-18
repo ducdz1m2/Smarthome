@@ -19,11 +19,7 @@ namespace Infrastructure.Configuration
             builder.Property(p => p.Sku).HasConversion(
                 sku => sku.Value,
                 value => Domain.ValueObjects.Sku.Create(value));
-            
-            builder.Property(p => p.BasePrice).HasConversion(
-                money => money.Amount,
-                value => Domain.ValueObjects.Money.Vnd(value));
-            
+
             builder.Property(p => p.IsActive).HasDefaultValue(true);
             builder.Property(p => p.RequiresInstallation).HasDefaultValue(false);
             

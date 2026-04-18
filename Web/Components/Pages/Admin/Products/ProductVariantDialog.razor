@@ -25,13 +25,6 @@
                                      Min="0" />
                 </MudItem>
                 
-                <MudItem xs="12" md="6">
-                    <MudNumericField T="int" @bind-Value="_request.StockQuantity" 
-                                     Label="Số lượng tồn kho" 
-                                     Variant="Variant.Outlined" Class="mb-3"
-                                     Min="0" />
-                </MudItem>
-                
                 @if (_isEdit)
                 {
                     <MudItem xs="12" md="6">
@@ -107,7 +100,6 @@
     {
         Sku = "",
         Price = 0,
-        StockQuantity = 0,
         Attributes = new(),
         IsActive = true
     };
@@ -138,7 +130,6 @@
                 {
                     Sku = variant.Sku,
                     Price = variant.Price,
-                    StockQuantity = variant.StockQuantity,
                     Attributes = variant.Attributes,
                     IsActive = variant.IsActive
                 };
@@ -202,7 +193,6 @@
                     ProductId = ProductId,
                     Sku = _request.Sku,
                     Price = _request.Price,
-                    StockQuantity = _request.StockQuantity,
                     Attributes = _request.Attributes
                 };
                 await VariantService.CreateAsync(createRequest);

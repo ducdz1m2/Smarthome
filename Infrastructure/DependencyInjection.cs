@@ -15,9 +15,14 @@ namespace Infrastructure
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
-            // Cấu hình DbContext
+            // Cấu hình DbContext for Blazor Server (scoped per request)
+            // Enable sensitive data logging and detailed errors for debugging
             services.AddDbContext<AppDbContext>(options =>
-                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+            {
+                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
+                options.EnableSensitiveDataLogging();
+                options.EnableDetailedErrors();
+            });
 
             // Đăng ký Domain Event Dispatcher
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
@@ -36,52 +41,53 @@ namespace Infrastructure
             .AddDefaultTokenProviders();
 
             // Đăng ký các Repositories
-            services.AddScoped<IProductVariantRepository, ProductVariantRepository>();
-            services.AddScoped<IProductRepository, ProductRepository>();
-            services.AddScoped<ICategoryRepository, CategoryRepository>();
-            services.AddScoped<IBrandRepository, BrandRepository>();
-            services.AddScoped<IWarehouseRepository, WarehouseRepository>();
-            services.AddScoped<IOrderRepository, OrderRepository>();
-            services.AddScoped<ISupplierRepository, SupplierRepository>();
-            services.AddScoped<ICouponRepository, CouponRepository>();
-            services.AddScoped<IPromotionRepository, PromotionRepository>();
-            services.AddScoped<IBannerRepository, BannerRepository>();
-            services.AddScoped<IStockEntryRepository, StockEntryRepository>();
-            services.AddScoped<IProductWarehouseRepository, ProductWarehouseRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IProductVariantRepository, ProductVariantRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IProductRepository, ProductRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.ICategoryRepository, CategoryRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IBrandRepository, BrandRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IWarehouseRepository, WarehouseRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IOrderRepository, OrderRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.ISupplierRepository, SupplierRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.ICouponRepository, CouponRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IPromotionRepository, PromotionRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IBannerRepository, BannerRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IStockEntryRepository, StockEntryRepository>();
+            services.AddScoped<Domain.Repositories.IStockIssueRepository, StockIssueRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IProductWarehouseRepository, ProductWarehouseRepository>();
 
             // Installation repositories
             services.AddScoped<Infrastructure.Repositories.Interfaces.IInstallationBookingRepository, InstallationBookingRepository>();
             services.AddScoped<Application.Interfaces.Repositories.IInstallationBookingRepository, InstallationBookingRepository>();
-            services.AddScoped<ITechnicianProfileRepository, TechnicianProfileRepository>();
-            services.AddScoped<IInstallationSlotRepository, InstallationSlotRepository>();
-            services.AddScoped<ITechnicianRatingRepository, TechnicianRatingRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.ITechnicianProfileRepository, TechnicianProfileRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IInstallationSlotRepository, InstallationSlotRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.ITechnicianRatingRepository, TechnicianRatingRepository>();
 
             // Warranty repositories
-            services.AddScoped<IWarrantyRepository, WarrantyRepository>();
-            services.AddScoped<IWarrantyClaimRepository, WarrantyClaimRepository>();
-            services.AddScoped<IWarrantyRequestRepository, WarrantyRequestRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IWarrantyRepository, WarrantyRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IWarrantyClaimRepository, WarrantyClaimRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IWarrantyRequestRepository, WarrantyRequestRepository>();
 
             // User Address repository
-            services.AddScoped<IUserAddressRepository, UserAddressRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IUserAddressRepository, UserAddressRepository>();
 
             // User repository
             services.AddScoped<Domain.Repositories.IUserRepository, UserRepository>();
 
             // Return Order & Shipment repositories
-            services.AddScoped<IReturnOrderRepository, ReturnOrderRepository>();
-            services.AddScoped<IOrderShipmentRepository, OrderShipmentRepository>();
-            services.AddScoped<IOrderWarehouseAllocationRepository, OrderWarehouseAllocationRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IReturnOrderRepository, ReturnOrderRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IOrderShipmentRepository, OrderShipmentRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IOrderWarehouseAllocationRepository, OrderWarehouseAllocationRepository>();
 
             // Product Comment repository
-            services.AddScoped<IProductCommentRepository, ProductCommentRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IProductCommentRepository, ProductCommentRepository>();
 
             // Chat & Notification repositories
-            services.AddScoped<IChatRoomRepository, ChatRoomRepository>();
-            services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
-            services.AddScoped<INotificationRepository, NotificationRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IChatRoomRepository, ChatRoomRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IChatMessageRepository, ChatMessageRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.INotificationRepository, NotificationRepository>();
 
             // ML/Recommendation
-            services.AddScoped<IUserBehaviorRepository, UserBehaviorRepository>();
+            services.AddScoped<Application.Interfaces.Repositories.IUserBehaviorRepository, UserBehaviorRepository>();
             services.AddScoped<Application.Interfaces.IUserSimilarityService, Infrastructure.Services.ML.UserSimilarityService>();
             services.AddScoped<Application.Services.RecommendationService>();
 

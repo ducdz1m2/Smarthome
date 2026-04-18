@@ -18,11 +18,11 @@ namespace Infrastructure.Configuration
                 value => Domain.ValueObjects.Money.Vnd(value));
             builder.Property(tp => tp.EmployeeCode).IsRequired();
             builder.Property(tp => tp.PhoneNumber).HasConversion(
-                phone => phone.ToString(),
-                value => Domain.ValueObjects.PhoneNumber.Create(value));
+                phone => phone!.ToString(),
+                value => Domain.ValueObjects.PhoneNumber.Create(value!));
             builder.Property(tp => tp.Email).HasConversion(
-                email => email.ToString(),
-                value => Domain.ValueObjects.Email.Create(value));
+                email => email!.ToString(),
+                value => Domain.ValueObjects.Email.Create(value!));
             builder.OwnsOne(tp => tp.Address, address =>
             {
                 address.Property(a => a.Street).HasColumnName("AddressStreet").HasMaxLength(200);

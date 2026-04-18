@@ -30,6 +30,10 @@ namespace Application.Interfaces.Services
         Task RejectBookingAsync(int bookingId, int technicianId, RejectBookingRequest request);
         Task<List<InstallationBookingListResponse>> GetPendingForTechnicianAsync(int technicianId);
 
+        // Warehouse material preparation flow
+        Task PrepareMaterialsFromWarehouseAsync(int bookingId, PrepareMaterialsRequest request);
+        Task ReturnMaterialsToWarehouseAsync(int bookingId, List<MaterialReturnInfo> returns);
+
         // Uninstall booking management
         Task SetIsUninstallAsync(int bookingId, bool isUninstall);
     }

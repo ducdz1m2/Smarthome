@@ -29,13 +29,6 @@
                                           Variant="Variant.Outlined" Class="mb-3"
                                           Disabled="_isEdit"
                                           HelperText="Mã sản phẩm duy nhất" />
-                            
-                            <MudNumericField T="decimal" @bind-Value="_request.BasePrice" 
-                                             Label="Giá bán *" 
-                                             Required="true"
-                                             Variant="Variant.Outlined" Class="mb-3"
-                                             Adornment="Adornment.End" AdornmentText="đ"
-                                             Min="0" />
                         </MudItem>
                         
                         <MudItem xs="12" md="6">
@@ -79,14 +72,27 @@
                 </MudTabPanel>
                 
                 <MudTabPanel Text="Hình ảnh" Icon="@Icons.Material.Filled.Image">
-                    <MudFileUpload T="IReadOnlyList<IBrowserFile>" 
-                                   FilesChanged="UploadImages" 
+                    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                   FilesChanged="UploadImages"
                                    Accept=".jpg,.jpeg,.png,.gif,.webp">
                         <ActivatorContent>
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload">
                                 Thêm hình ảnh (@_imageUrls.Count ảnh)
                             </MudButton>
                         </ActivatorContent>
+                        <FileContent>
+                            @if (_imageUrls.Count > 0)
+                            {
+                                <div class="d-flex flex-wrap gap-2 mt-2">
+                                    @foreach (var url in _imageUrls)
+                                    {
+                                        <MudCard Style="width: 100px; height: 100px;">
+                                            <MudCardMedia Image="@url" Style="width: 100px; height: 100px; object-fit: cover;" />
+                                        </MudCard>
+                                    }
+                                </div>
+                            }
+                        </FileContent>
                     </MudFileUpload>
                     
                     <MudText Typo="Typo.caption" Class="mt-2">Số ảnh hiện tại: @_imageUrls.Count</MudText>
@@ -246,7 +252,6 @@
     private UpdateProductRequest _request = new()
     {
         Name = "",
-        BasePrice = 0,
         CategoryId = 0,
         BrandId = 0,
         IsActive = true
@@ -280,7 +285,6 @@
             _request = new UpdateProductRequest
             {
                 Name = "",
-                BasePrice = 0,
                 CategoryId = firstCategory?.Id ?? 0,
                 BrandId = firstBrand?.Id ?? 0,
                 IsActive = true
@@ -319,7 +323,6 @@
                 _request = new UpdateProductRequest
                 {
                     Name = product.Name,
-                    BasePrice = product.BasePrice,
                     Description = product.Description,
                     Specs = product.Specs,
                     RequiresInstallation = product.RequiresInstallation,
@@ -456,7 +459,6 @@
                 {
                     Name = _request.Name,
                     Sku = _sku,
-                    BasePrice = _request.BasePrice,
                     Description = _request.Description,
                     Specs = _request.Specs,
                     RequiresInstallation = _request.RequiresInstallation,

@@ -25,11 +25,11 @@ namespace Infrastructure.Configuration
                 address.Property(a => a.PostalCode).HasColumnName("AddressPostalCode").HasMaxLength(10);
             });
             builder.Property(s => s.Phone).HasConversion(
-                phone => phone.ToString(),
-                value => Domain.ValueObjects.PhoneNumber.Create(value));
+                phone => phone!.ToString(),
+                value => Domain.ValueObjects.PhoneNumber.Create(value!));
             builder.Property(s => s.Email).HasConversion(
-                email => email.ToString(),
-                value => Domain.ValueObjects.Email.Create(value));
+                email => email!.ToString(),
+                value => Domain.ValueObjects.Email.Create(value!));
             builder.Property(s => s.IsActive).HasDefaultValue(true);
             builder.HasIndex(s => s.Name);
             builder.HasIndex(s => s.IsActive);

@@ -4,7 +4,6 @@
     {
         public string Name { get; set; } = string.Empty;
         public string Sku { get; set; } = string.Empty;
-        public decimal BasePrice { get; set; }
         public int StockQuantity { get; set; }
         public string? Description { get; set; }
         public Dictionary<string, string>? Specs { get; set; }

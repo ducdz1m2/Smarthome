@@ -3,7 +3,9 @@
 @using Application.DTOs.Requests
 @using Application.Interfaces.Services
 @using Domain.Enums
+@using Web.Services
 @inject IInstallationService InstallationService
+@inject InstallationApiService InstallationApiService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
@@ -80,7 +82,19 @@ else
                                     }
                                     <div>
                                         <MudText Typo="Typo.body1">@product.ProductName</MudText>
-                                        <MudText Typo="Typo.body2" Color="Color.Secondary">SL: @product.Quantity - Đơn giá: @product.UnitPrice.ToString("N0")đ</MudText>
+                                        @if (!string.IsNullOrEmpty(product.Sku))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">SKU: @product.Sku</MudText>
+                                        }
+                                        @if (!string.IsNullOrEmpty(product.VariantName))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Phân loại: @product.VariantName</MudText>
+                                        }
+                                        @if (!string.IsNullOrEmpty(product.VariantSku))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Variant SKU: @product.VariantSku</MudText>
+                                        }
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">SL: @product.Quantity - Đơn giá: @product.UnitPrice.ToString("N0")đ - Thành tiền: @product.TotalPrice.ToString("N0")đ</MudText>
                                     </div>
                                 </div>
                             </MudListItem>
@@ -109,8 +123,49 @@ else
                 }
                 else if (_booking.Status == "Preparing")
                 {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
-                               OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                    @if (_booking.MaterialsPrepared)
+                    {
+                        <MudAlert Severity="Severity.Success" Class="mb-3">
+                            Đã chuẩn bị vật tư xong. Sẵn sàng di chuyển!
+                        </MudAlert>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
+                                   OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Warning" Class="mb-3">
+                            Vui lòng chuẩn bị vật tư từ kho trước khi di chuyển.
+                        </MudAlert>
+                        <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
+                                   OnClick="OpenPrepareMaterialsDialog">Chuẩn bị vật tư từ kho</MudButton>
+                    }
+
+                    @if (_booking.Materials?.Any() == true)
+                    {
+                        <MudCard Class="mt-4" Elevation="1">
+                            <MudCardHeader>
+                                <MudText Typo="Typo.subtitle1">Vật tư đã lấy từ kho</MudText>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudList T="InstallationMaterialResponse">
+                                    @foreach (var material in _booking.Materials)
+                                    {
+                                        <MudListItem T="InstallationMaterialResponse">
+                                            <div class="d-flex justify-space-between align-center">
+                                                <div>
+                                                    <MudText>@material.ProductName</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                        SL: @material.QuantityTaken | Kho: @(material.WarehouseName ?? "N/A")
+                                                    </MudText>
+                                                </div>
+                                                <MudChip Size="Size.Small" Color="Color.Info">Đã lấy</MudChip>
+                                            </div>
+                                        </MudListItem>
+                                    }
+                                </MudList>
+                            </MudCardContent>
+                        </MudCard>
+                    }
                 }
                 else if (_booking.Status == "OnTheWay")
                 {
@@ -126,8 +181,25 @@ else
                 {
                     <MudAlert Severity="Severity.Success">
                         Đã hoàn thành lúc @_booking.CompletedAt?.ToString("dd/MM/yyyy HH:mm")<br />
-                        Đánh giá: @_booking.CustomerRating ⭐
+                        @if (_booking.CustomerRating > 0)
+                        {
+                            <span>Đánh giá: @_booking.CustomerRating ⭐</span>
+                        }
                     </MudAlert>
+                    @if (!string.IsNullOrEmpty(_booking.CustomerRatingContent))
+                    {
+                        <MudPaper Class="pa-4 mt-3">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Nhận xét của khách hàng</MudText>
+                            <MudText Typo="Typo.body2">@_booking.CustomerRatingContent</MudText>
+                        </MudPaper>
+                    }
+                    @if (!string.IsNullOrEmpty(_booking.CustomerSignature))
+                    {
+                        <MudPaper Class="pa-4 mt-3">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Ảnh hoàn thành</MudText>
+                            <img src="@_booking.CustomerSignature" style="max-width: 100%; max-height: 400px;" class="border rounded" />
+                        </MudPaper>
+                    }
                 }
             </MudPaper>
         </MudItem>
@@ -152,32 +224,127 @@ else
     </DialogActions>
 </MudDialog>
 
-<!-- Complete Dialog -->
-<MudDialog @bind-IsVisible="_showCompleteDialog" Options="_dialogOptions">
+<!-- Complete Dialog - CSS Overlay -->
+@if (_showCompleteDialog)
+{
+    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <MudPaper Class="pa-4" Style="max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <MudText Typo="Typo.h6" Class="mb-4">Hoàn thành lắp đặt</MudText>
+            <div>
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Ảnh hoàn thành *</MudText>
+                <InputFile OnChange="HandlePhotoUpload" accept="image/*" class="mb-2" />
+                @if (!string.IsNullOrEmpty(_completionPhoto))
+                {
+                    <img src="@_completionPhoto" style="max-width: 100%; max-height: 200px; margin-top: 10px;" class="border rounded" />
+                    <MudButton OnClick="ClearPhoto" Variant="Variant.Outlined" Size="Size.Small" Class="mt-2">Xóa ảnh</MudButton>
+                }
+            </div>
+            <MudForm @ref="_completeForm" @bind-IsValid="_isCompleteFormValid">
+                <MudTextField @bind-Value="_completionNotes" Label="Ghi chú"
+                              Variant="Variant.Outlined" Lines="2" Class="mt-3" />
+            </MudForm>
+            <div class="d-flex justify-end mt-4">
+                <MudButton OnClick="() => _showCompleteDialog = false" Variant="Variant.Outlined" Class="mr-2">Hủy</MudButton>
+                <MudButton Color="Color.Success" OnClick="ConfirmComplete" Disabled="!_isCompleteFormValid">Hoàn thành</MudButton>
+            </div>
+        </MudPaper>
+    </div>
+}
+
+<!-- Prepare Materials Dialog -->
+<MudDialog @bind-IsVisible="_showPrepareMaterialsDialog" Options="_dialogOptionsLarge">
     <TitleContent>
-        <MudText Typo="Typo.h6">Hoàn thành lắp đặt</MudText>
+        <MudText Typo="Typo.h6">Chuẩn bị vật tư từ kho</MudText>
     </TitleContent>
     <DialogContent>
-        <MudForm @ref="_completeForm" @bind-IsValid="_isCompleteFormValid">
-            <MudTextField @bind-Value="_customerSignature" Label="Chữ ký khách hàng *"
-                          Required="true" RequiredError="Vui lòng nhập chữ ký"
-                          Variant="Variant.Outlined" />
-            <MudNumericField T="int" @bind-Value="_customerRating" Label="Đánh giá (1-5) *"
-                             Min="1" Max="5" Required="true"
-                             Variant="Variant.Outlined" Class="mt-3" />
-            <MudTextField @bind-Value="_completionNotes" Label="Ghi chú"
-                          Variant="Variant.Outlined" Lines="2" Class="mt-3" />
-        </MudForm>
+        @if (_loadingWarehouses)
+        {
+            <MudProgressLinear Indeterminate="true" Class="my-4" />
+        }
+        else if (_availableWarehouses?.Any() != true)
+        {
+            <MudAlert Severity="Severity.Warning">Không có kho nào có đủ tồn kho cho các sản phẩm cần lắp.</MudAlert>
+        }
+        else
+        {
+            <MudForm @ref="_prepareForm" @bind-IsValid="_isPrepareFormValid">
+                <MudSelect T="int" @bind-Value="_selectedWarehouseId" Label="Chọn kho *" Required="true"
+                           RequiredError="Vui lòng chọn kho" Variant="Variant.Outlined" Class="mb-4">
+                    @foreach (var warehouse in _availableWarehouses)
+                    {
+                        <MudSelectItem T="int" Value="@warehouse.WarehouseId">
+                            @warehouse.WarehouseName (@warehouse.WarehouseCode) - @warehouse.AvailableProducts.Count sản phẩm
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+
+                @if (_selectedWarehouseId > 0)
+                {
+                    var selectedWarehouse = _availableWarehouses.FirstOrDefault(w => w.WarehouseId == _selectedWarehouseId);
+                    @if (selectedWarehouse != null)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Sản phẩm có sẵn trong kho:</MudText>
+                        <MudTable Items="selectedWarehouse.AvailableProducts" Dense="true" Hover="true">
+                            <HeaderContent>
+                                <MudTh>Sản phẩm</MudTh>
+                                <MudTh>SL cần</MudTh>
+                                <MudTh>SL tồn</MudTh>
+                                <MudTh>SL lấy</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>
+                                    <MudText>@context.ProductName</MudText>
+                                    <MudText Typo="Typo.caption">@context.Sku</MudText>
+                                </MudTd>
+                                <MudTd>
+                                    @{ var requiredQty = GetRequiredQuantity(context.ProductId); }
+                                    <MudText>@requiredQty</MudText>
+                                </MudTd>
+                                <MudTd>
+                                    <MudText Color="Color.Success">@context.AvailableStock</MudText>
+                                </MudTd>
+                                <MudTd>
+                                    <MudNumericField T="int" @bind-Value="GetMaterialItem(context.ProductId, context.VariantId).Quantity"
+                                                     Min="0" Max="Math.Min(context.AvailableStock, GetRequiredQuantity(context.ProductId))"
+                                                     Variant="Variant.Outlined" Dense="true"
+                                                     Required="GetMaterialItem(context.ProductId, context.VariantId).Quantity > 0" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+
+                        <MudAlert Severity="Severity.Info" Class="mt-3">
+                            <MudText Typo="Typo.body2">
+                                <b>Ghi chú:</b> Chỉ cần lấy đủ số lượng cần thiết cho lắp đặt. Vật tư thừa có thể trả lại kho sau khi hoàn thành.
+                            </MudText>
+                        </MudAlert>
+                    }
+                }
+            </MudForm>
+        }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="() => _showCompleteDialog = false">Hủy</MudButton>
-        <MudButton Color="Color.Success" OnClick="ConfirmComplete" Disabled="!_isCompleteFormValid">Hoàn thành</MudButton>
+        <MudButton OnClick="() => _showPrepareMaterialsDialog = false">Hủy</MudButton>
+        <MudButton Color="Color.Success" OnClick="ConfirmPrepareMaterials"
+                   Disabled="!_isPrepareFormValid || _selectedWarehouseId == 0 || _loadingWarehouses">Xác nhận lấy hàng</MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
     [Parameter]
     public int Id { get; set; }
+
+    public class UploadResult
+    {
+        public string tempPath { get; set; } = string.Empty;
+        public string url { get; set; } = string.Empty;
+        public string fileName { get; set; } = string.Empty;
+        public long size { get; set; }
+    }
+
+    public class ErrorResult
+    {
+        public string error { get; set; } = string.Empty;
+    }
 
     private InstallationBookingResponse? _booking;
     private bool _loading = true;
@@ -190,11 +357,20 @@ else
     private bool _showCompleteDialog = false;
     private MudForm _completeForm = null!;
     private bool _isCompleteFormValid = false;
-    private string _customerSignature = "";
-    private int _customerRating = 5;
+    private string _completionPhoto = "";
     private string _completionNotes = "";
 
+    // Prepare Materials Dialog fields
+    private bool _showPrepareMaterialsDialog = false;
+    private MudForm _prepareForm = null!;
+    private bool _isPrepareFormValid = false;
+    private bool _loadingWarehouses = false;
+    private int _selectedWarehouseId = 0;
+    private List<WarehouseStockForTechnicianResponse> _availableWarehouses = new();
+    private List<MaterialPreparationItem> _selectedMaterials = new();
+
     private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+    private readonly DialogOptions _dialogOptionsLarge = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
 
     protected override async Task OnInitializedAsync()
     {
@@ -291,20 +467,73 @@ else
 
     private void OpenCompleteDialog()
     {
-        _customerSignature = "";
-        _customerRating = 5;
+        Console.WriteLine($"[OpenCompleteDialog] Opening complete dialog for booking {_booking?.Id}, current status: {_booking?.Status}");
+        _completionPhoto = "";
         _completionNotes = "";
         _showCompleteDialog = true;
+        Console.WriteLine($"[OpenCompleteDialog] Dialog visibility set to: {_showCompleteDialog}");
+    }
+
+    private async Task HandlePhotoUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            var httpClient = new HttpClient { BaseAddress = new Uri(NavigationManager.BaseUri) };
+            var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024));
+            content.Add(fileContent, "file", file.Name);
+
+            var response = await httpClient.PostAsync("api/upload/temp", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<UploadResult>();
+                if (result != null)
+                {
+                    _completionPhoto = result.url;
+                    Console.WriteLine($"[HandlePhotoUpload] Photo uploaded successfully, URL: {result.url}");
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResult>();
+                Snackbar.Add(error?.error ?? "Lỗi upload ảnh", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[HandlePhotoUpload] Error: {ex.Message}");
+            Snackbar.Add($"Lỗi upload ảnh: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void ClearPhoto()
+    {
+        Console.WriteLine($"[ClearPhoto] Clearing photo");
+        _completionPhoto = "";
     }
 
     private async Task ConfirmComplete()
     {
         try
         {
+            Console.WriteLine($"[ConfirmComplete] Starting complete for booking {Id}");
+
+            if (string.IsNullOrEmpty(_completionPhoto))
+            {
+                Snackbar.Add("Vui lòng chụp ảnh hoàn thành", Severity.Warning);
+                return;
+            }
+
+            Console.WriteLine($"[ConfirmComplete] Photo length: {_completionPhoto.Length}, Notes: {_completionNotes}");
+
             var request = new CompleteInstallationRequest
             {
-                CustomerSignature = _customerSignature,
-                CustomerRating = _customerRating,
+                CustomerSignature = _completionPhoto,
+                CustomerRating = 0,
                 Notes = _completionNotes
             };
             await InstallationService.CompleteAsync(Id, request);
@@ -314,6 +543,7 @@ else
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[ConfirmComplete] Error: {ex.Message}");
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }
@@ -344,5 +574,103 @@ else
             "Cancelled" => "Đã hủy",
             _ => status
         };
+    }
+
+    // Prepare Materials methods
+    private async Task OpenPrepareMaterialsDialog()
+    {
+        _selectedWarehouseId = 0;
+        _selectedMaterials = new List<MaterialPreparationItem>();
+        _showPrepareMaterialsDialog = true;
+        await LoadAvailableWarehouses();
+    }
+
+    private async Task LoadAvailableWarehouses()
+    {
+        try
+        {
+            _loadingWarehouses = true;
+            if (_booking?.Products?.Any() == true)
+            {
+                var productIds = _booking.Products.Select(p => p.ProductId).ToList();
+                _availableWarehouses = await InstallationApiService.GetWarehousesForProductsAsync(productIds);
+
+                // Initialize material items for each product
+                foreach (var warehouse in _availableWarehouses)
+                {
+                    foreach (var product in warehouse.AvailableProducts)
+                    {
+                        var requiredQty = _booking.Products.FirstOrDefault(p => p.ProductId == product.ProductId)?.Quantity ?? 0;
+                        _selectedMaterials.Add(new MaterialPreparationItem
+                        {
+                            ProductId = product.ProductId,
+                            VariantId = product.VariantId,
+                            Quantity = requiredQty
+                        });
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải danh sách kho: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingWarehouses = false;
+        }
+    }
+
+    private int GetRequiredQuantity(int productId)
+    {
+        return _booking?.Products?.FirstOrDefault(p => p.ProductId == productId)?.Quantity ?? 0;
+    }
+
+    private MaterialPreparationItem GetMaterialItem(int productId, int? variantId)
+    {
+        var item = _selectedMaterials.FirstOrDefault(m => m.ProductId == productId && m.VariantId == variantId);
+        if (item == null)
+        {
+            item = new MaterialPreparationItem
+            {
+                ProductId = productId,
+                VariantId = variantId,
+                Quantity = GetRequiredQuantity(productId)
+            };
+            _selectedMaterials.Add(item);
+        }
+        return item;
+    }
+
+    private async Task ConfirmPrepareMaterials()
+    {
+        try
+        {
+            // Filter only materials with quantity > 0
+            var materialsToPrepare = _selectedMaterials
+                .Where(m => m.Quantity > 0)
+                .ToList();
+
+            if (!materialsToPrepare.Any())
+            {
+                Snackbar.Add("Vui lòng chọn ít nhất một vật tư để lấy từ kho", Severity.Warning);
+                return;
+            }
+
+            var request = new PrepareMaterialsRequest
+            {
+                WarehouseId = _selectedWarehouseId,
+                Items = materialsToPrepare
+            };
+
+            await InstallationApiService.PrepareMaterialsAsync(Id, request);
+            _showPrepareMaterialsDialog = false;
+            Snackbar.Add("Đã chuẩn bị vật tư từ kho thành công", Severity.Success);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
     }
 }

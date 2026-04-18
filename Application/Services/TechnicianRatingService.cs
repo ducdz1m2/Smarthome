@@ -3,6 +3,7 @@ using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Installation;
+using Domain.Interfaces;
 
 namespace Application.Services
 {
@@ -11,15 +12,18 @@ namespace Application.Services
         private readonly ITechnicianRatingRepository _ratingRepository;
         private readonly ITechnicianProfileRepository _technicianRepository;
         private readonly IInstallationBookingRepository _bookingRepository;
+        private readonly ICurrentUserService _currentUserService;
 
         public TechnicianRatingService(
             ITechnicianRatingRepository ratingRepository,
             ITechnicianProfileRepository technicianRepository,
-            IInstallationBookingRepository bookingRepository)
+            IInstallationBookingRepository bookingRepository,
+            ICurrentUserService currentUserService)
         {
             _ratingRepository = ratingRepository;
             _technicianRepository = technicianRepository;
             _bookingRepository = bookingRepository;
+            _currentUserService = currentUserService;
         }
 
         public async Task<List<TechnicianRatingResponse>> GetAllAsync()
@@ -92,6 +96,15 @@ namespace Application.Services
             await _ratingRepository.AddAsync(rating);
             await _ratingRepository.SaveChangesAsync();
 
+            // Update installation booking's CustomerRating
+            var booking = await _bookingRepository.GetByIdAsync(request.BookingId);
+            if (booking != null)
+            {
+                booking.SetCustomerRating(request.Rating);
+                _bookingRepository.Update(booking);
+                await _bookingRepository.SaveChangesAsync();
+            }
+
             // Update technician's rating if approved
             if (rating.IsApproved)
             {
@@ -123,6 +136,15 @@ namespace Application.Services
 
             _ratingRepository.Update(rating);
             await _ratingRepository.SaveChangesAsync();
+
+            // Update installation booking's CustomerRating
+            var booking = await _bookingRepository.GetByIdAsync(request.BookingId);
+            if (booking != null)
+            {
+                booking.SetCustomerRating(request.Rating);
+                _bookingRepository.Update(booking);
+                await _bookingRepository.SaveChangesAsync();
+            }
 
             // Update technician's rating if previously approved
             if (oldRating != request.Rating)
@@ -201,7 +223,7 @@ namespace Application.Services
                 TechnicianId = rating.TechnicianId,
                 TechnicianName = rating.Technician?.FullName ?? $"Kỹ thuật viên #{rating.TechnicianId}",
                 UserId = rating.UserId,
-                UserName = $"User #{rating.UserId}", // TODO: Get actual user name
+                UserName = _currentUserService.FullName ?? $"User #{rating.UserId}",
                 BookingId = rating.BookingId,
                 OrderNumber = rating.Booking?.Order?.OrderNumber ?? $"Booking #{rating.BookingId}",
                 Content = rating.Content,

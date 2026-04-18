@@ -65,7 +65,7 @@ public class SpeechRecognitionService
         {
             await _jsRuntime.InvokeVoidAsync("cancelRecording");
             IsRecording = false;
-            IsTranscribing = false;
+            // Note: IsTranscribing will be reset by the callback
         }
         catch (Exception ex)
         {

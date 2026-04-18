@@ -38,3 +38,10 @@ public record WarehouseTransferCreatedEvent(
 public record WarehouseTransferCompletedEvent(
     int TransferId,
     DateTime CompletedAt) : DomainEvent(TransferId, nameof(Entities.Inventory.WarehouseTransfer));
+
+public record StockDispatchedEvent(
+    int StockIssueId,
+    int ProductId,
+    int WarehouseId,
+    int Quantity,
+    int? BookingId) : DomainEvent(StockIssueId, nameof(StockIssue));

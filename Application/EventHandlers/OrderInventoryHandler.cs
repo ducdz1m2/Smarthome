@@ -32,7 +32,7 @@ public class OrderInventoryHandler :
     /// </summary>
     public async Task HandleAsync(OrderConfirmedEvent domainEvent, CancellationToken cancellationToken = default)
     {
-        var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(domainEvent.OrderId);
+        var order = await _orderRepository.GetByIdAsync(domainEvent.OrderId);
         if (order == null) return;
 
         foreach (var item in order.Items.Where(i => !i.IsReserved))
@@ -64,7 +64,7 @@ public class OrderInventoryHandler :
     /// </summary>
     public async Task HandleAsync(OrderCancelledEvent domainEvent, CancellationToken cancellationToken = default)
     {
-        var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(domainEvent.OrderId);
+        var order = await _orderRepository.GetByIdAsync(domainEvent.OrderId);
         if (order == null) return;
 
         foreach (var item in order.Items.Where(i => i.IsReserved))
@@ -94,7 +94,7 @@ public class OrderInventoryHandler :
     /// </summary>
     public async Task HandleAsync(OrderShippingStartedEvent domainEvent, CancellationToken cancellationToken = default)
     {
-        var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(domainEvent.OrderId);
+        var order = await _orderRepository.GetByIdAsync(domainEvent.OrderId);
         if (order == null) return;
 
         foreach (var item in order.Items.Where(i => i.IsReserved && !i.IsCompleted))

@@ -49,7 +49,6 @@
         <MudTh>Hình</MudTh>
         <MudTh><MudTableSortLabel T="ProductListResponse" SortBy="@(p => p.Name)">Tên sản phẩm</MudTableSortLabel></MudTh>
         <MudTh>SKU</MudTh>
-        <MudTh><MudTableSortLabel T="ProductListResponse" SortBy="@(p => p.BasePrice)">Giá</MudTableSortLabel></MudTh>
         <MudTh><MudTableSortLabel T="ProductListResponse" SortBy="@(p => p.StockQuantity)">Tồn kho</MudTableSortLabel></MudTh>
         <MudTh>Danh mục</MudTh>
         <MudTh>Thương hiệu</MudTh>
@@ -76,7 +75,6 @@
             <MudText Style="font-weight: 500;">@context.Name</MudText>
         </MudTd>
         <MudTd DataLabel="SKU">@context.Sku</MudTd>
-        <MudTd DataLabel="Giá">@context.BasePrice.ToString("N0")đ</MudTd>
         <MudTd DataLabel="Tồn kho">
             <MudChip T="int" Color="@GetStockColor(context.StockQuantity)" Size="Size.Small">
                 @context.StockQuantity

@@ -3,7 +3,6 @@
     public class UpdateProductRequest
     {
         public string Name { get; set; } = string.Empty;
-        public decimal BasePrice { get; set; }
 
         [Obsolete("StockQuantity không được cập nhật trực tiếp. Sử dụng InventoryService để quản lý tồn kho.")]
         public int StockQuantity { get; set; }

@@ -165,8 +165,8 @@
                 }
                 <div class="d-flex gap-2">
                     <InputFile class="d-none technician-chat-file-input" OnChange="OnFileSelected" accept="image/*,.pdf,.doc,.docx" />
-                    <MudIconButton Icon="@Icons.Material.Filled.AttachFile" @onclick="TriggerFileSelect" Disabled="@_sending" Title="Đính kèm file" Size="Size.Medium" />
-                    <MudIconButton Icon="@(_isRecording ? Icons.Material.Filled.Stop : Icons.Material.Filled.Mic)" @onclick="ToggleRecording" Disabled="@_sending" Title="Ghi âm" Size="Size.Medium" Color="@(_isRecording ? Color.Error : Color.Default)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.AttachFile" @onclick="TriggerFileSelect" Disabled="@(_sending || _isTranscribing)" Title="Đính kèm file" Size="Size.Medium" />
+                    <MudIconButton Icon="@(_isRecording ? Icons.Material.Filled.Stop : Icons.Material.Filled.Mic)" @onclick="ToggleRecording" Disabled="@(_sending || _isTranscribing)" Title="Ghi âm" Size="Size.Medium" Color="@(_isRecording ? Color.Error : Color.Default)" />
                     <MudTextField T="string" 
                                  @bind-Value="_message" 
                                  Placeholder="Nhập tin nhắn..." 
@@ -475,7 +475,7 @@
     private bool _isTranscribing = false;
     private static readonly SemaphoreSlim _chatServiceLock = new SemaphoreSlim(1, 1);
 
-    private bool CanSendMessage => !_sending && (!_isRecording) && (!string.IsNullOrWhiteSpace(_message) || _selectedFile != null);
+    private bool CanSendMessage => !_sending && !_isRecording && !_isTranscribing && (!string.IsNullOrWhiteSpace(_message) || _selectedFile != null);
 
     public async ValueTask DisposeAsync()
     {
@@ -496,28 +496,29 @@
     {
         if (_isRecording)
         {
-            // Stop recording - callback will handle the text
-            await SpeechRecognitionService.StopAndTranscribeAsync();
+            // Stop recording - JavaScript will automatically stop and invoke callback
+            _isTranscribing = true;
+            await InvokeAsync(StateHasChanged);
+            await SpeechRecognitionService.CancelRecordingAsync();
         }
         else
         {
             // Start recording with callback
             _isRecording = true;
-            _isTranscribing = true;
             await InvokeAsync(StateHasChanged);
-            
+
             try
             {
                 await SpeechRecognitionService.StartRecordingAsync(async (text) =>
                 {
                     _isRecording = false;
                     _isTranscribing = false;
-                    
+
                     if (!string.IsNullOrWhiteSpace(text))
                     {
                         _message += (string.IsNullOrEmpty(_message) ? "" : " ") + text;
                     }
-                    
+
                     await InvokeAsync(StateHasChanged);
                 });
             }
@@ -843,9 +844,9 @@
                     new ChatAttachmentResponse
                     {
                         FileUrl = fileUrl,
-                        FileName = fileName,
-                        FileType = fileType,
-                        FileSize = fileSize
+                        FileName = fileName ?? string.Empty,
+                        FileType = fileType ?? string.Empty,
+                        FileSize = fileSize ?? 0
                     }
                 } : new()
             };

@@ -6,7 +6,8 @@ namespace Application.DTOs.Responses
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public string Sku { get; set; } = string.Empty;
-        public decimal BasePrice { get; set; }
+        public decimal MinPrice { get; set; }
+        public decimal MaxPrice { get; set; }
 
         // Category info
         public int CategoryId { get; set; }

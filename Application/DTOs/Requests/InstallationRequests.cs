@@ -39,7 +39,22 @@ namespace Application.DTOs.Requests
     public class AddInstallationMaterialRequest
     {
         public int ProductId { get; set; }
+        public int? VariantId { get; set; }
         public int QuantityTaken { get; set; }
+        public int WarehouseId { get; set; }
+    }
+
+    public class PrepareMaterialsRequest
+    {
+        public int WarehouseId { get; set; }
+        public List<MaterialPreparationItem> Items { get; set; } = new();
+    }
+
+    public class MaterialPreparationItem
+    {
+        public int ProductId { get; set; }
+        public int? VariantId { get; set; }
+        public int Quantity { get; set; }
     }
 
     public class RecordMaterialUsageRequest

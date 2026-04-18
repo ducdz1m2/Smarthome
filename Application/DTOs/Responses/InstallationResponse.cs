@@ -37,6 +37,7 @@ namespace Application.DTOs.Responses
         public DateTime? StartedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
         public int? CustomerRating { get; set; }
+        public string? CustomerRatingContent { get; set; }
         public string? CustomerSignature { get; set; }
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -49,19 +50,48 @@ namespace Application.DTOs.Responses
     public class InstallationProductItem
     {
         public int ProductId { get; set; }
+        public int? VariantId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public string? ProductImage { get; set; }
+        public string? Sku { get; set; }
+        public string? VariantName { get; set; }
+        public string? VariantSku { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
+        public decimal TotalPrice { get; set; }
     }
 
     public class InstallationMaterialResponse
     {
         public int Id { get; set; }
         public int ProductId { get; set; }
+        public int? VariantId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public int QuantityTaken { get; set; }
         public int? QuantityUsed { get; set; }
         public int? QuantityReturned { get; set; }
+        public int? WarehouseId { get; set; }
+        public string? WarehouseName { get; set; }
+        public DateTime? PickedUpAt { get; set; }
+    }
+
+    public class WarehouseStockForTechnicianResponse
+    {
+        public int WarehouseId { get; set; }
+        public string WarehouseName { get; set; } = string.Empty;
+        public string WarehouseCode { get; set; } = string.Empty;
+        public string WarehouseAddress { get; set; } = string.Empty;
+        public List<ProductStockForTechnician> AvailableProducts { get; set; } = new();
+    }
+
+    public class ProductStockForTechnician
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public string Sku { get; set; } = string.Empty;
+        public int? VariantId { get; set; }
+        public string? VariantName { get; set; }
+        public int AvailableStock { get; set; }
+        public int ReservedStock { get; set; }
     }
 }

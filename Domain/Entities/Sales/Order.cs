@@ -118,16 +118,13 @@ public class Order : AggregateRoot
             return item;
         }
 
-        public void Confirm()
+        public void Confirm(bool hasInstallItems = false, bool hasShipItems = false)
         {
             if (Status != OrderStatus.Pending)
                 throw new InvalidOrderStateException(Status.ToString(), "xác nhận");
 
-            if (!Items.Any())
+            if (!hasInstallItems && !hasShipItems)
                 throw new BusinessRuleViolationException("OrderNotEmpty", "Không thể xác nhận đơn hàng trống");
-
-            var hasInstallItems = Items.Any(i => i.RequiresInstallation);
-            var hasShipItems = Items.Any(i => !i.RequiresInstallation);
 
             // For mixed orders, we need to track both flows separately
             // Set status to indicate both flows are active
@@ -191,13 +188,12 @@ public class Order : AggregateRoot
             AddStatusHistory(Status, "Bắt đầu luồng giao hàng");
         }
 
-        public void StartInstallationFlow()
+        public void StartInstallationFlow(bool hasInstallItems = false)
         {
             // Allow starting installation flow from Confirmed, AwaitingSchedule, or AwaitingPickup (for mixed orders)
             if (Status != OrderStatus.Confirmed && Status != OrderStatus.AwaitingSchedule && Status != OrderStatus.AwaitingPickup)
                 throw new InvalidOrderStateException(Status.ToString(), "bắt đầu luồng lắp đặt");
 
-            var hasInstallItems = Items.Any(i => i.RequiresInstallation);
             if (!hasInstallItems)
                 throw new BusinessRuleViolationException("NoInstallItems", "Không có sản phẩm cần lắp đặt");
 

@@ -4,9 +4,11 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Catalog;
 using Domain.Entities.Installation;
+using Domain.Entities.Inventory;
 using Domain.Entities.Sales;
 using Domain.Enums;
 using Domain.Exceptions;
+using Domain.Interfaces;
 using Domain.ValueObjects;
 
 namespace Application.Services
@@ -18,7 +20,15 @@ namespace Application.Services
         private readonly IInstallationSlotRepository _slotRepository;
         private readonly IOrderRepository _orderRepository;
         private readonly IReturnOrderRepository _returnOrderRepository;
+        private readonly Domain.Repositories.IStockIssueRepository _stockIssueRepository;
+        private readonly ICurrentUserService _currentUserService;
         private readonly IWarrantyRequestRepository _warrantyRequestRepository;
+        private readonly IProductWarehouseRepository _productWarehouseRepository;
+        private readonly IWarehouseRepository _warehouseRepository;
+        private readonly IProductRepository _productRepository;
+        private readonly IProductVariantRepository _productVariantRepository;
+        private readonly IProductVariantService _productVariantService;
+        private readonly ITechnicianRatingService _technicianRatingService;
 
         public InstallationService(
             IInstallationBookingRepository bookingRepository,
@@ -26,7 +36,15 @@ namespace Application.Services
             IInstallationSlotRepository slotRepository,
             IOrderRepository orderRepository,
             IReturnOrderRepository returnOrderRepository,
-            IWarrantyRequestRepository warrantyRequestRepository)
+            IWarrantyRequestRepository warrantyRequestRepository,
+            IProductWarehouseRepository productWarehouseRepository,
+            IWarehouseRepository warehouseRepository,
+            Domain.Repositories.IStockIssueRepository stockIssueRepository,
+            ICurrentUserService currentUserService,
+            IProductRepository productRepository,
+            IProductVariantRepository productVariantRepository,
+            IProductVariantService productVariantService,
+            ITechnicianRatingService technicianRatingService)
         {
             _bookingRepository = bookingRepository;
             _technicianRepository = technicianRepository;
@@ -34,6 +52,14 @@ namespace Application.Services
             _orderRepository = orderRepository;
             _returnOrderRepository = returnOrderRepository;
             _warrantyRequestRepository = warrantyRequestRepository;
+            _productWarehouseRepository = productWarehouseRepository;
+            _warehouseRepository = warehouseRepository;
+            _stockIssueRepository = stockIssueRepository;
+            _currentUserService = currentUserService;
+            _productRepository = productRepository;
+            _productVariantRepository = productVariantRepository;
+            _productVariantService = productVariantService;
+            _technicianRatingService = technicianRatingService;
         }
 
         public async Task<List<InstallationBookingListResponse>> GetAllAsync()
@@ -46,14 +72,14 @@ namespace Application.Services
         {
             var booking = await _bookingRepository.GetByIdWithDetailsAsync(id);
             if (booking == null) return null;
-            return MapToResponse(booking);
+            return await MapToResponseAsync(booking);
         }
 
         public async Task<InstallationBookingResponse?> GetByOrderIdAsync(int orderId)
         {
             var booking = await _bookingRepository.GetByOrderIdAsync(orderId);
             if (booking == null) return null;
-            return MapToResponse(booking);
+            return await MapToResponseAsync(booking);
         }
 
         public async Task<(List<InstallationBookingListResponse> Items, int TotalCount)> GetPagedAsync(
@@ -415,7 +441,177 @@ namespace Application.Services
             if (booking == null)
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
-            booking.AddMaterial(request.ProductId, request.QuantityTaken);
+            // Verify warehouse exists
+            var warehouse = await _warehouseRepository.GetByIdAsync(request.WarehouseId);
+            if (warehouse == null)
+                throw new DomainException("Không tìm thấy kho");
+
+            // Check stock availability
+            var productWarehouse = await _productWarehouseRepository
+                .GetByProductVariantAndWarehouseAsync(request.ProductId, request.VariantId, request.WarehouseId);
+
+            if (productWarehouse == null || productWarehouse.GetAvailableStock() < request.QuantityTaken)
+                throw new DomainException($"Không đủ tồn kho cho sản phẩm ID {request.ProductId} tại kho {request.WarehouseId}");
+
+            booking.AddMaterial(request.ProductId, request.QuantityTaken, request.WarehouseId, request.VariantId);
+            await _bookingRepository.SaveChangesAsync();
+        }
+
+        public async Task PrepareMaterialsFromWarehouseAsync(int bookingId, PrepareMaterialsRequest request)
+        {
+            var booking = await _bookingRepository.GetByIdWithDetailsAsync(bookingId);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            if (booking.Status != InstallationStatus.Confirmed)
+                throw new DomainException("Chỉ có thể chuẩn bị vật tư khi đang ở trạng thái Đã xác nhận");
+
+            // Verify warehouse exists
+            var warehouse = await _warehouseRepository.GetByIdAsync(request.WarehouseId);
+            if (warehouse == null)
+                throw new DomainException("Không tìm thấy kho");
+
+            // Create StockIssue for warehouse history tracking
+            var stockIssue = StockIssue.Create(
+                request.WarehouseId,
+                StockIssueType.Installation,
+                bookingId: bookingId,
+                issuedBy: _currentUserService.UserId,
+                note: $"Lấy vật tư cho lịch lắp đặt #{bookingId}"
+            );
+            _stockIssueRepository.Add(stockIssue);
+
+            // Save StockIssue first to get Id using DbContext
+            await _bookingRepository.SaveChangesAsync();
+
+            // Collect stock issue details separately
+            var stockIssueDetails = new List<StockIssueDetail>();
+
+            Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] Starting loop for {request.Items.Count} items");
+            foreach (var item in request.Items)
+            {
+                // Check stock availability - try variant level first, then product level
+                var productWarehouse = await _productWarehouseRepository
+                    .GetByProductVariantAndWarehouseAsync(item.ProductId, item.VariantId, request.WarehouseId);
+
+                // If not found at variant level, try product level
+                if (productWarehouse == null)
+                {
+                    productWarehouse = await _productWarehouseRepository
+                        .GetByProductAndWarehouseAsync(item.ProductId, request.WarehouseId);
+                }
+
+                if (productWarehouse == null)
+                    throw new DomainException($"Sản phẩm ID {item.ProductId} không có trong kho {request.WarehouseId}");
+
+                var availableStock = productWarehouse.GetAvailableStock();
+                if (availableStock < item.Quantity)
+                    throw new DomainException($"Không đủ tồn kho cho sản phẩm ID {item.ProductId}. Cần: {item.Quantity}, Có: {availableStock}");
+
+                Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] Product {item.ProductId}: Quantity={productWarehouse.Quantity}, Reserved={productWarehouse.ReservedQuantity}, Available={availableStock}, Dispatching={item.Quantity}");
+
+                // Dispatch from warehouse
+                productWarehouse.Dispatch(item.Quantity);
+                var newAvailableStock = productWarehouse.GetAvailableStock();
+                Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] Product {item.ProductId} after dispatch: Quantity={productWarehouse.Quantity}, Reserved={productWarehouse.ReservedQuantity}, Available={newAvailableStock}");
+                
+                _productWarehouseRepository.Update(productWarehouse);
+
+                // Add material to booking
+                booking.AddMaterial(item.ProductId, item.Quantity, request.WarehouseId, item.VariantId);
+
+                // Create stock issue detail for history tracking with proper StockIssueId
+                var detail = stockIssue.AddItem(item.ProductId, item.Quantity, item.VariantId);
+                detail.StockIssueId = stockIssue.Id; // Now stockIssue has an Id
+                stockIssueDetails.Add(detail);
+            }
+            Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] Loop completed, {stockIssueDetails.Count} details created");
+
+            // Sync product stock quantities to ensure ProductVariant.StockQuantity is updated
+            foreach (var item in request.Items)
+            {
+                await SyncProductStockFromWarehouses(item.ProductId);
+            }
+
+            // Complete the StockIssue (triggers domain events)
+            stockIssue.CompleteWithItems(stockIssueDetails);
+
+            // Add each detail separately since we removed the navigation property
+            foreach (var detail in stockIssueDetails)
+            {
+                _stockIssueRepository.Add(detail);
+            }
+            Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] StockIssue and details added to repository");
+
+            // Mark materials as prepared
+            Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] About to call booking.PrepareMaterials(), current status: {booking.Status}");
+            booking.PrepareMaterials();
+            Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] After booking.PrepareMaterials(), new status: {booking.Status}");
+
+            // Explicitly update the booking to ensure status change is tracked
+            _bookingRepository.Update(booking);
+
+            // Save all changes at once to avoid DbContext concurrency issues
+            Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] About to save changes");
+            await _bookingRepository.SaveChangesAsync();
+            Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] Changes saved successfully");
+        }
+
+        /// <summary>
+        /// Đồng bộ Product.StockQuantity từ tổng tồn kho của tất cả các kho
+        /// </summary>
+        private async Task SyncProductStockFromWarehouses(int productId)
+        {
+            var product = await _productRepository.GetByIdForUpdateAsync(productId);
+            if (product == null) return;
+
+            var warehouseStocks = await _productWarehouseRepository.GetByProductAsync(productId);
+            var totalStock = warehouseStocks.Sum(pw => pw.Quantity);
+            var totalReserved = warehouseStocks.Sum(pw => pw.ReservedQuantity);
+
+            product.SetStockQuantity(totalStock);
+            _productRepository.Update(product);
+            await _productRepository.SaveChangesAsync();
+
+            // Đồng bộ ProductVariant.StockQuantity cho tất cả variants của sản phẩm
+            var variants = await _productVariantRepository.GetByProductIdAsync(productId);
+            foreach (var variant in variants)
+            {
+                var variantStocks = warehouseStocks.Where(pw => pw.VariantId == variant.Id).ToList();
+                var variantTotalStock = variantStocks.Sum(pw => pw.Quantity);
+                await _productVariantService.UpdateStockQuantityAsync(variant.Id, variantTotalStock);
+            }
+        }
+
+        public async Task ReturnMaterialsToWarehouseAsync(int bookingId, List<MaterialReturnInfo> returns)
+        {
+            var booking = await _bookingRepository.GetByIdWithDetailsAsync(bookingId);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            foreach (var returnInfo in returns)
+            {
+                var material = booking.Materials.FirstOrDefault(m => m.Id == returnInfo.MaterialId);
+                if (material == null)
+                    throw new DomainException($"Không tìm thấy vật tư ID {returnInfo.MaterialId}");
+
+                if (!material.WarehouseId.HasValue)
+                    throw new DomainException($"Vật tư ID {returnInfo.MaterialId} không có thông tin kho");
+
+                // Return stock to warehouse
+                var productWarehouse = await _productWarehouseRepository
+                    .GetByProductVariantAndWarehouseAsync(material.ProductId, material.VariantId, material.WarehouseId.Value);
+
+                if (productWarehouse != null)
+                {
+                    productWarehouse.Receive(returnInfo.QuantityReturned);
+                    _productWarehouseRepository.Update(productWarehouse);
+                }
+
+                // Record return on material
+                material.RecordReturn(returnInfo.QuantityReturned);
+            }
+
             await _bookingRepository.SaveChangesAsync();
         }
 
@@ -500,7 +696,7 @@ namespace Application.Services
             await _bookingRepository.SaveChangesAsync();
         }
 
-        private InstallationBookingResponse MapToResponse(InstallationBooking booking)
+        private async Task<InstallationBookingResponse> MapToResponseAsync(InstallationBooking booking)
         {
             var order = booking.Order;
             var technician = booking.Technician;
@@ -514,7 +710,7 @@ namespace Application.Services
                 order?.ShippingAddress?.City
             }.Where(s => !string.IsNullOrWhiteSpace(s));
             
-            return new InstallationBookingResponse
+            var response = new InstallationBookingResponse
             {
                 Id = booking.Id,
                 
@@ -530,14 +726,7 @@ namespace Application.Services
                 District = order?.ShippingAddress?.District,
                 
                 // Products needing installation
-                Products = order?.Items?.Where(i => i.RequiresInstallation).Select(i => new InstallationProductItem
-                {
-                    ProductId = i.ProductId,
-                    ProductName = i.Product?.Name ?? $"Sản phẩm #{i.ProductId}",
-                    ProductImage = i.Product?.Images?.FirstOrDefault(img => img.IsMain)?.Url,
-                    Quantity = i.Quantity,
-                    UnitPrice = i.UnitPrice.Amount
-                }).ToList() ?? new List<InstallationProductItem>(),
+                Products = await LoadProductDetailsAsync(order?.Items?.Where(i => i.RequiresInstallation).ToList() ?? new List<OrderItem>()),
                 
                 // Technician info
                 TechnicianId = booking.TechnicianId,
@@ -562,18 +751,99 @@ namespace Application.Services
                 Notes = booking.Notes,
                 CreatedAt = booking.CreatedAt,
                 IsUninstall = booking.IsUninstall,
-                
+
+                // Load technician rating content
+                CustomerRatingContent = null,
+
                 // Materials
                 Materials = booking.Materials?.Select(m => new InstallationMaterialResponse
                 {
                     Id = m.Id,
                     ProductId = m.ProductId,
+                    VariantId = m.VariantId,
                     ProductName = $"Vật tư #{m.ProductId}", // Would need Product lookup
                     QuantityTaken = m.QuantityTaken,
                     QuantityUsed = m.QuantityUsed,
-                    QuantityReturned = m.QuantityReturned
+                    QuantityReturned = m.QuantityReturned,
+                    WarehouseId = m.WarehouseId,
+                    WarehouseName = m.Warehouse?.Name,
+                    PickedUpAt = m.PickedUpAt
                 }).ToList() ?? new List<InstallationMaterialResponse>()
             };
+
+            // Load technician rating content
+            if (booking.CustomerRating.HasValue && booking.CustomerRating > 0)
+            {
+                try
+                {
+                    var ratings = await _technicianRatingService.GetByBookingAsync(booking.Id);
+                    if (ratings != null && ratings.Any())
+                    {
+                        response.CustomerRatingContent = ratings.First().Content;
+                    }
+                }
+                catch { }
+            }
+
+            return response;
+        }
+
+        private async Task<List<InstallationProductItem>> LoadProductDetailsAsync(List<OrderItem> items)
+        {
+            var result = new List<InstallationProductItem>();
+            
+            foreach (var item in items)
+            {
+                var product = await _productRepository.GetByIdWithDetailsAsync(item.ProductId);
+                string variantName = null;
+                string variantSku = null;
+                
+                if (item.VariantId.HasValue)
+                {
+                    var variant = await _productVariantRepository.GetByIdAsync(item.VariantId.Value);
+                    if (variant != null)
+                    {
+                        variantSku = variant.Sku?.Value;
+                        // Try to get variant name from attributes if available
+                        if (!string.IsNullOrEmpty(variant.AttributesJson))
+                        {
+                            try
+                            {
+                                var attributes = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(variant.AttributesJson);
+                                if (attributes != null && attributes.Count > 0)
+                                {
+                                    variantName = string.Join(", ", attributes.Values.Take(2));
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                
+                // Get main image
+                string mainImageUrl = null;
+                if (product?.Images != null && product.Images.Any())
+                {
+                    var mainImage = product.Images.FirstOrDefault(i => i.IsMain) ?? product.Images.FirstOrDefault();
+                    mainImageUrl = mainImage?.Url;
+                }
+                
+                result.Add(new InstallationProductItem
+                {
+                    ProductId = item.ProductId,
+                    VariantId = item.VariantId,
+                    ProductName = product?.Name ?? $"Sản phẩm #{item.ProductId}",
+                    ProductImage = mainImageUrl,
+                    Sku = product?.Sku?.Value,
+                    VariantName = variantName,
+                    VariantSku = variantSku,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.UnitPrice.Amount,
+                    TotalPrice = item.Quantity * item.UnitPrice.Amount
+                });
+            }
+            
+            return result;
         }
 
         private InstallationBookingListResponse MapToListResponse(InstallationBooking booking)

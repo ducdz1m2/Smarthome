@@ -13,6 +13,14 @@ public class JwtTokenHandler
 
     public async Task<string?> GetTokenAsync()
     {
-        return await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "JWTToken");
+        try
+        {
+            return await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "JWTToken");
+        }
+        catch
+        {
+            // JS runtime not ready or localStorage not accessible
+            return null;
+        }
     }
 }

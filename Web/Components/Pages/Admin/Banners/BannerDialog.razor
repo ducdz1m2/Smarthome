@@ -30,12 +30,18 @@
                     
                     <MudFileUpload T="IBrowserFile" FilesChanged="UploadFile" Accept=".jpg,.jpeg,.png,.gif,.webp" Class="mb-3">
                         <ActivatorContent>
-                            <MudButton Variant="Variant.Filled" 
-                                       Color="Color.Primary" 
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
                                        StartIcon="@Icons.Material.Filled.CloudUpload">
                                 @(_tempImagePath != null ? "Đổi ảnh khác" : "Chọn ảnh")
                             </MudButton>
                         </ActivatorContent>
+                        <FileContent>
+                            @if (_tempImagePath != null)
+                            {
+                                <MudImage Src="@_tempImagePath" Class="mt-2" Style="max-width: 200px; max-height: 200px;" />
+                            }
+                        </FileContent>
                     </MudFileUpload>
                     
                     @if (_isUploading)

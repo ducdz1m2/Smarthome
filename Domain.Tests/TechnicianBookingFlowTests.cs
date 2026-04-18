@@ -254,7 +254,7 @@ public class TechnicianBookingFlowTests
         var order = Order.Create(1, "Test User", "0901234567",
             Address.Create("123 Test", "Ward 1", "District 1", "HCMC", "Vietnam", "70000"));
 
-        var product = Product.Create("Smart Lock", "LOCK-001", Money.Vnd(2500000), 1, 1, requiresInstallation: true);
+        var product = Product.Create("Smart Lock", "LOCK-001", 1, 1, requiresInstallation: true);
         order.AddItem(product.Id, null, 1, Money.Vnd(2500000), true);
 
         return order;

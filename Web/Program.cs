@@ -92,6 +92,7 @@ builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<CurrentUserService>();
+builder.Services.AddScoped<Domain.Interfaces.ICurrentUserService>(provider => provider.GetRequiredService<CurrentUserService>());
 builder.Services.AddHttpContextAccessor();
 
 // Register SignalR services
@@ -109,6 +110,9 @@ builder.Services.AddScoped<SpeechRecognitionService>();
 // Register Recommendation service
 builder.Services.AddScoped<RecommendationService>();
 builder.Services.AddScoped<RecommendationApiService>();
+
+// Register Installation API service
+builder.Services.AddScoped<InstallationApiService>();
 
 // Add HttpClient for API calls with JWT token handler
 builder.Services.AddHttpClient();
@@ -183,6 +187,23 @@ app.MapRazorComponents<App>()
 
 // Map API controllers
 app.MapControllers();
+
+// Map warehouse endpoint
+app.MapGet("/api/warehouses", async (Application.Interfaces.Repositories.IWarehouseRepository warehouseRepository) =>
+{
+    var warehouses = await warehouseRepository.GetAllAsync();
+    var response = warehouses.Select(w => new
+    {
+        Id = w.Id,
+        Name = w.Name,
+        Code = w.Code,
+        Address = w.Address?.ToFullString() ?? "",
+        Phone = w.Phone?.Value ?? "",
+        ManagerName = w.ManagerName ?? "",
+        IsActive = w.IsActive
+    }).ToList();
+    return Results.Ok(response);
+}).RequireAuthorization();
 
 // Map SignalR hubs
 app.MapHub<NotificationHub>("/hubs/notification");

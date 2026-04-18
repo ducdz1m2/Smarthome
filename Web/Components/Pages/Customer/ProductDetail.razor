@@ -97,20 +97,41 @@ else
                         </MudText>
                         <MudText Typo="Typo.h4" Class="fw-bold mb-2">@_product.Name</MudText>
                         <div class="d-flex align-center gap-4">
-                            <MudText Typo="Typo.h4" Color="Color.Primary" Class="fw-bold">
-                                @FormatPrice(_product.BasePrice)
-                            </MudText>
-                            @if (_product.AvailableStock <= 0)
+                            @if (!_product.Variants.Any())
                             {
-                                <MudChip T="string" Color="Color.Error" Size="Size.Small">Hết hàng</MudChip>
+                                <MudText Typo="Typo.h4" Color="Color.Primary" Class="fw-bold">
+                                    @FormatPrice(_product.MinPrice)
+                                </MudText>
                             }
-                            else if (_product.AvailableStock <= 10)
+                            @if (_product.Variants.Any())
                             {
-                                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Còn @_product.AvailableStock sản phẩm</MudChip>
+                                @if (_selectedVariant?.StockQuantity <= 0)
+                                {
+                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Hết hàng</MudChip>
+                                }
+                                else if (_selectedVariant?.StockQuantity <= 10)
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Còn @_selectedVariant.StockQuantity sản phẩm</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Còn hàng</MudChip>
+                                }
                             }
                             else
                             {
-                                <MudChip T="string" Color="Color.Success" Size="Size.Small">Còn hàng</MudChip>
+                                @if (_product.AvailableStock <= 0)
+                                {
+                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Hết hàng</MudChip>
+                                }
+                                else if (_product.AvailableStock <= 10)
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Còn @_product.AvailableStock sản phẩm</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Còn hàng</MudChip>
+                                }
                             }
                         </div>
                         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
@@ -148,6 +169,12 @@ else
                             {
                                 <MudText Typo="Typo.h5" Color="Color.Primary" Class="fw-bold mt-2">
                                     @FormatPrice(_selectedVariant.Price)
+                                </MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.h5" Color="Color.Secondary" Class="fw-bold mt-2">
+                                    Chọn phiên bản để xem giá
                                 </MudText>
                             }
                         </div>
@@ -347,7 +374,7 @@ else
                                 <MudCardContent Class="pa-3">
                                     <MudText Typo="Typo.subtitle1" Class="fw-bold text-truncate" title="@product.Name">@product.Name</MudText>
                                     <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold mt-1">
-                                        @FormatPrice(product.BasePrice)
+                                        @GetDisplayPrice(product)
                                     </MudText>
                                 </MudCardContent>
                             </MudCard>
@@ -611,7 +638,7 @@ else
                 : System.Text.Json.JsonSerializer.Deserialize<List<CartItem>>(cartJson) ?? new List<CartItem>();
 
             // Determine price and name
-            var price = _selectedVariant?.Price ?? _product?.BasePrice ?? 0;
+            var price = _selectedVariant?.Price ?? _product?.MinPrice ?? 0;
             var productName = _product?.Name ?? "Sản phẩm";
             var imageUrl = _product?.Images?.FirstOrDefault(i => i.IsMain)?.Url 
                           ?? _product?.Images?.FirstOrDefault()?.Url 
@@ -775,5 +802,18 @@ else
     private string FormatPrice(decimal price)
     {
         return $"{price:N0} ₫";
+    }
+
+    private string GetDisplayPrice(ProductListResponse product)
+    {
+        if (product.MinPrice == 0 && product.MaxPrice == 0)
+        {
+            return "Liên hệ";
+        }
+        if (product.MinPrice == product.MaxPrice)
+        {
+            return FormatPrice(product.MinPrice);
+        }
+        return $"{FormatPrice(product.MinPrice)} - {FormatPrice(product.MaxPrice)}";
     }
 }

@@ -25,9 +25,9 @@ namespace Web.Hubs
                     new Application.DTOs.Requests.ChatAttachmentRequest
                     {
                         FileUrl = fileUrl,
-                        FileName = fileName,
-                        FileType = fileType,
-                        FileSize = fileSize
+                        FileName = fileName ?? string.Empty,
+                        FileType = fileType ?? string.Empty,
+                        FileSize = fileSize ?? 0
                     }
                 } : null
             };

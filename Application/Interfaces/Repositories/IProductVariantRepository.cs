@@ -5,6 +5,8 @@ namespace Application.Interfaces.Repositories
     public interface IProductVariantRepository
     {
         Task<ProductVariant?> GetByIdAsync(int id);
+        Task<ProductVariant?> GetByIdForUpdateAsync(int id);
+        Task<List<ProductVariant>> GetByIdsAsync(List<int> ids);
         Task<ProductVariant?> GetBySkuAsync(string sku);
         Task<List<ProductVariant>> GetByProductIdAsync(int productId);
         Task<List<ProductVariant>> GetByProductIdsAsync(List<int> productIds);

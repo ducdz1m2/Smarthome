@@ -30,6 +30,8 @@ namespace Infrastructure.Data
         public DbSet<ProductWarehouse> ProductWarehouses => Set<ProductWarehouse>();
         public DbSet<StockEntry> StockEntries => Set<StockEntry>();
         public DbSet<StockEntryDetail> StockEntryDetails => Set<StockEntryDetail>();
+        public DbSet<StockIssue> StockIssues => Set<StockIssue>();
+        public DbSet<StockIssueDetail> StockIssueDetails => Set<StockIssueDetail>();
         public DbSet<WarehouseTransfer> WarehouseTransfers => Set<WarehouseTransfer>();
         public DbSet<ProductReservation> ProductReservations => Set<ProductReservation>();
 

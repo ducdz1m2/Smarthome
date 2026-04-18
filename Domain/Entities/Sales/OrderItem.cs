@@ -20,7 +20,6 @@ public class OrderItem : Entity
     public int? InstallationBookingId { get; private set; }
 
     public virtual Order Order { get; private set; } = null!;
-    public virtual Entities.Catalog.Product Product { get; private set; } = null!;
     public virtual Installation.InstallationBooking? InstallationBooking { get; private set; }
     public virtual ICollection<OrderWarehouseAllocation> WarehouseAllocations { get; private set; } = new List<OrderWarehouseAllocation>();
 

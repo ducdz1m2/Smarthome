@@ -94,13 +94,6 @@
 
                     <MudDivider Class="my-2"/>
 
-                    <!-- Price Range -->
-                    <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Khoảng giá</MudText>
-                    <MudSlider Value="_maxPrice" ValueChanged="@(async (double v) => await OnMaxPriceChanged(v))" Min="0" Max="50000000" Step="1000000" 
-                               Color="Color.Primary" Class="mb-2">
-                        Tối đa: @FormatPrice((decimal)_maxPrice)
-                    </MudSlider>
-
                     <!-- Reset Button -->
                     <MudButton OnClick="ResetFilters" 
                               Variant="Variant.Outlined" 
@@ -124,8 +117,6 @@
                     <MudSelect T="string" Value="_sortOrder" ValueChanged="OnSortChanged" Label="Sắp xếp" Dense="true" 
                               Variant="Variant.Outlined" Style="width: 180px;">
                         <MudSelectItem T="string" Value="@("newest")">Mới nhất</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("price_asc")">Giá tăng dần</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("price_desc")">Giá giảm dần</MudSelectItem>
                         <MudSelectItem T="string" Value="@("name_asc")">Tên A-Z</MudSelectItem>
                     </MudSelect>
                 </MudCardContent>
@@ -174,7 +165,7 @@
                                     <MudText Typo="Typo.subtitle1" Class="fw-bold text-truncate mb-2" title="@product.Name">@product.Name</MudText>
                                     <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">@product.BrandName</MudText>
                                     <div class="d-flex align-center justify-space-between">
-                                        <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">@FormatPrice(product.BasePrice)</MudText>
+                                        <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">@GetDisplayPrice(product)</MudText>
                                         <MudBadge Content="@product.StockQuantity" Color="Color.Info" Overlap="true">
                                             <MudIconButton Icon="@Icons.Material.Filled.AddShoppingCart" 
                                                            Color="Color.Primary" 
@@ -331,7 +322,6 @@
 
     private string _searchQuery = "";
     private int? _selectedCategoryId;
-    private double _maxPrice = 50000000;
     private string _sortOrder = "newest";
     private string _pageTitle = "Tất cả sản phẩm";
     private string _pageSubtitle = "";
@@ -386,12 +376,6 @@
             _products = items;
             _totalCount = total;
 
-            // Apply price filter locally
-            if (_maxPrice < 50000000)
-            {
-                _products = _products.Where(p => p.BasePrice <= (decimal)_maxPrice).ToList();
-            }
-
             // Apply sorting
             ApplySorting();
         }
@@ -409,8 +393,6 @@
     {
         _products = _sortOrder switch
         {
-            "price_asc" => _products.OrderBy(p => p.BasePrice).ToList(),
-            "price_desc" => _products.OrderByDescending(p => p.BasePrice).ToList(),
             "name_asc" => _products.OrderBy(p => p.Name).ToList(),
             _ => _products.OrderByDescending(p => p.Id).ToList() // newest
         };
@@ -467,7 +449,6 @@
     {
         _searchQuery = "";
         _selectedCategoryId = null;
-        _maxPrice = 50000000;
         _sortOrder = "newest";
         _currentPage = 1;
         
@@ -480,12 +461,6 @@
     {
         _currentPage = page;
         await LoadProductsAsync();
-    }
-
-    private async Task OnMaxPriceChanged(double value)
-    {
-        _maxPrice = value;
-        await ApplyFilters();
     }
 
     private void OnSortChanged(string sortOrder)
@@ -509,6 +484,19 @@
     private string FormatPrice(decimal price)
     {
         return $"{price:N0} ₫";
+    }
+
+    private string GetDisplayPrice(ProductListResponse product)
+    {
+        if (product.MinPrice == 0 && product.MaxPrice == 0)
+        {
+            return "Liên hệ";
+        }
+        if (product.MinPrice == product.MaxPrice)
+        {
+            return FormatPrice(product.MinPrice);
+        }
+        return $"{FormatPrice(product.MinPrice)} - {FormatPrice(product.MaxPrice)}";
     }
 
     private async Task ToggleSearchRecording()

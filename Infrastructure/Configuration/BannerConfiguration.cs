@@ -15,8 +15,8 @@ namespace Infrastructure.Configuration
             builder.Property(b => b.Position).IsRequired().HasMaxLength(50);
             
             builder.Property(b => b.ImageUrl).HasConversion(
-                url => url.Value,
-                value => Domain.ValueObjects.WebsiteUrl.Create(value));
+                url => url!.Value,
+                value => Domain.ValueObjects.WebsiteUrl.Create(value!)!);
             builder.Property(b => b.LinkUrl).HasConversion(
                 url => url != null ? url.Value : null,
                 value => value != null ? Domain.ValueObjects.WebsiteUrl.Create(value) : null);

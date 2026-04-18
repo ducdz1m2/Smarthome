@@ -74,7 +74,7 @@ public class UserRepository : IUserRepository
     public async Task<IReadOnlyList<ApplicationUser>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
     {
         return await _userManager.Users
-            .Where(u => u.FullName.Contains(keyword) || u.Email.Contains(keyword))
+            .Where(u => (u.FullName != null && u.FullName.Contains(keyword)) || (u.Email != null && u.Email.Contains(keyword)))
             .ToListAsync(cancellationToken);
     }
 

@@ -38,26 +38,24 @@
                 {
                     @foreach (var notification in _notifications.OrderByDescending(n => n.CreatedAt))
                     {
-                        <MudListItem T="string" 
-                            Class="@(!notification.IsRead ? "unread-notification" : "")" 
+                        <MudListItem T="string"
+                            Class="@(!notification.IsRead ? "unread-notification" : "")"
                             OnClick="() => NavigateToNotification(notification)"
                             Style="cursor: pointer;">
-                            <MudListItemAvatar>
-                                <MudAvatar Size="Size.Small" Color="@(GetNotificationColor(notification.Type))">
+                            <ItemContent>
+                                <MudAvatar Size="Size.Small" Color="@(GetNotificationColor(notification.Type))" Class="mr-2">
                                     <MudIcon Icon="@GetNotificationIcon(notification.Icon)" Size="Size.Small" />
                                 </MudAvatar>
-                            </MudListItemAvatar>
-                            <MudListItemContent>
-                                <MudListItemText Typo="Typo.subtitle2" Class="fw-bold">@notification.Title</MudListItemText>
-                                <MudListItemText Typo="Typo.body2" Class="text-truncate">@notification.Message</MudListItemText>
-                                <MudListItemText Typo="Typo.caption" Color="Color.Secondary">@notification.TimeAgo</MudListItemText>
-                            </MudListItemContent>
-                            @if (!notification.IsRead)
-                            {
-                                <MudListItemAction>
+                                <div class="flex-grow-1">
+                                    <MudText Typo="Typo.subtitle2" Class="fw-bold">@notification.Title</MudText>
+                                    <MudText Typo="Typo.body2" Class="text-truncate">@notification.Message</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@notification.TimeAgo</MudText>
+                                </div>
+                                @if (!notification.IsRead)
+                                {
                                     <div class="notification-dot"></div>
-                                </MudListItemAction>
-                            }
+                                }
+                            </ItemContent>
                         </MudListItem>
                     }
                 }

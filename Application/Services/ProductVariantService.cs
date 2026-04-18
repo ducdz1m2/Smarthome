@@ -146,7 +146,7 @@ namespace Application.Services
 
         public async Task UpdateStockQuantityAsync(int id, int quantity)
         {
-            var variant = await _variantRepository.GetByIdAsync(id);
+            var variant = await _variantRepository.GetByIdForUpdateAsync(id);
             if (variant == null)
                 throw new DomainException("Không tìm thấy phân loại sản phẩm");
 

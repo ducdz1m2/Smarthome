@@ -68,6 +68,11 @@ namespace Application.Services
             foreach (var product in products)
             {
                 var productStocks = warehouseStocks.Where(pw => pw.ProductId == product.Id).ToList();
+                Console.WriteLine($"[GetProductInventoryAsync] Product {product.Id} ({product.Name}): Found {productStocks.Count} warehouse stocks");
+                foreach (var ps in productStocks)
+                {
+                    Console.WriteLine($"  - WarehouseId: {ps.WarehouseId}, WarehouseCode: {ps.Warehouse?.Code}, Quantity: {ps.Quantity}, Reserved: {ps.ReservedQuantity}");
+                }
                 var totalQty = productStocks.Sum(pw => pw.Quantity);
                 var totalReserved = productStocks.Sum(pw => pw.ReservedQuantity);
 
@@ -104,7 +109,8 @@ namespace Application.Services
                     ProductId = product.Id,
                     ProductName = product.Name,
                     Sku = product.Sku.Value,
-                    BasePrice = product.BasePrice.Amount,
+                    MinPrice = variantResponses.Any() ? variantResponses.Min(v => v.Price) : 0,
+                    MaxPrice = variantResponses.Any() ? variantResponses.Max(v => v.Price) : 0,
                     CategoryId = product.CategoryId,
                     CategoryName = product.Category?.Name ?? "",
                     BrandId = product.BrandId,
@@ -113,13 +119,13 @@ namespace Application.Services
                     TotalReserved = totalReserved,
                     IsLowStock = (totalQty - totalReserved) <= 10 && (totalQty - totalReserved) > 0,
                     MainImageUrl = "",
-                    WarehouseStocks = productStocks.Select(pw => new WarehouseStockDetailResponse
+                    WarehouseStocks = productStocks.GroupBy(pw => pw.WarehouseId).Select(g => new WarehouseStockDetailResponse
                     {
-                        WarehouseId = pw.WarehouseId,
-                        WarehouseName = pw.Warehouse?.Name ?? "",
-                        WarehouseCode = pw.Warehouse?.Code ?? "",
-                        Quantity = pw.Quantity,
-                        ReservedQuantity = pw.ReservedQuantity
+                        WarehouseId = g.Key,
+                        WarehouseName = g.First().Warehouse?.Name ?? "",
+                        WarehouseCode = g.First().Warehouse?.Code ?? "",
+                        Quantity = g.Sum(pw => pw.Quantity),
+                        ReservedQuantity = g.Sum(pw => pw.ReservedQuantity)
                     }).ToList(),
                     Variants = variantResponses
                 };
@@ -150,6 +156,8 @@ namespace Application.Services
             var product = await _productRepository.GetByIdAsync(productId);
             if (product == null) return null;
 
+            var variants = await _productVariantRepository.GetByProductIdAsync(productId);
+
             List<ProductWarehouse> warehouseStocks;
             if (warehouseId.HasValue)
             {
@@ -169,7 +177,8 @@ namespace Application.Services
                 ProductId = product.Id,
                 ProductName = product.Name,
                 Sku = product.Sku.Value,
-                BasePrice = product.BasePrice.Amount,
+                MinPrice = variants.Any() ? variants.Min(v => v.Price.Amount) : 0,
+                MaxPrice = variants.Any() ? variants.Max(v => v.Price.Amount) : 0,
                 CategoryId = product.CategoryId,
                 CategoryName = product.Category?.Name ?? "",
                 BrandId = product.BrandId,
@@ -209,12 +218,14 @@ namespace Application.Services
         public async Task<List<CategoryInventorySummaryResponse>> GetInventoryByCategoryAsync(int? parentCategoryId = null)
         {
             var allCategories = await _categoryRepository.GetAllAsync();
-            var categories = parentCategoryId.HasValue 
+            var categories = parentCategoryId.HasValue
                 ? allCategories.Where(c => c.ParentId == parentCategoryId.Value).ToList()
                 : allCategories.Where(c => c.ParentId == null).ToList();
 
             var allProducts = await _productRepository.GetAllAsync();
             var allWarehouses = await _warehouseRepository.GetAllAsync();
+            var allProductIds = allProducts.Select(p => p.Id).ToList();
+            var allVariants = await _productVariantRepository.GetByProductIdsAsync(allProductIds);
 
             var result = new List<CategoryInventorySummaryResponse>();
 
@@ -236,8 +247,13 @@ namespace Application.Services
                     ParentCategoryName = category.Parent?.Name,
                     TotalProducts = categoryProducts.Count,
                     TotalStockQuantity = categoryStocks.Sum(pw => pw.Quantity),
-                    TotalStockValue = categoryProducts.Sum(p => 
-                        categoryStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity) * p.BasePrice.Amount),
+                    TotalStockValue = categoryProducts.Sum(p =>
+                        {
+                            var productVariants = allVariants.Where(v => v.ProductId == p.Id);
+                            var productStock = categoryStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity);
+                            var avgVariantPrice = productVariants.Any() ? productVariants.Average(v => v.Price.Amount) : 0;
+                            return productStock * avgVariantPrice;
+                        }),
                     LowStockProducts = categoryProducts.Count(p => 
                     {
                         var stock = categoryStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity - pw.ReservedQuantity);
@@ -275,6 +291,9 @@ namespace Application.Services
             var products = allProducts.Where(p => childCategoryIds.Contains(p.CategoryId)).ToList();
             var productIds = products.Select(p => p.Id).ToList();
 
+            var allProductIds = allProducts.Select(p => p.Id).ToList();
+            var allVariants = await _productVariantRepository.GetByProductIdsAsync(allProductIds);
+
             var stocks = productIds.Any()
                 ? await _productWarehouseRepository.GetByProductsAsync(productIds)
                 : new List<ProductWarehouse>();
@@ -293,7 +312,13 @@ namespace Application.Services
                 ParentCategoryName = category.Parent?.Name,
                 TotalProducts = products.Count,
                 TotalStockQuantity = stocks.Sum(s => s.Quantity),
-                TotalStockValue = products.Sum(p => stocks.Where(s => s.ProductId == p.Id).Sum(s => s.Quantity) * p.BasePrice.Amount),
+                TotalStockValue = products.Sum(p =>
+                    {
+                        var productVariants = allVariants.Where(v => v.ProductId == p.Id);
+                        var productStock = stocks.Where(s => s.ProductId == p.Id).Sum(s => s.Quantity);
+                        var avgVariantPrice = productVariants.Any() ? productVariants.Average(v => v.Price.Amount) : 0;
+                        return productStock * avgVariantPrice;
+                    }),
                 LowStockProducts = products.Count(p =>
                 {
                     var productStock = stocks.Where(s => s.ProductId == p.Id).Sum(s => s.Quantity - s.ReservedQuantity);
@@ -320,6 +345,8 @@ namespace Application.Services
             var warehouses = await _warehouseRepository.GetAllAsync();
             var allProducts = await _productRepository.GetAllAsync();
             var allStocks = await _productWarehouseRepository.GetAllAsync();
+            var allProductIds = allProducts.Select(p => p.Id).ToList();
+            var allVariants = await _productVariantRepository.GetByProductIdsAsync(allProductIds);
             var result = new List<WarehouseInventorySummaryResponse>();
 
             foreach (var warehouse in warehouses)
@@ -340,8 +367,13 @@ namespace Application.Services
                     TotalProducts = warehouseStocks.Count(pw => pw.Quantity > 0),
                     TotalQuantity = totalQty,
                     TotalReserved = totalReserved,
-                    TotalStockValue = products.Sum(p => 
-                        warehouseStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity) * p.BasePrice.Amount),
+                    TotalStockValue = products.Sum(p =>
+                        {
+                            var productVariants = allVariants.Where(v => v.ProductId == p.Id);
+                            var productStock = warehouseStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity);
+                            var avgVariantPrice = productVariants.Any() ? productVariants.Average(v => v.Price.Amount) : 0;
+                            return productStock * avgVariantPrice;
+                        }),
                     LowStockCount = warehouseStocks.Count(pw => pw.IsLowStock()),
                     CategoryBreakdown = products
                         .GroupBy(p => p.CategoryId)
@@ -369,9 +401,11 @@ namespace Application.Services
 
             var warehouseStocks = await _productWarehouseRepository.GetByWarehouseAsync(warehouseId);
             var productIds = warehouseStocks.Select(pw => pw.ProductId).ToList();
-            
+
             var allProducts = await _productRepository.GetAllAsync();
             var products = allProducts.Where(p => productIds.Contains(p.Id)).ToList();
+            var allProductIds = allProducts.Select(p => p.Id).ToList();
+            var allVariants = await _productVariantRepository.GetByProductIdsAsync(allProductIds);
 
             return new WarehouseInventorySummaryResponse
             {
@@ -382,8 +416,13 @@ namespace Application.Services
                 TotalProducts = warehouseStocks.Count(pw => pw.Quantity > 0),
                 TotalQuantity = warehouseStocks.Sum(pw => pw.Quantity),
                 TotalReserved = warehouseStocks.Sum(pw => pw.ReservedQuantity),
-                TotalStockValue = products.Sum(p => 
-                    warehouseStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity) * p.BasePrice.Amount),
+                TotalStockValue = products.Sum(p =>
+                    {
+                        var productVariants = allVariants.Where(v => v.ProductId == p.Id);
+                        var productStock = warehouseStocks.Where(pw => pw.ProductId == p.Id).Sum(pw => pw.Quantity);
+                        var avgVariantPrice = productVariants.Any() ? productVariants.Average(v => v.Price.Amount) : 0;
+                        return productStock * avgVariantPrice;
+                    }),
                 LowStockCount = warehouseStocks.Count(pw => pw.IsLowStock()),
                 CategoryBreakdown = products
                     .GroupBy(p => p.CategoryId)
@@ -521,7 +560,7 @@ namespace Application.Services
         /// </summary>
         private async Task SyncProductStockFromWarehouses(int productId)
         {
-            var product = await _productRepository.GetByIdAsync(productId);
+            var product = await _productRepository.GetByIdForUpdateAsync(productId);
             if (product == null) return;
 
             var warehouseStocks = await _productWarehouseRepository.GetByProductAsync(productId);
@@ -529,8 +568,6 @@ namespace Application.Services
             var totalReserved = warehouseStocks.Sum(pw => pw.ReservedQuantity);
 
             product.SetStockQuantity(totalStock);
-            // FrozenStockQuantity cũng cần được đồng bộ từ ReservedQuantity
-            // Note: Product không có method SetFrozenStockQuantity, nên cần cập nhật trực tiếp qua EF
             _productRepository.Update(product);
             await _productRepository.SaveChangesAsync();
 
@@ -651,6 +688,8 @@ namespace Application.Services
         {
             var allProducts = await _productRepository.GetAllAsync();
             var allStocks = await _productWarehouseRepository.GetAllAsync();
+            var allProductIds = allProducts.Select(p => p.Id).ToList();
+            var allVariants = await _productVariantRepository.GetByProductIdsAsync(allProductIds);
 
             var totalQty = allStocks.Sum(s => s.Quantity);
             var totalReserved = allStocks.Sum(s => s.ReservedQuantity);
@@ -659,7 +698,9 @@ namespace Application.Services
             foreach (var product in allProducts)
             {
                 var productStocks = allStocks.Where(s => s.ProductId == product.Id).Sum(s => s.Quantity);
-                totalValue += productStocks * product.BasePrice.Amount;
+                var productVariants = allVariants.Where(v => v.ProductId == product.Id);
+                var avgVariantPrice = productVariants.Any() ? productVariants.Average(v => v.Price.Amount) : 0;
+                totalValue += productStocks * avgVariantPrice;
             }
 
             var lowStockCount = allStocks.Count(s => s.IsLowStock());

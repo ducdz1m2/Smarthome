@@ -20,7 +20,17 @@ namespace Infrastructure.Repositories
 
         public async Task<Product?> GetByIdAsync(int id)
         {
-            return await _context.Products.FindAsync(id);
+            return await _context.Products
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == id);
+        }
+
+        public async Task<List<Product>> GetByIdsAsync(List<int> ids)
+        {
+            return await _context.Products
+                .AsNoTracking()
+                .Where(p => ids.Contains(p.Id))
+                .ToListAsync();
         }
 
         public async Task<Product?> GetByIdWithDetailsAsync(int id)
@@ -60,6 +70,7 @@ namespace Infrastructure.Repositories
                 .AsNoTracking()
                 .Include(p => p.Category)
                 .Include(p => p.Brand)
+                .Include(p => p.Variants)
                 .Include(p => p.Images)
                 .OrderByDescending(p => p.Id)
                 .ToListAsync();
@@ -71,6 +82,7 @@ namespace Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(p => p.CategoryId == categoryId)
                 .Include(p => p.Brand)
+                .Include(p => p.Variants)
                 .Include(p => p.Images)
                 .ToListAsync();
         }
@@ -81,6 +93,7 @@ namespace Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(p => p.BrandId == brandId)
                 .Include(p => p.Category)
+                .Include(p => p.Variants)
                 .ToListAsync();
         }
 
@@ -106,6 +119,7 @@ namespace Infrastructure.Repositories
             var items = await query
                 .Include(p => p.Category)
                 .Include(p => p.Brand)
+                .Include(p => p.Variants)
                 .Include(p => p.Images)
                 .OrderByDescending(p => p.Id)
                 .Skip((page - 1) * pageSize)
@@ -192,6 +206,7 @@ namespace Infrastructure.Repositories
             return await query
                 .Include(p => p.Category)
                 .Include(p => p.Brand)
+                .Include(p => p.Variants)
                 .Include(p => p.Images)
                 .ToListAsync();
         }

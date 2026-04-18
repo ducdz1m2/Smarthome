@@ -26,10 +26,10 @@ namespace Infrastructure.Repositories
                 .AsNoTracking()
                 .Include(b => b.Order)
                     .ThenInclude(o => o.Items)
-                        .ThenInclude(i => i.Product)
                 .Include(b => b.Technician)
                 .Include(b => b.Slot)
                 .Include(b => b.Materials)
+                    .ThenInclude(m => m.Warehouse)
                 .FirstOrDefaultAsync(b => b.Id == id);
         }
 
@@ -43,6 +43,7 @@ namespace Infrastructure.Repositories
                 .Include(b => b.Technician)
                 .Include(b => b.Slot)
                 .Include(b => b.Materials)
+                    .ThenInclude(m => m.Warehouse)
                 .ToListAsync();
         }
 
@@ -56,6 +57,7 @@ namespace Infrastructure.Repositories
                 .Include(b => b.Technician)
                 .Include(b => b.Slot)
                 .Include(b => b.Materials)
+                    .ThenInclude(m => m.Warehouse)
                 .FirstOrDefaultAsync();
         }
 

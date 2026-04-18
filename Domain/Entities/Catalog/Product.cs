@@ -15,7 +15,6 @@ public class Product : AggregateRoot
 {
     public string Name { get; private set; } = string.Empty;
     public Sku Sku { get; private set; } = null!;
-    public Money BasePrice { get; private set; } = null!;
     public int StockQuantity { get; private set; }
     public int FrozenStockQuantity { get; private set; }
     public string? Description { get; private set; }
@@ -35,7 +34,7 @@ public class Product : AggregateRoot
 
     private Product() { }
 
-    public static Product Create(string name, string sku, Money basePrice, int categoryId, int brandId, int? supplierId = null, bool requiresInstallation = false)
+    public static Product Create(string name, string sku, int categoryId, int brandId, int? supplierId = null, bool requiresInstallation = false)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ValidationException(nameof(name), "Tên sản phẩm không được trống");
@@ -46,14 +45,10 @@ public class Product : AggregateRoot
         if (brandId <= 0)
             throw new ValidationException(nameof(brandId), "BrandId không hợp lệ");
 
-        if (basePrice.IsLessThan(Money.Zero()))
-            throw new ValidationException(nameof(basePrice), "Giá không thể âm");
-
         var product = new Product
         {
             Name = name.Trim(),
             Sku = Sku.Create(sku),
-            BasePrice = basePrice,
             CategoryId = categoryId,
             BrandId = brandId,
             SupplierId = supplierId,
@@ -67,32 +62,13 @@ public class Product : AggregateRoot
         return product;
     }
 
-    // Legacy factory method for backward compatibility
-    public static Product Create(string name, string sku, decimal basePrice, int categoryId, int brandId, int? supplierId = null, bool requiresInstallation = false)
-    {
-        return Create(name, sku, Money.Vnd(basePrice), categoryId, brandId, supplierId, requiresInstallation);
-    }
-
-        public void Update(string name, Money basePrice, string? description)
+        public void Update(string name, string? description)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Tên sản phẩm không được trống", nameof(name));
 
-            if (!BasePrice.Equals(basePrice))
-            {
-                var oldPrice = BasePrice;
-                BasePrice = basePrice;
-                AddDomainEvent(new ProductPriceChangedEvent(Id, oldPrice.Amount, basePrice.Amount));
-            }
-
             Name = name.Trim();
             Description = description?.Trim();
-        }
-
-        // Legacy overload for backward compatibility
-        public void Update(string name, decimal basePrice, string? description)
-        {
-            Update(name, Money.Vnd(basePrice), description);
         }
 
         public void UpdateSpecs(Dictionary<string, string> specs)
@@ -182,22 +158,6 @@ public class Product : AggregateRoot
         public void RemoveSupplier()
         {
             SupplierId = null;
-        }
-
-        public Money GetEffectivePrice(DiscountType discountType, Money discountValue)
-        {
-            return discountType switch
-            {
-                DiscountType.FixedAmount => BasePrice.Subtract(discountValue),
-                DiscountType.Percentage => BasePrice.ApplyDiscount(discountValue.Amount),
-                _ => BasePrice
-            };
-        }
-
-        // Legacy overload for backward compatibility
-        public decimal GetEffectivePrice(DiscountType discountType, decimal discountValue)
-        {
-            return GetEffectivePrice(discountType, Money.Vnd(discountValue)).Amount;
         }
 
         //kho

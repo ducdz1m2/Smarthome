@@ -84,7 +84,6 @@ namespace Application.Services
             var product = Product.Create(
                 request.Name,
                 request.Sku,
-                request.BasePrice,
                 request.CategoryId,
                 request.BrandId,
                 request.SupplierId,
@@ -92,7 +91,7 @@ namespace Application.Services
             );
 
             if (!string.IsNullOrEmpty(request.Description))
-                product.Update(request.Name, request.BasePrice, request.Description);
+                product.Update(request.Name, request.Description);
 
             if (request.Specs != null && request.Specs.Any())
                 product.UpdateSpecs(request.Specs);
@@ -135,7 +134,7 @@ namespace Application.Services
             if (product == null)
                 throw new DomainException("Không tìm thấy sản phẩm");
 
-            product.Update(request.Name, request.BasePrice, request.Description);
+            product.Update(request.Name, request.Description);
 
             // Không cập nhật StockQuantity trực tiếp từ đây
             // Tồn kho phải được quản lý thông qua hệ thống kho (InventoryService)
@@ -292,12 +291,17 @@ namespace Application.Services
 
         private ProductResponse MapToResponse(Product product)
         {
+            var activeVariants = product.Variants?.Where(v => v.IsActive).ToList() ?? new List<ProductVariant>();
+            var minPrice = activeVariants.Any() ? activeVariants.Min(v => v.Price.Amount) : 0;
+            var maxPrice = activeVariants.Any() ? activeVariants.Max(v => v.Price.Amount) : 0;
+
             return new ProductResponse
             {
                 Id = product.Id,
                 Name = product.Name,
                 Sku = product.Sku.Value,
-                BasePrice = product.BasePrice.Amount,
+                MinPrice = minPrice,
+                MaxPrice = maxPrice,
                 StockQuantity = product.StockQuantity,
                 FrozenStockQuantity = product.FrozenStockQuantity,
                 Description = product.Description,
@@ -346,12 +350,17 @@ namespace Application.Services
 
         private ProductListResponse MapToListResponse(Product product)
         {
+            var activeVariants = product.Variants?.Where(v => v.IsActive).ToList() ?? new List<ProductVariant>();
+            var minPrice = activeVariants.Any() ? activeVariants.Min(v => v.Price.Amount) : 0;
+            var maxPrice = activeVariants.Any() ? activeVariants.Max(v => v.Price.Amount) : 0;
+
             return new ProductListResponse
             {
                 Id = product.Id,
                 Name = product.Name,
                 Sku = product.Sku.Value,
-                BasePrice = product.BasePrice.Amount,
+                MinPrice = minPrice,
+                MaxPrice = maxPrice,
                 StockQuantity = product.StockQuantity,
                 IsActive = product.IsActive,
                 CategoryName = product.Category?.Name ?? "",

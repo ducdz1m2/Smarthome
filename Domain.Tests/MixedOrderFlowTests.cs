@@ -18,8 +18,8 @@ public class MixedOrderFlowTests
     {
         // Arrange
         var order = CreateTestOrder();
-        var normalProduct = Product.Create("Mouse", "MOU-001", Money.Vnd(200000), 1, 1, requiresInstallation: false);
-        var installProduct = Product.Create("Smart Lock", "LOCK-001", Money.Vnd(2500000), 1, 1, requiresInstallation: true);
+        var normalProduct = Product.Create("Mouse", "MOU-001", 1, 1, requiresInstallation: false);
+        var installProduct = Product.Create("Smart Lock", "LOCK-001", 1, 1, requiresInstallation: true);
 
         // Act
         order.AddItem(normalProduct.Id, null, 2, Money.Vnd(200000), false);  // sản phẩm thường
@@ -76,8 +76,8 @@ public class MixedOrderFlowTests
     {
         // Arrange
         var order = CreateTestOrder();
-        var installProduct1 = Product.Create("Camera", "CAM-001", Money.Vnd(3500000), 1, 1, requiresInstallation: true);
-        var installProduct2 = Product.Create("Smart Lock", "LOCK-001", Money.Vnd(2500000), 1, 1, requiresInstallation: true);
+        var installProduct1 = Product.Create("Camera", "CAM-001", 1, 1, requiresInstallation: true);
+        var installProduct2 = Product.Create("Smart Lock", "LOCK-001", 1, 1, requiresInstallation: true);
 
         order.AddItem(installProduct1.Id, null, 1, Money.Vnd(3500000), true);
         order.AddItem(installProduct2.Id, null, 2, Money.Vnd(2500000), true);
@@ -131,7 +131,7 @@ public class MixedOrderFlowTests
         order.Confirm();
 
         // Act
-        order.StartInstallationFlow();
+        order.StartInstallationFlow(true);
 
         // Assert
         order.Status.Should().Be(OrderStatus.AwaitingSchedule);
@@ -144,7 +144,7 @@ public class MixedOrderFlowTests
         var order = CreateMixedOrder();
         order.Confirm();
         order.StartShippingFlow();
-        order.StartInstallationFlow();
+        order.StartInstallationFlow(true);
 
         var normalItem = order.Items.First(i => !i.RequiresInstallation);
         var installItem = order.Items.First(i => i.RequiresInstallation);
@@ -171,7 +171,7 @@ public class MixedOrderFlowTests
         var order = CreateMixedOrder();
         order.Confirm();
         order.StartShippingFlow();
-        order.StartInstallationFlow();
+        order.StartInstallationFlow(true);
 
         var normalItem = order.Items.First(i => !i.RequiresInstallation);
         var installItem = order.Items.First(i => i.RequiresInstallation);
@@ -196,8 +196,8 @@ public class MixedOrderFlowTests
     {
         // Arrange
         var order = CreateTestOrder();
-        var normalProduct = Product.Create("USB Cable", "USB-001", Money.Vnd(150000), 1, 1, requiresInstallation: false);
-        var installProduct = Product.Create("Camera", "CAM-001", Money.Vnd(3500000), 1, 1, requiresInstallation: true);
+        var normalProduct = Product.Create("USB Cable", "USB-001", 1, 1, requiresInstallation: false);
+        var installProduct = Product.Create("Camera", "CAM-001", 1, 1, requiresInstallation: true);
 
         order.AddItem(normalProduct.Id, null, 3, Money.Vnd(150000), false);
         order.AddItem(installProduct.Id, null, 2, Money.Vnd(3500000), true);
@@ -294,8 +294,8 @@ public class MixedOrderFlowTests
     private static Order CreateMixedOrder()
     {
         var order = CreateTestOrder();
-        var normalProduct = Product.Create("Mouse", "MOU-001", Money.Vnd(200000), 1, 1, requiresInstallation: false);
-        var installProduct = Product.Create("Smart Lock", "LOCK-001", Money.Vnd(2500000), 1, 1, requiresInstallation: true);
+        var normalProduct = Product.Create("Mouse", "MOU-001", 1, 1, requiresInstallation: false);
+        var installProduct = Product.Create("Smart Lock", "LOCK-001", 1, 1, requiresInstallation: true);
 
         var normalItem = order.AddItem(normalProduct.Id, null, 2, Money.Vnd(200000), false);
         var installItem = order.AddItem(installProduct.Id, null, 1, Money.Vnd(2500000), true);
