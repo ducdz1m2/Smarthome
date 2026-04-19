@@ -2,6 +2,7 @@
 @inject IProductService ProductService
 @inject ICategoryService CategoryService
 @inject IBannerService BannerService
+@inject IPromotionService PromotionService
 @inject NavigationManager NavigationManager
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
@@ -40,7 +41,7 @@
             @foreach (var category in _categories.Take(8))
             {
                 <MudItem xs="6" sm="4" md="3" lg="3">
-                    <MudCard Elevation="2" Class="h-100 cursor-pointer" @onclick="() => NavigateToCategory(category.Id)">
+                    <MudCard Elevation="2" Class="h-100 cursor-pointer category-card" @onclick="() => NavigateToCategory(category.Id)">
                         <MudCardContent Class="text-center pa-4">
                             <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Color="Color.Primary" Class="mb-2"/>
                             <MudText Typo="Typo.h6" Class="fw-bold">@category.Name</MudText>
@@ -54,6 +55,35 @@
     else
     {
         <MudText Color="Color.Secondary">Chưa có danh mục sản phẩm</MudText>
+    }
+
+    <!-- Promotions Section -->
+    @if (_promotions.Any())
+    {
+        <div class="d-flex align-center justify-space-between mt-8 mb-4">
+            <MudText Typo="Typo.h4" Class="fw-bold">Khuyến mãi đặc biệt</MudText>
+        </div>
+
+        <MudGrid Spacing="3">
+            @foreach (var promotion in _promotions.Take(3))
+            {
+                <MudItem xs="12" md="4">
+                    <MudCard Elevation="3" Class="promotion-card">
+                        <div class="promotion-header" style="background: linear-gradient(135deg, var(--mud-palette-primary), var(--mud-palette-primary-dark));">
+                            <MudText Typo="Typo.h4" Class="white-text fw-bold text-center py-3">@promotion.DiscountPercent%</MudText>
+                            <MudText Typo="Typo.body1" Class="white-text text-center pb-2">GIẢM GIÁ</MudText>
+                        </div>
+                        <MudCardContent Class="pa-4">
+                            <MudText Typo="Typo.h6" Class="fw-bold mb-2">@promotion.Name</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-truncate mb-2">@promotion.Description</MudText>
+                            <MudButton Href="@($"/products?promotion={promotion.Id}")" Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true">
+                                Xem sản phẩm
+                            </MudButton>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
     }
 
     <!-- Featured Products Section -->
@@ -178,6 +208,24 @@
         transform: translateY(-4px);
         box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
     }
+    .category-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .category-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+        background-color: var(--mud-palette-action-hover);
+    }
+    .promotion-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .promotion-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+    }
+    .promotion-header {
+        border-radius: 4px 4px 0 0;
+    }
     .product-image-container {
         height: 200px;
         overflow: hidden;
@@ -237,6 +285,7 @@
     private List<CategoryResponse> _categories = new();
     private List<ProductListResponse> _featuredProducts = new();
     private List<ProductListResponse> _newProducts = new();
+    private List<PromotionResponse> _promotions = new();
     private bool _isLoading = true;
 
     protected override async Task OnInitializedAsync()
@@ -254,8 +303,8 @@
             var allBanners = await BannerService.GetAllAsync();
             var now = DateTime.Now;
             _banners = allBanners
-                .Where(b => b.IsActive 
-                    && b.IsVisible 
+                .Where(b => b.IsActive
+                    && b.IsVisible
                     && b.Position.ToLower() == "home"
                     && (b.StartDate == null || b.StartDate <= now)
                     && (b.EndDate == null || b.EndDate >= now))
@@ -264,6 +313,15 @@
 
             // Load categories
             _categories = await CategoryService.GetAllAsync();
+
+            // Load active promotions
+            var allPromotions = await PromotionService.GetAllAsync();
+            _promotions = allPromotions
+                .Where(p => p.IsActive
+                    && p.StartDate <= now
+                    && p.EndDate >= now)
+                .OrderBy(p => p.DiscountPercent)
+                .ToList();
 
             // Load featured products (active products, get first page)
             var (featuredItems, _) = await ProductService.GetPagedAsync(1, 8, null, null, null, true);

@@ -155,6 +155,11 @@ namespace Infrastructure.Repositories
 
         public void Update(InstallationBooking booking)
         {
+            var existing = _context.InstallationBookings.Local.FirstOrDefault(e => e.Id == booking.Id);
+            if (existing != null)
+            {
+                _context.Entry(existing).State = EntityState.Detached;
+            }
             _context.InstallationBookings.Update(booking);
         }
 

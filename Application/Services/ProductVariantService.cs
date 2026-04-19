@@ -59,8 +59,9 @@ namespace Application.Services
                 request.ProductId,
                 request.Sku,
                 request.Price,
-                request.StockQuantity,
-                request.Attributes
+                0,
+                request.Attributes,
+                request.WarrantyPeriod
             );
 
             await _variantRepository.AddAsync(variant);
@@ -86,10 +87,10 @@ namespace Application.Services
             }
 
             // Update using reflection since the properties are private
-            typeof(ProductVariant).GetProperty("Sku")?.SetValue(variant, request.Sku.Trim().ToUpper());
-            typeof(ProductVariant).GetProperty("Price")?.SetValue(variant, request.Price);
-            typeof(ProductVariant).GetProperty("StockQuantity")?.SetValue(variant, request.StockQuantity);
-            
+            typeof(ProductVariant).GetProperty("Sku")?.SetValue(variant, Domain.ValueObjects.Sku.Create(request.Sku.Trim().ToUpper()));
+            typeof(ProductVariant).GetProperty("Price")?.SetValue(variant, Domain.ValueObjects.Money.Vnd(request.Price));
+
+            variant.UpdateWarrantyPeriod(request.WarrantyPeriod);
             variant.UpdateAttributes(request.Attributes);
 
             if (request.IsActive && !variant.IsActive)
@@ -164,6 +165,7 @@ namespace Application.Services
                 Sku = variant.Sku.Value,
                 Price = variant.Price.Amount,
                 StockQuantity = variant.StockQuantity,
+                WarrantyPeriod = variant.WarrantyPeriod,
                 Attributes = variant.GetAttributes(),
                 IsActive = variant.IsActive
             };
@@ -179,6 +181,7 @@ namespace Application.Services
                 Sku = variant.Sku.Value,
                 Price = variant.Price.Amount,
                 StockQuantity = variant.StockQuantity,
+                WarrantyPeriod = variant.WarrantyPeriod,
                 Attributes = variant.GetAttributes(),
                 IsActive = variant.IsActive,
                 CreatedAt = variant.CreatedAt

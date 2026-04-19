@@ -102,7 +102,7 @@
                                     <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
                                 }
                             </MudTd>
-                            <MudTd>@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                            <MudTd>@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
                             <MudTd>
                                 <div class="d-flex gap-1">
                                     <MudIconButton Icon="@Icons.Material.Filled.Reply" 
@@ -205,7 +205,7 @@
                                     <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
                                 }
                             </MudTd>
-                            <MudTd>@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                            <MudTd>@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
                             <MudTd>
                                 <div class="d-flex gap-1">
                                     @if (!context.IsApproved)

@@ -90,10 +90,7 @@ namespace Infrastructure.Repositories
             {
                 query = query.Where(pw => pw.VariantId == variantId.Value);
             }
-            else
-            {
-                query = query.Where(pw => pw.VariantId == null);
-            }
+            // If variantId is null, return all warehouses for this product (any variant)
 
             return await query
                 .Include(pw => pw.Warehouse)
@@ -107,6 +104,11 @@ namespace Infrastructure.Repositories
 
         public void Update(ProductWarehouse productWarehouse)
         {
+            var existing = _context.ProductWarehouses.Local.FirstOrDefault(e => e.Id == productWarehouse.Id);
+            if (existing != null)
+            {
+                _context.Entry(existing).State = EntityState.Detached;
+            }
             _context.ProductWarehouses.Update(productWarehouse);
         }
 

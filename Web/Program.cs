@@ -91,6 +91,7 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<Web.Services.AuthService>();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<Domain.Interfaces.ICurrentUserService>(provider => provider.GetRequiredService<CurrentUserService>());
 builder.Services.AddHttpContextAccessor();

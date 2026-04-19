@@ -3,10 +3,13 @@
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @using Domain.Enums
+@using Web.Helpers
+@using Web.Services
 
 @inject IOrderService OrderService
 @inject IReturnOrderService ReturnOrderService
 @inject IWarrantyRequestService WarrantyRequestService
+@inject IAuthService AuthService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
@@ -47,7 +50,7 @@
     else
     {
         <MudGrid>
-            @foreach (var order in _orders.OrderByDescending(o => o.CreatedAt))
+            @foreach (var order in _pagedOrders)
             {
                 <MudItem xs="12">
                     <MudCard Elevation="2" Class="mb-3 cursor-pointer" @onclick="() => OpenOrderDetail(order)">
@@ -59,7 +62,7 @@
                                             Đơn hàng #@order.OrderNumber
                                         </MudText>
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                            @order.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                            @order.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                                         </MudText>
                                     </div>
                                     <MudChip T="string" Color="@GetStatusColor(order.Status, _returnOrders.ContainsKey(order.Id) ? _returnOrders[order.Id] : null, _warrantyRequests.ContainsKey(order.Id) ? _warrantyRequests[order.Id] : null)" Size="Size.Small">
@@ -111,6 +114,25 @@
                 </MudItem>
             }
         </MudGrid>
+
+        @if (_totalPages > 1)
+        {
+            <div class="d-flex justify-center align-center mt-4 gap-2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           Disabled="@(_currentPageValue == 1)"
+                           OnClick="() => ChangePage(_currentPageValue - 1)">
+                    Trang trước
+                </MudButton>
+                <MudText Typo="Typo.body2" Class="mx-2">
+                    Trang @_currentPageValue / @_totalPages
+                </MudText>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           Disabled="@(_currentPageValue == _totalPages)"
+                           OnClick="() => ChangePage(_currentPageValue + 1)">
+                    Trang sau
+                </MudButton>
+            </div>
+        }
     }
 
 <style>
@@ -129,27 +151,57 @@
 
 @code {
     private List<OrderResponse> _orders = new();
+    private List<OrderResponse> _pagedOrders = new();
     private bool _isLoading = true;
+    private int _currentPageValue = 1;
+    private int _pageSize = 5;
+    private int _totalPages => (int)Math.Ceiling(_orders.Count / (double)_pageSize);
     private Dictionary<int, ReturnOrderResponse?> _returnOrders = new();
     private Dictionary<int, WarrantyRequestResponse?> _warrantyRequests = new();
+    private int? _currentUserId;
+
+    private int CurrentPage
+    {
+        get => _currentPageValue;
+        set
+        {
+            _currentPageValue = value;
+            UpdatePagedItems();
+            StateHasChanged();
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            await LoadCurrentUserId();
             await LoadOrdersAsync();
+        }
+    }
+
+    private async Task LoadCurrentUserId()
+    {
+        var userIdStr = await AuthService.GetUserIdAsync();
+        if (int.TryParse(userIdStr, out var userId))
+        {
+            _currentUserId = userId;
         }
     }
 
     private async Task LoadOrdersAsync()
     {
+        if (!_currentUserId.HasValue)
+        {
+            Snackbar.Add("Không tìm thấy thông tin người dùng", Severity.Error);
+            return;
+        }
+
         _isLoading = true;
         try
         {
-            // TODO: Get current user ID from auth service
-            // For now, get all orders (should filter by current user)
-            var allOrders = await OrderService.GetAllAsync();
-            _orders = allOrders;
+            var allOrders = await OrderService.GetByUserIdAsync(_currentUserId.Value);
+            _orders = allOrders.OrderByDescending(o => o.CreatedAt).ToList();
 
             // Load all return orders at once to prevent DbContext concurrency
             var allReturnOrders = await ReturnOrderService.GetAllAsync();
@@ -180,6 +232,8 @@
                     _warrantyRequests[order.Id] = nonRejectedWarranty ?? warrantyRequests.OrderByDescending(w => w.CreatedAt).FirstOrDefault();
                 }
             }
+
+            UpdatePagedItems();
         }
         catch (Exception ex)
         {
@@ -190,6 +244,25 @@
             _isLoading = false;
             await InvokeAsync(StateHasChanged);
         }
+    }
+
+    private void UpdatePagedItems()
+    {
+        var skip = (_currentPageValue - 1) * _pageSize;
+        _pagedOrders = _orders.Skip(skip).Take(_pageSize).ToList();
+
+        // Adjust current page if it's beyond total pages
+        if (_currentPageValue > _totalPages && _totalPages > 0)
+        {
+            _currentPageValue = _totalPages;
+            UpdatePagedItems();
+        }
+    }
+
+    private void ChangePage(int page)
+    {
+        _currentPageValue = page;
+        UpdatePagedItems();
     }
 
     private async Task OpenOrderDetail(OrderResponse order)
@@ -213,51 +286,16 @@
         // If there's an active warranty request, show warranty status color
         if (warrantyRequest != null && warrantyRequest.Status != "Completed")
         {
-            return warrantyRequest.Status switch
-            {
-                "Pending" => Color.Warning,
-                "Approved" => Color.Success,
-                "Rejected" => Color.Error,
-                "InProgress" => Color.Info,
-                "Completed" => Color.Primary,
-                _ => Color.Default
-            };
+            return StatusHelper.GetWarrantyStatusColor(warrantyRequest.Status);
         }
 
         // If there's an active return order, show return status color
         if (returnOrder != null)
         {
-            return returnOrder.Status switch
-            {
-                "Pending" => Color.Warning,
-                "Approved" => Color.Info,
-                "Received" => Color.Primary,
-                "Completed" => Color.Success,
-                "Rejected" => Color.Error,
-                _ => Color.Default
-            };
+            return StatusHelper.GetReturnOrderStatusColor(returnOrder.Status);
         }
 
-        return orderStatus switch
-        {
-            "Pending" => Color.Warning,
-            "Confirmed" => Color.Info,
-            "AwaitingPickup" => Color.Info,
-            "Shipping" => Color.Primary,
-            "Shipped" => Color.Primary,
-            "Delivered" => Color.Success,
-            "AwaitingSchedule" => Color.Info,
-            "Scheduled" => Color.Secondary,
-            "TechnicianAssigned" => Color.Tertiary,
-            "Preparing" => Color.Primary,
-            "Installing" => Color.Primary,
-            "Testing" => Color.Info,
-            "Completed" => Color.Success,
-            "Cancelled" => Color.Error,
-            "Refunded" => Color.Warning,
-            "ReturnRequested" => Color.Warning,
-            _ => Color.Default
-        };
+        return StatusHelper.GetOrderStatusColor(orderStatus);
     }
 
     private static string GetStatusText(string orderStatus, ReturnOrderResponse? returnOrder, WarrantyRequestResponse? warrantyRequest)
@@ -265,51 +303,16 @@
         // If there's an active warranty request, show warranty status text
         if (warrantyRequest != null && warrantyRequest.Status != "Completed")
         {
-            return warrantyRequest.Status switch
-            {
-                "Pending" => "Yêu cầu bảo hành",
-                "Approved" => "Đã duyệt bảo hành",
-                "Rejected" => "Đã từ chối bảo hành",
-                "InProgress" => "Đang bảo hành",
-                "Completed" => "Bảo hành hoàn thành",
-                _ => warrantyRequest.Status
-            };
+            return StatusHelper.GetWarrantyStatusText(warrantyRequest.Status);
         }
 
         // If there's an active return order, show return status text
         if (returnOrder != null)
         {
-            return returnOrder.Status switch
-            {
-                "Pending" => "Yêu cầu hoàn hàng",
-                "Approved" => "Đã duyệt hoàn hàng",
-                "Received" => "Đã nhận hàng hoàn",
-                "Completed" => "Đã hoàn thành hoàn hàng",
-                "Rejected" => "Đã từ chối hoàn hàng",
-                _ => returnOrder.Status
-            };
+            return StatusHelper.GetReturnOrderStatusText(returnOrder.Status);
         }
 
-        return orderStatus switch
-        {
-            "Pending" => "Chờ xác nhận",
-            "Confirmed" => "Đã xác nhận",
-            "AwaitingPickup" => "Chờ lấy hàng",
-            "Shipping" => "Đang giao",
-            "Delivered" => "Đã giao",
-            "AwaitingSchedule" => "Chờ lịch",
-            "Scheduled" => "Đã đặt lịch",
-            "TechnicianAssigned" => "Đã giao kỹ thuật",
-            "Preparing" => "Đang chuẩn bị",
-            "Installing" => "Đang lắp đặt",
-            "Testing" => "Đang kiểm tra",
-            "Completed" => "Hoàn thành",
-            "Cancelled" => "Đã hủy",
-            "Refunded" => "Đã hoàn tiền",
-            "ReturnRequested" => "Yêu cầu trả hàng",
-            "Shipped" => "Đang giao", // Legacy support
-            _ => orderStatus
-        };
+        return StatusHelper.GetOrderStatusText(orderStatus);
     }
 
     private string FormatPrice(decimal price)

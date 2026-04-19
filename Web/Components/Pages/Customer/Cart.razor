@@ -38,14 +38,14 @@
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        @foreach (var item in _cartItems)
+                        @foreach (var item in _pagedItems)
                         {
                             <MudGrid Class="mb-4" @key="item.Id">
                                 <MudItem xs="12" sm="3">
                                     @if (!string.IsNullOrEmpty(item.ImageUrl))
                                     {
-                                        <MudImage Src="@item.ImageUrl" Alt="@item.ProductName" 
-                                                  Height="120" ObjectFit="ObjectFit.Cover" Class="rounded" />
+                                        <MudImage Src="@item.ImageUrl" Alt="@item.ProductName"
+                                                  Height="120" ObjectFit="ObjectFit.Cover" Class="rounded" Loading="Lazy" />
                                     }
                                     else
                                     {
@@ -74,17 +74,17 @@
                                 </MudItem>
                                 <MudItem xs="12" sm="4" Class="d-flex align-center justify-space-between">
                                     <div class="d-flex align-center">
-                                        <MudIconButton Icon="@Icons.Material.Filled.Remove" 
+                                        <MudIconButton Icon="@Icons.Material.Filled.Remove"
                                                       Size="Size.Small"
                                                       OnClick="() => UpdateQuantity(item, item.Quantity - 1)"
                                                       Disabled="item.Quantity <= 1" />
-                                        <MudTextField @bind-Value="item.Quantity" 
+                                        <MudTextField @bind-Value="item.Quantity"
                                                      Variant="Variant.Outlined"
                                                      Style="width: 60px;"
                                                      textalign="TextAlign.Center"
                                                      Immediate="true"
                                                      OnBlur="() => UpdateQuantity(item, item.Quantity)" />
-                                        <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                                        <MudIconButton Icon="@Icons.Material.Filled.Add"
                                                       Size="Size.Small"
                                                       OnClick="() => UpdateQuantity(item, item.Quantity + 1)" />
                                     </div>
@@ -92,17 +92,36 @@
                                         <MudText Typo="Typo.subtitle1" Color="Color.Primary" Class="fw-bold">
                                             @FormatPrice(item.TotalPrice)
                                         </MudText>
-                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                       Color="Color.Error"
                                                       Size="Size.Small"
                                                       OnClick="() => RemoveItem(item)" />
                                     </div>
                                 </MudItem>
                             </MudGrid>
-                            @if (item != _cartItems.Last())
+                            @if (item != _pagedItems.Last())
                             {
                                 <MudDivider Class="my-4" />
                             }
+                        }
+
+                        @if (_totalPages > 1)
+                        {
+                            <div class="d-flex justify-center align-center mt-4 gap-2">
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                           Disabled="@(_currentPageValue == 1)"
+                                           OnClick="() => ChangePage(_currentPageValue - 1)">
+                                    Trang trước
+                                </MudButton>
+                                <MudText Typo="Typo.body2" Class="mx-2">
+                                    Trang @_currentPageValue / @_totalPages
+                                </MudText>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                           Disabled="@(_currentPageValue == _totalPages)"
+                                           OnClick="() => ChangePage(_currentPageValue + 1)">
+                                    Trang sau
+                                </MudButton>
+                            </div>
                         }
                     </MudCardContent>
                 </MudCard>
@@ -181,10 +200,25 @@
 
 @code {
     private List<CartItem> _cartItems = new();
+    private List<CartItem> _pagedItems = new();
     private bool _isLoading = true;
+    private int _currentPageValue = 1;
+    private int _pageSize = 5;
+    private int _totalPages => (int)Math.Ceiling(_cartItems.Count / (double)_pageSize);
     private decimal _subTotal => _cartItems.Sum(i => i.TotalPrice);
     private decimal _shippingFee => _subTotal >= 500000 ? 0 : 30000;
     private decimal _total => _subTotal + _shippingFee;
+
+    private int CurrentPage
+    {
+        get => _currentPageValue;
+        set
+        {
+            _currentPageValue = value;
+            UpdatePagedItems();
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
 
     public class CartItem
     {
@@ -221,6 +255,8 @@
             {
                 _cartItems = new List<CartItem>();
             }
+
+            UpdatePagedItems();
         }
         catch (Exception ex)
         {
@@ -232,11 +268,30 @@
         }
     }
 
+    private void UpdatePagedItems()
+    {
+        var skip = (_currentPageValue - 1) * _pageSize;
+        _pagedItems = _cartItems.Skip(skip).Take(_pageSize).ToList();
+
+        // Adjust current page if it's beyond total pages
+        if (_currentPageValue > _totalPages && _totalPages > 0)
+        {
+            _currentPageValue = _totalPages;
+            UpdatePagedItems();
+        }
+    }
+
+    private void ChangePage(int page)
+    {
+        _currentPageValue = page;
+        UpdatePagedItems();
+    }
+
     private async Task UpdateQuantity(CartItem item, int quantity)
     {
         if (quantity < 1) quantity = 1;
         if (quantity > 99) quantity = 99;
-        
+
         item.Quantity = quantity;
         await SaveCartAsync();
     }
@@ -245,6 +300,7 @@
     {
         _cartItems.Remove(item);
         await SaveCartAsync();
+        UpdatePagedItems();
         Snackbar.Add("Đã xóa sản phẩm khỏi giỏ hàng", Severity.Success);
     }
 
@@ -252,6 +308,7 @@
     {
         _cartItems.Clear();
         await SaveCartAsync();
+        UpdatePagedItems();
         Snackbar.Add("Đã xóa toàn bộ giỏ hàng", Severity.Success);
     }
 

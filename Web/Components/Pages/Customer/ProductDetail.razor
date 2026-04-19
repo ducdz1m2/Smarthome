@@ -170,6 +170,9 @@ else
                                 <MudText Typo="Typo.h5" Color="Color.Primary" Class="fw-bold mt-2">
                                     @FormatPrice(_selectedVariant.Price)
                                 </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                    Bảo hành: @_selectedVariant.WarrantyPeriod tháng
+                                </MudText>
                             }
                             else
                             {
@@ -291,7 +294,7 @@ else
                                             <MudText Typo="Typo.subtitle2" Class="fw-bold">@comment.UserName</MudText>
                                         </div>
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                            @comment.CreatedAt.ToString("dd/MM/yyyy")
+                                            @comment.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")
                                         </MudText>
                                     </div>
                                     <MudRating ReadOnly="true" SelectedValue="@comment.Rating"/>

@@ -10,6 +10,7 @@
         public string ShippingDistrict { get; set; } = string.Empty;
         public string ShippingCity { get; set; } = string.Empty;
         public decimal ShippingFee { get; set; }
+        public Domain.Enums.PaymentMethod PaymentMethod { get; set; } = Domain.Enums.PaymentMethod.COD;
         public DateTime? InstallationDate { get; set; }
         public int? InstallationSlotId { get; set; }
         public List<CreateOrderItemRequest> Items { get; set; } = new();

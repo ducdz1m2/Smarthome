@@ -22,18 +22,21 @@
             {
                 <MudCard Class="mb-2" Elevation="0" Outlined="true">
                     <MudCardContent>
-                        <div class="d-flex align-center justify-space-between">
+                        <div class="d-flex align-center justify-space-between mb-2">
                             <div>
                                 <MudText Typo="Typo.body1" Class="fw-bold">@item.ProductName</MudText>
                                 <MudText Typo="Typo.caption">SKU: @item.Sku</MudText>
                             </div>
                             <div class="d-flex align-center gap-3">
-                                <MudNumericField T="int" @bind-Value="_warrantyQuantities[item.Id]" 
+                                <MudNumericField T="int" @bind-Value="_warrantyQuantities[item.Id]"
                                                  Label="SL bảo hành" Min="0" Max="@item.Quantity"
                                                  Style="width: 120px;" />
                                 <MudText Typo="Typo.caption">/ @item.Quantity</MudText>
                             </div>
                         </div>
+                        <MudCheckBox T="bool" @bind-Checked="_isDamaged[item.Id]"
+                                   Label="Sản phẩm bị hư hỏng (không trả lại kho)"
+                                   Color="Color.Warning" />
                     </MudCardContent>
                 </MudCard>
             }
@@ -75,6 +78,7 @@
     private Domain.Enums.WarrantyType _warrantyType = Domain.Enums.WarrantyType.Repair;
     private string _description = "";
     private Dictionary<int, int> _warrantyQuantities = new();
+    private Dictionary<int, bool> _isDamaged = new();
 
     protected override void OnInitialized()
     {
@@ -82,6 +86,7 @@
         foreach (var item in Items)
         {
             _warrantyQuantities[item.Id] = 0;
+            _isDamaged[item.Id] = false;
         }
     }
 
@@ -106,7 +111,8 @@
                 {
                     OrderItemId = x.Key,
                     Quantity = x.Value,
-                    Description = _description
+                    Description = _description,
+                    IsDamaged = _isDamaged[x.Key]
                 })
                 .ToList();
 

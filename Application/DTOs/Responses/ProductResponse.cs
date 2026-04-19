@@ -50,6 +50,7 @@ namespace Application.DTOs.Responses
         public string Sku { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public int StockQuantity { get; set; }
+        public int WarrantyPeriod { get; set; } = 12;
         public Dictionary<string, string> Attributes { get; set; } = new();
         public bool IsActive { get; set; }
     }

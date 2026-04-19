@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Application.DTOs.Requests;
 using Application.DTOs.Responses;
+using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Identity;
 using Domain.Exceptions;
@@ -19,15 +20,18 @@ namespace Application.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<ApplicationRole> _roleManager;
         private readonly IConfiguration _configuration;
+        private readonly ITechnicianProfileRepository _technicianProfileRepository;
 
         public IdentityService(
             UserManager<ApplicationUser> userManager,
             RoleManager<ApplicationRole> roleManager,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ITechnicianProfileRepository technicianProfileRepository)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _configuration = configuration;
+            _technicianProfileRepository = technicianProfileRepository;
         }
 
         #region User Management
@@ -296,7 +300,7 @@ namespace Application.Services
             await _userManager.UpdateAsync(user);
 
             var roles = await _userManager.GetRolesAsync(user);
-            return GenerateAuthResponse(user, roles);
+            return await GenerateAuthResponse(user, roles);
         }
 
         public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
@@ -343,7 +347,7 @@ namespace Application.Services
             await _userManager.AddToRoleAsync(user, "Customer");
 
             var roles = await _userManager.GetRolesAsync(user);
-            return GenerateAuthResponse(user, roles);
+            return await GenerateAuthResponse(user, roles);
         }
 
         public async Task<IdentityResult> ChangePasswordAsync(int userId, string currentPassword, string newPassword)
@@ -368,11 +372,11 @@ namespace Application.Services
 
         #region Private Methods
 
-        private AuthResponse GenerateAuthResponse(ApplicationUser user, IList<string> roles)
+        private async Task<AuthResponse> GenerateAuthResponse(ApplicationUser user, IList<string> roles)
         {
             var jwt = _configuration.GetSection("JwtSettings");
             var expiresInDays = int.Parse(jwt["ExpiresInDays"] ?? "7");
-            var token = GenerateJwtToken(user, roles);
+            var token = await GenerateJwtToken(user, roles);
             var refreshToken = GenerateRefreshToken();
 
             return new AuthResponse
@@ -384,7 +388,7 @@ namespace Application.Services
             };
         }
 
-        private string GenerateJwtToken(ApplicationUser user, IList<string> roles)
+        private async Task<string> GenerateJwtToken(ApplicationUser user, IList<string> roles)
         {
             var jwt = _configuration.GetSection("JwtSettings");
             var key = Encoding.UTF8.GetBytes(jwt["SecretKey"] ?? "YourSuperSecretKey12345678901234567890");
@@ -404,6 +408,24 @@ namespace Application.Services
             foreach (var role in roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+
+            // Add TechnicianId claim for technician users
+            if (roles.Contains("Technician"))
+            {
+                try
+                {
+                    var technician = await _technicianProfileRepository.GetByUserIdAsync(user.Id);
+                    if (technician != null)
+                    {
+                        claims.Add(new Claim("TechnicianId", technician.Id.ToString()));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log error but don't fail login if technician profile lookup fails
+                    Console.WriteLine($"[IdentityService] Error fetching technician profile for user {user.Id}: {ex.Message}");
+                }
             }
 
             var tokenDescriptor = new SecurityTokenDescriptor

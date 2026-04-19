@@ -121,6 +121,9 @@ namespace Application.Services
                 request.ShippingFee
             );
 
+            // Set payment method
+            order.SetPaymentMethod(request.PaymentMethod);
+
             Console.WriteLine($"[OrderService] Order created with OrderNumber: {order.OrderNumber}, DomainEvents count: {order.DomainEvents.Count()}");
 
             decimal regularItemsTotal = 0;
@@ -614,6 +617,30 @@ namespace Application.Services
                 throw new DomainException("Chỉ có thể xóa đơn hàng ở trạng thái chờ xác nhận hoặc đã hủy");
 
             _orderRepository.Delete(order);
+            await _orderRepository.SaveChangesAsync();
+        }
+
+        public async Task UpdatePaymentStatusAsync(int orderId, string paymentMethod, string transactionCode)
+        {
+            var order = await _orderRepository.GetByIdAsync(orderId);
+            if (order == null)
+                throw new DomainException("Không tìm thấy đơn hàng");
+
+            if (order.PaymentTransaction != null)
+            {
+                order.PaymentTransaction.MarkSuccess(transactionCode);
+            }
+            else
+            {
+                var paymentTransaction = Domain.Entities.Sales.PaymentTransaction.Create(
+                    orderId,
+                    order.TotalAmount,
+                    Enum.Parse<PaymentMethod>(paymentMethod)
+                );
+                paymentTransaction.MarkSuccess(transactionCode);
+                order.SetPaymentTransaction(paymentTransaction);
+            }
+
             await _orderRepository.SaveChangesAsync();
         }
 

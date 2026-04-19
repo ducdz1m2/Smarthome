@@ -48,6 +48,20 @@ public class LocalAuthStateProvider : AuthenticationStateProvider
                 _currentUserService.Clear();
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
+            catch (Microsoft.JSInterop.JSException)
+            {
+                // JS interop not available (prerendering), return anonymous
+                Console.WriteLine($"[LocalAuthStateProvider] JS interop not available (prerendering), returning anonymous");
+                _currentUserService.Clear();
+                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            }
+            catch (InvalidOperationException)
+            {
+                // Invalid operation during prerendering, return anonymous
+                Console.WriteLine($"[LocalAuthStateProvider] Invalid operation (prerendering), returning anonymous");
+                _currentUserService.Clear();
+                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"[LocalAuthStateProvider] Error reading from localStorage: {ex.Message}");
@@ -88,13 +102,19 @@ public class LocalAuthStateProvider : AuthenticationStateProvider
             var email = principal.FindFirst("email")?.Value;
             var fullName = principal.FindFirst("given_name")?.Value;
             var roles = principal.FindAll("role").Select(c => c.Value).ToList();
+            var technicianIdClaim = principal.FindFirst("TechnicianId")?.Value;
+            int? technicianId = null;
+            if (!string.IsNullOrEmpty(technicianIdClaim) && int.TryParse(technicianIdClaim, out var tid))
+            {
+                technicianId = tid;
+            }
 
-            Console.WriteLine($"[LocalAuthStateProvider] Extracted: UserIdClaim={userIdClaim}, UserName={userName}, Email={email}, FullName={fullName}, Roles=[{string.Join(", ", roles)}]");
+            Console.WriteLine($"[LocalAuthStateProvider] Extracted: UserIdClaim={userIdClaim}, UserName={userName}, Email={email}, FullName={fullName}, Roles=[{string.Join(", ", roles)}], TechnicianId={technicianId}");
 
             if (int.TryParse(userIdClaim, out var userId))
             {
-                _currentUserService.SetUser(userId, userName ?? "", email ?? "", fullName ?? "", roles, null);
-                Console.WriteLine($"[LocalAuthStateProvider] Synced to CurrentUserService: UserId={userId}, UserName={userName}");
+                _currentUserService.SetUser(userId, userName ?? "", email ?? "", fullName ?? "", roles, technicianId);
+                Console.WriteLine($"[LocalAuthStateProvider] Synced to CurrentUserService: UserId={userId}, UserName={userName}, TechnicianId={technicianId}");
             }
             else
             {

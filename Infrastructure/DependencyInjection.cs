@@ -87,8 +87,8 @@ namespace Infrastructure
             services.AddScoped<Application.Interfaces.Repositories.INotificationRepository, NotificationRepository>();
 
             // ML/Recommendation
-            services.AddScoped<Application.Interfaces.Repositories.IUserBehaviorRepository, UserBehaviorRepository>();
-            services.AddScoped<Application.Interfaces.IUserSimilarityService, Infrastructure.Services.ML.UserSimilarityService>();
+            services.AddScoped<Application.Interfaces.Repositories.IUserBehaviorRepository, Repositories.UserBehaviorRepository>();
+            services.AddScoped<Application.Interfaces.IUserSimilarityService, Services.ML.UserSimilarityService>();
             services.AddScoped<Application.Services.RecommendationService>();
 
             // Shipping service

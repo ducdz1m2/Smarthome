@@ -17,18 +17,27 @@
                 </MudItem>
                 
                 <MudItem xs="12" md="6">
-                    <MudNumericField T="decimal" @bind-Value="_request.Price" 
-                                     Label="Giá *" 
+                    <MudNumericField T="decimal" @bind-Value="_request.Price"
+                                     Label="Giá *"
                                      Required="true"
                                      Variant="Variant.Outlined" Class="mb-3"
                                      Adornment="Adornment.End" AdornmentText="đ"
                                      Min="0" />
                 </MudItem>
-                
+
+                <MudItem xs="12" md="6">
+                    <MudNumericField T="int" @bind-Value="_request.WarrantyPeriod"
+                                     Label="Thời hạn bảo hành (tháng)"
+                                     Required="true"
+                                     Variant="Variant.Outlined" Class="mb-3"
+                                     Adornment="Adornment.End" AdornmentText="tháng"
+                                     Min="0" />
+                </MudItem>
+
                 @if (_isEdit)
                 {
                     <MudItem xs="12" md="6">
-                        <MudSwitch @bind-Value="_request.IsActive" 
+                        <MudSwitch @bind-Value="_request.IsActive"
                                    Label="Đang bán" Color="Color.Success" />
                     </MudItem>
                 }
@@ -130,6 +139,7 @@
                 {
                     Sku = variant.Sku,
                     Price = variant.Price,
+                    WarrantyPeriod = variant.WarrantyPeriod,
                     Attributes = variant.Attributes,
                     IsActive = variant.IsActive
                 };
@@ -193,6 +203,7 @@
                     ProductId = ProductId,
                     Sku = _request.Sku,
                     Price = _request.Price,
+                    WarrantyPeriod = _request.WarrantyPeriod,
                     Attributes = _request.Attributes
                 };
                 await VariantService.CreateAsync(createRequest);

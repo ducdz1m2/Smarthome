@@ -28,6 +28,9 @@ namespace Application
             services.AddScoped<IBannerService, BannerService>();
             services.AddScoped<IInventoryService, InventoryService>();
 
+            // VNPay
+            services.AddScoped<IVNPayService, VNPayService>();
+
             // Installation services
             services.AddScoped<IInstallationService, InstallationService>();
             services.AddScoped<ITechnicianProfileService, TechnicianProfileService>();

@@ -12,6 +12,7 @@ public class ProductVariant : Entity
     public Money Price { get; private set; } = null!;
     public int StockQuantity { get; private set; }
     public int FrozenStockQuantity { get; private set; }
+    public int WarrantyPeriod { get; private set; } = 12; // Default 12 months
     public string AttributesJson { get; private set; } = "{}";
     public bool IsActive { get; private set; } = true;
 
@@ -19,7 +20,7 @@ public class ProductVariant : Entity
 
     private ProductVariant() { }
 
-    public static ProductVariant Create(Product product, Sku sku, Money price, int initialStock, Dictionary<string, string> attributes)
+    public static ProductVariant Create(Product product, Sku sku, Money price, int initialStock, Dictionary<string, string> attributes, int warrantyPeriod = 12)
     {
         var variant = new ProductVariant
         {
@@ -27,6 +28,7 @@ public class ProductVariant : Entity
             Sku = sku,
             Price = price,
             StockQuantity = initialStock,
+            WarrantyPeriod = warrantyPeriod,
             AttributesJson = JsonSerializer.Serialize(attributes),
             IsActive = true
         };
@@ -34,7 +36,7 @@ public class ProductVariant : Entity
         return variant;
     }
 
-    public static ProductVariant Create(int productId, Sku sku, Money price, int initialStock, Dictionary<string, string> attributes)
+    public static ProductVariant Create(int productId, Sku sku, Money price, int initialStock, Dictionary<string, string> attributes, int warrantyPeriod = 12)
     {
         var variant = new ProductVariant
         {
@@ -42,6 +44,7 @@ public class ProductVariant : Entity
             Sku = sku,
             Price = price,
             StockQuantity = initialStock,
+            WarrantyPeriod = warrantyPeriod,
             AttributesJson = JsonSerializer.Serialize(attributes),
             IsActive = true
         };
@@ -50,14 +53,14 @@ public class ProductVariant : Entity
     }
 
     // Legacy overloads for backward compatibility
-    public static ProductVariant Create(Product product, string sku, decimal price, int initialStock, Dictionary<string, string> attributes)
+    public static ProductVariant Create(Product product, string sku, decimal price, int initialStock, Dictionary<string, string> attributes, int warrantyPeriod = 12)
     {
-        return Create(product, Sku.Create(sku), Money.Vnd(price), initialStock, attributes);
+        return Create(product, Sku.Create(sku), Money.Vnd(price), initialStock, attributes, warrantyPeriod);
     }
 
-    public static ProductVariant Create(int productId, string sku, decimal price, int initialStock, Dictionary<string, string> attributes)
+    public static ProductVariant Create(int productId, string sku, decimal price, int initialStock, Dictionary<string, string> attributes, int warrantyPeriod = 12)
     {
-        return Create(productId, Sku.Create(sku), Money.Vnd(price), initialStock, attributes);
+        return Create(productId, Sku.Create(sku), Money.Vnd(price), initialStock, attributes, warrantyPeriod);
     }
 
     public void UpdatePrice(Money newPrice)
@@ -68,6 +71,14 @@ public class ProductVariant : Entity
     public void UpdatePrice(decimal newPrice)
     {
         UpdatePrice(Money.Vnd(newPrice));
+    }
+
+    public void UpdateWarrantyPeriod(int warrantyPeriod)
+    {
+        if (warrantyPeriod < 0)
+            throw new ValidationException(nameof(warrantyPeriod), "Thời hạn bảo hành không thể âm");
+
+        WarrantyPeriod = warrantyPeriod;
     }
 
         public void UpdateAttributes(Dictionary<string, string> attributes)

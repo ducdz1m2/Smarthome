@@ -3,8 +3,10 @@
 @using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Web.Services
 @inject IUserAddressService AddressService
 @inject IIdentityService IdentityService
+@inject IAuthService AuthService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
@@ -100,7 +102,7 @@
             {
                 <MudText Typo="Typo.h6" Class="mb-3">Danh sách địa chỉ</MudText>
                 
-                @foreach (var address in _addresses)
+                @foreach (var address in _pagedAddresses)
                 {
                     var currentAddress = address; // Capture variable to avoid closure issues
                     <MudCard Elevation="1" Class="mb-3" @key="currentAddress.Id">
@@ -142,6 +144,25 @@
                             </div>
                         </MudCardContent>
                     </MudCard>
+                }
+
+                @if (_totalPages > 1)
+                {
+                    <div class="d-flex justify-center align-center mt-4 gap-2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   Disabled="@(_currentPageValue == 1)"
+                                   OnClick="() => ChangePage(_currentPageValue - 1)">
+                            Trang trước
+                        </MudButton>
+                        <MudText Typo="Typo.body2" Class="mx-2">
+                            Trang @_currentPageValue / @_totalPages
+                        </MudText>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   Disabled="@(_currentPageValue == _totalPages)"
+                                   OnClick="() => ChangePage(_currentPageValue + 1)">
+                            Trang sau
+                        </MudButton>
+                    </div>
                 }
             }
             else
@@ -232,11 +253,15 @@
     private bool _isEditValid;
     private bool _isSaving;
     private bool _showEditDialog;
-    private int _currentUserId = 1; // TODO: Get from auth
+    private int? _currentUserId;
     
     private CreateUserAddressRequest _newAddress = new();
     private UserAddressResponse _editAddress = new();
     private List<UserAddressResponse> _addresses = new();
+    private List<UserAddressResponse> _pagedAddresses = new();
+    private int _currentPageValue = 1;
+    private int _pageSize = 5;
+    private int _totalPages => (int)Math.Ceiling(_addresses.Count / (double)_pageSize);
     
     private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
 
@@ -244,21 +269,57 @@
     {
         if (firstRender)
         {
+            await LoadCurrentUserId();
             await LoadAddresses();
+        }
+    }
+
+    private async Task LoadCurrentUserId()
+    {
+        var userIdStr = await AuthService.GetUserIdAsync();
+        if (int.TryParse(userIdStr, out var userId))
+        {
+            _currentUserId = userId;
         }
     }
 
     private async Task LoadAddresses()
     {
+        if (!_currentUserId.HasValue)
+        {
+            Snackbar.Add("Không tìm thấy thông tin người dùng", Severity.Error);
+            return;
+        }
+
         try
         {
-            _addresses = await AddressService.GetByUserIdAsync(_currentUserId);
+            _addresses = await AddressService.GetByUserIdAsync(_currentUserId.Value);
+            UpdatePagedItems();
             await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Lỗi khi tải địa chỉ: {ex.Message}", Severity.Error);
         }
+    }
+
+    private void UpdatePagedItems()
+    {
+        var skip = (_currentPageValue - 1) * _pageSize;
+        _pagedAddresses = _addresses.Skip(skip).Take(_pageSize).ToList();
+
+        // Adjust current page if it's beyond total pages
+        if (_currentPageValue > _totalPages && _totalPages > 0)
+        {
+            _currentPageValue = _totalPages;
+            UpdatePagedItems();
+        }
+    }
+
+    private void ChangePage(int page)
+    {
+        _currentPageValue = page;
+        UpdatePagedItems();
     }
 
     private async Task AddAddress()
@@ -269,7 +330,7 @@
         _isSaving = true;
         try
         {
-            await AddressService.CreateAsync(_currentUserId, _newAddress);
+            await AddressService.CreateAsync(_currentUserId.Value, _newAddress);
             Snackbar.Add("Thêm địa chỉ thành công!", Severity.Success);
             _newAddress = new CreateUserAddressRequest();
             await LoadAddresses();
@@ -335,7 +396,7 @@
     {
         try
         {
-            await AddressService.SetAsDefaultAsync(_currentUserId, addressId);
+            await AddressService.SetAsDefaultAsync(_currentUserId.Value, addressId);
             Snackbar.Add("Đã đặt địa chỉ mặc định!", Severity.Success);
             await LoadAddresses();
         }

@@ -1,4 +1,6 @@
 @using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Web.Helpers
 @using MudBlazor
 
 <MudDialog>
@@ -13,20 +15,20 @@
                     <div><strong>Loại bảo hành:</strong> @WarrantyRequest.WarrantyType</div>
                     <div><strong>Mô tả:</strong> @WarrantyRequest.Description</div>
                     <div><strong>Trạng thái:</strong>
-                        <MudChip T="string" Color="@GetStatusColor(WarrantyRequest.Status)" Size="Size.Small">@WarrantyRequest.Status</MudChip>
+                        <MudChip T="string" Color="@StatusHelper.GetWarrantyStatusColor(WarrantyRequest.Status)" Size="Size.Small">@StatusHelper.GetWarrantyStatusText(WarrantyRequest.Status)</MudChip>
                     </div>
-                    <div><strong>Ngày tạo:</strong> @WarrantyRequest.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
+                    <div><strong>Ngày tạo:</strong> @WarrantyRequest.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
                     @if (WarrantyRequest.ApprovedAt.HasValue)
                     {
-                        <div><strong>Ngày duyệt:</strong> @WarrantyRequest.ApprovedAt.Value.ToString("dd/MM/yyyy HH:mm")</div>
+                        <div><strong>Ngày duyệt:</strong> @WarrantyRequest.ApprovedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
                     }
                     @if (WarrantyRequest.StartedAt.HasValue)
                     {
-                        <div><strong>Ngày bắt đầu:</strong> @WarrantyRequest.StartedAt.Value.ToString("dd/MM/yyyy HH:mm")</div>
+                        <div><strong>Ngày bắt đầu:</strong> @WarrantyRequest.StartedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
                     }
                     @if (WarrantyRequest.CompletedAt.HasValue)
                     {
-                        <div><strong>Ngày hoàn thành:</strong> @WarrantyRequest.CompletedAt.Value.ToString("dd/MM/yyyy HH:mm")</div>
+                        <div><strong>Ngày hoàn thành:</strong> @WarrantyRequest.CompletedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
                     }
                     @if (!string.IsNullOrEmpty(WarrantyRequest.TechnicianNotes))
                     {
@@ -61,16 +63,4 @@
         MudDialog.Cancel();
     }
 
-    private static Color GetStatusColor(string status)
-    {
-        return status switch
-        {
-            "Pending" => Color.Warning,
-            "Approved" => Color.Success,
-            "Rejected" => Color.Error,
-            "InProgress" => Color.Info,
-            "Completed" => Color.Primary,
-            _ => Color.Default
-        };
-    }
 }

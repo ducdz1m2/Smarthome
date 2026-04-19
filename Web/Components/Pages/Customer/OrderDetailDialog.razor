@@ -1,6 +1,7 @@
 @using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Web.Helpers
 @inject IOrderService OrderService
 @inject IReturnOrderService ReturnOrderService
 @inject IWarrantyRequestService WarrantyRequestService
@@ -29,11 +30,11 @@
                         <div>
                             <MudText Typo="Typo.h6" Class="fw-bold">Đơn hàng #@_order.OrderNumber</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                Đặt ngày @_order.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                Đặt ngày @_order.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                             </MudText>
                         </div>
-                        <MudChip T="string" Color="@GetStatusColor(_order.Status)" Size="Size.Medium">
-                            @GetStatusText(_order.Status)
+                        <MudChip T="string" Color="@StatusHelper.GetOrderStatusColor(_order.Status)" Size="Size.Medium">
+                            @StatusHelper.GetOrderStatusText(_order.Status)
                         </MudChip>
                     </div>
                 </MudItem>
@@ -179,8 +180,29 @@
                                     @if (shipment.PickedUpAt.HasValue)
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                                            Lấy hàng ngày: @shipment.PickedUpAt.Value.ToString("dd/MM/yyyy")
+                                            Lấy hàng ngày: @shipment.PickedUpAt.Value.ToLocalTime().ToString("dd/MM/yyyy")
                                         </MudText>
+                                    }
+                                    @if (shipment.DeliveredAt.HasValue)
+                                    {
+                                        var daysSinceDelivery = (DateTime.UtcNow - shipment.DeliveredAt.Value).TotalDays;
+                                        var daysRemaining = 30 - daysSinceDelivery;
+                                        @if (daysRemaining > 0)
+                                        {
+                                            <MudAlert Severity="Severity.Info" Class="mt-2" Dense="true">
+                                                <MudText Typo="Typo.caption">
+                                                    Còn @Math.Floor(daysRemaining) ngày để hoàn trả (trong vòng 30 ngày kể từ ngày giao)
+                                                </MudText>
+                                            </MudAlert>
+                                        }
+                                        else
+                                        {
+                                            <MudAlert Severity="Severity.Warning" Class="mt-2" Dense="true">
+                                                <MudText Typo="Typo.caption">
+                                                    Đã hết thời gian hoàn trả (30 ngày kể từ ngày giao)
+                                                </MudText>
+                                            </MudAlert>
+                                        }
                                     }
                                 </MudCardContent>
                             </MudCard>
@@ -225,13 +247,13 @@
                                 @if (_warrantyRequest.ApprovedAt.HasValue)
                                 {
                                     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                                        Ngày duyệt: @_warrantyRequest.ApprovedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                                        Ngày duyệt: @_warrantyRequest.ApprovedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                                     </MudText>
                                 }
                                 @if (_warrantyRequest.CompletedAt.HasValue)
                                 {
                                     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                                        Ngày hoàn thành: @_warrantyRequest.CompletedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                                        Ngày hoàn thành: @_warrantyRequest.CompletedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
                                     </MudText>
                                 }
                             </MudCardContent>
@@ -262,7 +284,7 @@
                                         }
                                     </div>
                                     <MudText Typo="Typo.body2" Class="mt-2">@review.Content</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@review.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@review.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
                                     @if (review.Replies?.Any() == true)
                                     {
                                         <div class="mt-2 ml-4">
@@ -273,7 +295,7 @@
                                                         <MudText Typo="Typo.caption" Class="fw-bold">@reply.UserName</MudText>
                                                         <MudRating SelectedValue="reply.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
                                                         <MudText Typo="Typo.caption">@reply.Content</MudText>
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@reply.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@reply.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
                                                     </MudCardContent>
                                                 </MudCard>
                                             }
@@ -313,7 +335,7 @@
                                     </div>
                                 </div>
                                 <MudText Typo="Typo.body2" Class="mt-2">@_technicianRating.Content</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@_technicianRating.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@_technicianRating.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
                             </MudCardContent>
                         </MudCard>
                     </MudItem>
@@ -326,6 +348,43 @@
                         <MudDivider Class="my-2" />
                         <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Liên hệ kỹ thuật viên</MudText>
                         <TechnicianChatWidget InstallationId="@_installationBooking.Id" />
+                    </MudItem>
+                }
+
+                <!-- Installation Booking Info -->
+                @if (_hasInstallation && _installationBooking != null)
+                {
+                    <MudItem xs="12" Class="mt-4">
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Thông tin lắp đặt</MudText>
+                        <MudCard Elevation="0" Outlined="true">
+                            <MudCardContent>
+                                <div class="d-flex align-center gap-2 mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Color="Color.Secondary" />
+                                    <MudText Typo="Typo.body2">Ngày lắp: @_installationBooking.ScheduledDate.ToLocalTime().ToString("dd/MM/yyyy")</MudText>
+                                </div>
+                                @if (_installationBooking.StartTime.HasValue)
+                                {
+                                    <div class="d-flex align-center gap-2 mb-2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.body2">Giờ: @_installationBooking.StartTime.Value.ToString(@"hh\:mm") - @_installationBooking.EndTime.Value.ToString(@"hh\:mm")</MudText>
+                                    </div>
+                                }
+                                <div class="d-flex align-center gap-2 mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Color="Color.Secondary" />
+                                    <MudText Typo="Typo.body2">KTV: @_installationBooking.TechnicianName</MudText>
+                                </div>
+                                <MudChip T="string" Color="@StatusHelper.GetInstallationStatusColor(_installationBooking.Status)" Size="Size.Small">
+                                    @StatusHelper.GetInstallationStatusText(_installationBooking.Status)
+                                </MudChip>
+                                @if (_installationBooking.CustomerRescheduleCount >= 1)
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small" Class="ml-2">
+                                        Đã đổi lịch
+                                    </MudChip>
+                                }
+                            </MudCardContent>
+                        </MudCard>
                     </MudItem>
                 }
             </MudGrid>
@@ -390,6 +449,14 @@
                     Đánh giá kỹ thuật viên
                 </MudButton>
             }
+        }
+
+        @* Nút Đổi lịch - hiển thị khi có lắp đặt và chưa hoàn thành và chưa đổi lịch *@
+        @if (_hasInstallation && _installationBooking != null && _installationBooking.Status != "Completed" && _installationBooking.CustomerRescheduleCount < 1)
+        {
+            <MudButton Color="Color.Tertiary" OnClick="OpenRescheduleDialog" StartIcon="@Icons.Material.Filled.Event">
+                Đổi lịch lắp đặt
+            </MudButton>
         }
     </DialogActions>
 </MudDialog>
@@ -683,64 +750,44 @@
         }
     }
 
-    private static Color GetStatusColor(string status)
-    {
-        return status switch
-        {
-            "Pending" => Color.Warning,
-            "Confirmed" => Color.Info,
-            "Shipped" => Color.Primary,
-            "Delivered" => Color.Success,
-            "Completed" => Color.Success,
-            "Cancelled" => Color.Error,
-            _ => Color.Default
-        };
-    }
-
-    private static string GetStatusText(string status)
-    {
-        return status switch
-        {
-            "Pending" => "Chờ xác nhận",
-            "Confirmed" => "Đã xác nhận",
-            "Shipped" => "Đang giao",
-            "Delivered" => "Đã giao",
-            "Completed" => "Hoàn thành",
-            "Cancelled" => "Đã hủy",
-            _ => status
-        };
-    }
-
     private static Color GetShipmentStatusColor(string status)
     {
-        return status switch
-        {
-            "Pending" => Color.Warning,
-            "PickedUp" => Color.Info,
-            "InTransit" => Color.Primary,
-            "Delivered" => Color.Success,
-            "Failed" => Color.Error,
-            _ => Color.Default
-        };
+        return StatusHelper.GetShipmentStatusColor(status);
     }
 
     private static string GetShipmentStatusText(string status)
     {
-        return status switch
+        return StatusHelper.GetShipmentStatusText(status);
+    }
+
+    private async Task OpenRescheduleDialog()
+    {
+        if (_installationBooking == null) return;
+
+        var parameters = new DialogParameters
         {
-            "Pending" => "Chờ lấy hàng",
-            "PickedUp" => "Đã lấy hàng",
-            "InTransit" => "Đang vận chuyển",
-            "Delivered" => "Đã giao",
-            "Failed" => "Giao thất bại",
-            _ => status
+            { "BookingId", _installationBooking.Id },
+            { "CurrentDate", _installationBooking.ScheduledDate },
+            { "CurrentSlotId", _installationBooking.SlotId }
         };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<RescheduleDialog>("Đổi lịch lắp đặt", parameters, options);
+        var result = await dialog.Result;
+
+        if (result?.Canceled == false)
+        {
+            Snackbar.Add("Đã đổi lịch thành công", Severity.Success);
+            await LoadOrderAsync();
+        }
     }
 
     private static string GetPaymentMethodText(string paymentMethod)
     {
         return paymentMethod switch
         {
+            "COD" => "Thanh toán khi nhận hàng (COD)",
+            "VNPay" => "VNPay",
             "CashOnDelivery" => "Thanh toán khi nhận hàng (COD)",
             "BankTransfer" => "Chuyển khoản ngân hàng",
             "CreditCard" => "Thẻ tín dụng",
@@ -751,28 +798,12 @@
 
     private static Color GetWarrantyStatusColor(string status)
     {
-        return status switch
-        {
-            "Pending" => Color.Warning,
-            "Approved" => Color.Success,
-            "Rejected" => Color.Error,
-            "InProgress" => Color.Info,
-            "Completed" => Color.Primary,
-            _ => Color.Default
-        };
+        return StatusHelper.GetWarrantyStatusColor(status);
     }
 
     private static string GetWarrantyStatusText(string status)
     {
-        return status switch
-        {
-            "Pending" => "Chờ duyệt",
-            "Approved" => "Đã duyệt",
-            "Rejected" => "Đã từ chối",
-            "InProgress" => "Đang thực hiện",
-            "Completed" => "Đã hoàn thành",
-            _ => status
-        };
+        return StatusHelper.GetWarrantyStatusText(status);
     }
 
     private string FormatPrice(decimal price)

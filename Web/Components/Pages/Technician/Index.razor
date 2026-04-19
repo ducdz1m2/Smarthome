@@ -1,11 +1,16 @@
 ﻿@page "/technician"
+@layout Web.Components.Layout.TechnicianLayout
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @using Domain.Enums
+@using Web.Helpers
+@using Web.Services
+
 @inject IInstallationService InstallationService
 @inject ITechnicianProfileService TechnicianService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
+@inject AuthService AuthService
 
 <MudText Typo="Typo.h4" Class="mb-4">Tổng quan</MudText>
 
@@ -110,7 +115,7 @@ else
                                 <MudCardContent>
                                     <MudText Typo="Typo.subtitle2">@booking.StartTime?.ToString("hh\\:mm") - @booking.CustomerName</MudText>
                                     <MudText Typo="Typo.body2">@booking.OrderNumber</MudText>
-                                    <MudChip T="string" Size="Size.Small" Color="GetStatusColor(booking.Status)">@GetStatusText(booking.Status)</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Color="StatusHelper.GetInstallationStatusColor(booking.Status)">@StatusHelper.GetInstallationStatusText(booking.Status)</MudChip>
                                 </MudCardContent>
                                 <MudCardActions>
                                     <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"/technician/bookings/{booking.Id}")">Chi tiết</MudButton>
@@ -164,7 +169,16 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadDashboardData();
+        // Don't load data here - it runs during prerendering when localStorage is not available
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadDashboardData();
+            StateHasChanged();
+        }
     }
 
     private async Task LoadDashboardData()
@@ -173,7 +187,6 @@ else
         {
             _loading = true;
             
-            // TODO: Get current technician ID from auth context
             var technicianId = await GetCurrentTechnicianId();
             if (technicianId == 0)
             {
@@ -216,9 +229,8 @@ else
 
     private async Task<int> GetCurrentTechnicianId()
     {
-        // TODO: Implement actual auth logic to get technician ID
-        // For now, return 1 as placeholder
-        return 1;
+        var technicianId = await AuthService.GetTechnicianIdAsync();
+        return technicianId ?? 0;
     }
 
     private async Task AcceptBooking(int bookingId)
@@ -262,42 +274,7 @@ else
 
     private static Color GetTimelineColor(string status)
     {
-        return status switch
-        {
-            "Assigned" => Color.Warning,
-            "Preparing" => Color.Info,
-            "OnTheWay" => Color.Primary,
-            "Installing" => Color.Secondary,
-            "Completed" => Color.Success,
-            _ => Color.Default
-        };
+        return StatusHelper.GetInstallationStatusColor(status);
     }
 
-    private static Color GetStatusColor(string status)
-    {
-        return status switch
-        {
-            "Assigned" => Color.Warning,
-            "Preparing" => Color.Info,
-            "OnTheWay" => Color.Primary,
-            "Installing" => Color.Secondary,
-            "Completed" => Color.Success,
-            "Cancelled" => Color.Error,
-            _ => Color.Default
-        };
-    }
-
-    private static string GetStatusText(string status)
-    {
-        return status switch
-        {
-            "Assigned" => "Chờ xác nhận",
-            "Preparing" => "Chuẩn bị",
-            "OnTheWay" => "Đang đi",
-            "Installing" => "Đang lắp",
-            "Completed" => "Hoàn thành",
-            "Cancelled" => "Đã hủy",
-            _ => status
-        };
-    }
 }

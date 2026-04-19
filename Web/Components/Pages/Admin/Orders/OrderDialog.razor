@@ -1,12 +1,13 @@
 @using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
-@using Application.Interfaces.Repositories
 @using Domain.Enums
+@using Microsoft.AspNetCore.Authorization
+@using Web.Helpers
+
 @inject IOrderService OrderService
 @inject ISnackbar Snackbar
 @inject IWarehouseService WarehouseService
-@inject IProductWarehouseRepository ProductWarehouseRepository
 
 <MudDialog>
     <DialogContent>
@@ -30,10 +31,10 @@
                         </MudCardHeader>
                         <MudCardContent>
                             <MudField Label="Mã đơn" Variant="Variant.Text">@_order.OrderNumber</MudField>
-                            <MudField Label="Ngày tạo" Variant="Variant.Text">@_order.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudField>
+                            <MudField Label="Ngày tạo" Variant="Variant.Text">@_order.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudField>
                             <MudField Label="Trạng thái" Variant="Variant.Text">
-                                <MudChip T="string" Color="@GetStatusColor(_order.Status)" Size="Size.Small">
-                                    @GetStatusDisplayName(_order.Status)
+                                <MudChip T="string" Color="@StatusHelper.GetOrderStatusColor(_order.Status)" Size="Size.Small">
+                                    @StatusHelper.GetOrderStatusText(_order.Status)
                                 </MudChip>
                             </MudField>
                             <MudField Label="Phương thức thanh toán" Variant="Variant.Text">@_order.PaymentMethod</MudField>
@@ -354,20 +355,18 @@
                     }
 
                     // Load available warehouses for this product variant
-                    var availableWarehouses = await ProductWarehouseRepository.GetAvailableWarehousesForProductVariantAsync(
-                        item.ProductId, 
-                        item.VariantId
-                    );
+                    var allWarehouses = await WarehouseService.GetAllAsync();
 
                     if (!_availableStockByWarehouse.ContainsKey(item.Id))
                     {
                         _availableStockByWarehouse[item.Id] = new Dictionary<int, int>();
                     }
 
-                    foreach (var warehouseStock in availableWarehouses)
+                    // Initialize all warehouses with 0 stock
+                    foreach (var warehouse in allWarehouses)
                     {
-                        _availableStockByWarehouse[item.Id][warehouseStock.WarehouseId] = warehouseStock.GetAvailableStock();
-                        _checkboxStates[item.Id][warehouseStock.WarehouseId] = false;
+                        _availableStockByWarehouse[item.Id][warehouse.Id] = 0;
+                        _checkboxStates[item.Id][warehouse.Id] = false;
                     }
 
                     // If order is not Pending, load existing warehouse allocations for display
@@ -541,51 +540,5 @@
     private static bool CanCancel(string status)
     {
         return status != "Completed" && status != "Cancelled" && status != "Refunded";
-    }
-
-    private static string GetStatusDisplayName(string status)
-    {
-        return status switch
-        {
-            "Pending" => "Chờ xác nhận",
-            "Confirmed" => "Đã xác nhận",
-            "AwaitingPickup" => "Chờ lấy hàng",
-            "Shipping" => "Đang giao",
-            "Delivered" => "Đã giao",
-            "AwaitingSchedule" => "Chờ đặt lịch",
-            "Scheduled" => "Đã có lịch",
-            "TechnicianAssigned" => "Đã phân công",
-            "Preparing" => "Chuẩn bị",
-            "Installing" => "Đang lắp",
-            "Testing" => "Kiểm tra",
-            "Completed" => "Hoàn tất",
-            "Cancelled" => "Đã hủy",
-            "Refunded" => "Đã hoàn tiền",
-            "ReturnRequested" => "Yêu cầu trả hàng",
-            _ => status
-        };
-    }
-
-    private static Color GetStatusColor(string status)
-    {
-        return status switch
-        {
-            "Pending" => Color.Warning,
-            "Confirmed" => Color.Info,
-            "AwaitingPickup" => Color.Info,
-            "Shipping" => Color.Primary,
-            "Delivered" => Color.Success,
-            "AwaitingSchedule" => Color.Warning,
-            "Scheduled" => Color.Info,
-            "TechnicianAssigned" => Color.Info,
-            "Preparing" => Color.Info,
-            "Installing" => Color.Primary,
-            "Testing" => Color.Primary,
-            "Completed" => Color.Success,
-            "Cancelled" => Color.Error,
-            "Refunded" => Color.Error,
-            "ReturnRequested" => Color.Error,
-            _ => Color.Default
-        };
     }
 }

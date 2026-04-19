@@ -1,9 +1,10 @@
 @page "/admin/warranty-requests"
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
-@using MudBlazor
-@using Web.Components.Shared
-@layout AdminLayout
+@using Domain.Enums
+@using Microsoft.AspNetCore.Authorization
+@using Web.Helpers
+
 @inject IWarrantyRequestService WarrantyRequestService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -36,9 +37,9 @@
         <MudTd DataLabel="Loại">@context.WarrantyType</MudTd>
         <MudTd DataLabel="Mô tả">@context.Description</MudTd>
         <MudTd DataLabel="Trạng thái">
-            <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
+            <MudChip T="string" Color="@StatusHelper.GetWarrantyStatusColor(context.Status)" Size="Size.Small">@StatusHelper.GetWarrantyStatusText(context.Status)</MudChip>
         </MudTd>
-        <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+        <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
         <MudTd>
             <div class="d-flex gap-1">
                 <MudIconButton Icon="@Icons.Material.Filled.Visibility"
@@ -81,19 +82,6 @@
         return warrantyRequest.OrderNumber.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
                warrantyRequest.Id.ToString().Contains(_searchString) ||
                warrantyRequest.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static Color GetStatusColor(string status)
-    {
-        return status switch
-        {
-            "Pending" => Color.Warning,
-            "Approved" => Color.Success,
-            "Rejected" => Color.Error,
-            "InProgress" => Color.Info,
-            "Completed" => Color.Primary,
-            _ => Color.Default
-        };
     }
 
     protected override async Task OnInitializedAsync()

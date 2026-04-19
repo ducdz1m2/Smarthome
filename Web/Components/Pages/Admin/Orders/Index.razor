@@ -3,9 +3,9 @@
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @using Domain.Enums
-@using MudBlazor
-@using Web.Components.Shared
-@layout AdminLayout
+@using Microsoft.AspNetCore.Authorization
+@using Web.Helpers
+
 @inject IOrderService OrderService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -19,7 +19,7 @@
             <MudSelectItem T="string" Value="@null">Tất cả</MudSelectItem>
             @foreach (var status in _statusList)
             {
-                <MudSelectItem Value="@status">@GetStatusDisplayName(status)</MudSelectItem>
+                <MudSelectItem Value="@status">@StatusHelper.GetOrderStatusText(status)</MudSelectItem>
             }
         </MudSelect>
     </MudItem>
@@ -71,11 +71,11 @@
             </MudText>
         </MudTd>
         <MudTd DataLabel="Trạng thái">
-            <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small" Variant="Variant.Filled">
-                @GetStatusDisplayName(context.Status)
+            <MudChip T="string" Color="@StatusHelper.GetOrderStatusColor(context.Status)" Size="Size.Small" Variant="Variant.Filled">
+                @StatusHelper.GetOrderStatusText(context.Status)
             </MudChip>
         </MudTd>
-        <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+        <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
         <MudTd>
             <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" 
                            OnClick="@(() => OpenOrderDialog(context))" Size="Size.Small" />
@@ -204,47 +204,6 @@
 
     private static string GetStatusDisplayName(string status)
     {
-        return status switch
-        {
-            "Pending" => "Chờ xác nhận",
-            "Confirmed" => "Đã xác nhận",
-            "AwaitingPickup" => "Chờ lấy hàng",
-            "Shipping" => "Đang giao",
-            "Delivered" => "Đã giao",
-            "AwaitingSchedule" => "Chờ đặt lịch",
-            "Scheduled" => "Đã có lịch",
-            "TechnicianAssigned" => "Đã phân công",
-            "Preparing" => "Chuẩn bị",
-            "Installing" => "Đang lắp",
-            "Testing" => "Kiểm tra",
-            "Completed" => "Hoàn tất",
-            "Cancelled" => "Đã hủy",
-            "Refunded" => "Đã hoàn tiền",
-            "ReturnRequested" => "Yêu cầu trả hàng",
-            _ => status
-        };
-    }
-
-    private static Color GetStatusColor(string status)
-    {
-        return status switch
-        {
-            "Pending" => Color.Warning,
-            "Confirmed" => Color.Info,
-            "AwaitingPickup" => Color.Info,
-            "Shipping" => Color.Primary,
-            "Delivered" => Color.Success,
-            "AwaitingSchedule" => Color.Warning,
-            "Scheduled" => Color.Info,
-            "TechnicianAssigned" => Color.Info,
-            "Preparing" => Color.Info,
-            "Installing" => Color.Primary,
-            "Testing" => Color.Primary,
-            "Completed" => Color.Success,
-            "Cancelled" => Color.Error,
-            "Refunded" => Color.Error,
-            "ReturnRequested" => Color.Error,
-            _ => Color.Default
-        };
+        return StatusHelper.GetOrderStatusText(status);
     }
 }

@@ -38,6 +38,7 @@ public class Order : AggregateRoot
     // Navigation properties
     public virtual ICollection<OrderItem> Items { get; private set; } = new List<OrderItem>();
     public virtual ICollection<OrderShipment> Shipments { get; private set; } = new List<OrderShipment>();
+    public virtual PaymentTransaction? PaymentTransaction { get; private set; }
 
     private Order() { } // EF Core constructor
 
@@ -319,5 +320,15 @@ public class Order : AggregateRoot
         private static string GenerateOrderNumber()
         {
             return $"ORD{DateTime.UtcNow:yyyyMMdd}{Guid.NewGuid().ToString()[..6].ToUpper()}";
+        }
+
+        public void SetPaymentTransaction(PaymentTransaction paymentTransaction)
+        {
+            PaymentTransaction = paymentTransaction;
+        }
+
+        public void SetPaymentMethod(PaymentMethod paymentMethod)
+        {
+            PaymentMethod = paymentMethod;
         }
     }

@@ -15,6 +15,7 @@ namespace Application.Interfaces.Services
         Task UpdateStatusAsync(int id, UpdateOrderStatusRequest request);
         Task ConfirmAsync(int id, List<WarehouseAllocationRequest>? warehouseAllocations = null);
     Task<List<WarehouseAllocationResponse>> GetWarehouseAllocationsAsync(int orderId);
+        Task UpdatePaymentStatusAsync(int orderId, string paymentMethod, string transactionCode);
         Task StartShippingAsync(int id);
         Task MarkDeliveredAsync(int id);
         Task CancelAsync(int id, string reason);

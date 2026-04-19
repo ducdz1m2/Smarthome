@@ -17,6 +17,7 @@ namespace Infrastructure.Configuration
             builder.Property(v => v.Price).HasConversion(
                 money => money.Amount,
                 value => Domain.ValueObjects.Money.Vnd(value));
+            builder.Property(v => v.WarrantyPeriod).HasDefaultValue(12);
             builder.Property(v => v.AttributesJson).HasColumnType("nvarchar(max)");
             builder.Property(v => v.IsActive).HasDefaultValue(true);
             

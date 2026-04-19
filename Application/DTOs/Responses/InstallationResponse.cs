@@ -42,6 +42,7 @@ namespace Application.DTOs.Responses
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsUninstall { get; set; }
+        public int CustomerRescheduleCount { get; set; }
         
         // Vật tư
         public List<InstallationMaterialResponse> Materials { get; set; } = new();

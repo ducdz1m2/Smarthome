@@ -3,12 +3,14 @@
 @using Application.DTOs.Requests
 @using Application.Interfaces.Services
 @using Domain.Enums
+@using Web.Helpers
 @using Web.Services
 @inject IInstallationService InstallationService
 @inject InstallationApiService InstallationApiService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
+@inject AuthService AuthService
 
 @if (_loading)
 {
@@ -29,7 +31,7 @@ else
                         <MudText Typo="Typo.h5">Lịch lắp đặt #@_booking.Id</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">@_booking.OrderNumber</MudText>
                     </div>
-                    <MudChip T="string" Color="GetStatusColor(_booking.Status)" Size="Size.Large">@GetStatusText(_booking.Status)</MudChip>
+                    <MudChip T="string" Color="StatusHelper.GetInstallationStatusColor(_booking.Status)" Size="Size.Large">@StatusHelper.GetInstallationStatusText(_booking.Status)</MudChip>
                 </div>
             </MudPaper>
         </MudItem>
@@ -109,10 +111,17 @@ else
             <MudPaper Class="pa-4" Elevation="2">
                 <MudText Typo="Typo.h6" Class="mb-3">Cập nhật trạng thái</MudText>
                 
-                @if (_booking.Status == "Assigned")
+                @if (_booking.Status == "Assigned" || _booking.Status == "Rescheduled")
                 {
                     <MudAlert Severity="Severity.Warning" Class="mb-3">
-                        Lịch này đang chờ bạn xác nhận. Vui lòng tiếp nhận hoặc từ chối.
+                        @if (_booking.Status == "Rescheduled")
+                        {
+                            <span>Khách hàng đã đổi lịch. Vui lòng xác nhận lịch mới.</span>
+                        }
+                        else
+                        {
+                            <span>Lịch này đang chờ bạn xác nhận. Vui lòng tiếp nhận hoặc từ chối.</span>
+                        }
                     </MudAlert>
                     <div class="d-flex gap-2">
                         <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.CheckCircle"
@@ -120,6 +129,22 @@ else
                         <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel"
                                    OnClick="OpenRejectDialog">Từ chối lịch</MudButton>
                     </div>
+                }
+                else if (_booking.Status == "Confirmed")
+                {
+                    <MudAlert Severity="Severity.Success" Class="mb-3">
+                        Đã xác nhận lịch. Vui lòng chuẩn bị vật tư từ kho trước khi di chuyển.
+                    </MudAlert>
+                    @if (_booking.MaterialsPrepared)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
+                                   OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
+                                   OnClick="OpenPrepareMaterialsDialog">Chuẩn bị vật tư từ kho</MudButton>
+                    }
                 }
                 else if (_booking.Status == "Preparing")
                 {
@@ -252,82 +277,83 @@ else
 }
 
 <!-- Prepare Materials Dialog -->
-<MudDialog @bind-IsVisible="_showPrepareMaterialsDialog" Options="_dialogOptionsLarge">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Chuẩn bị vật tư từ kho</MudText>
-    </TitleContent>
-    <DialogContent>
-        @if (_loadingWarehouses)
-        {
-            <MudProgressLinear Indeterminate="true" Class="my-4" />
-        }
-        else if (_availableWarehouses?.Any() != true)
-        {
-            <MudAlert Severity="Severity.Warning">Không có kho nào có đủ tồn kho cho các sản phẩm cần lắp.</MudAlert>
-        }
-        else
-        {
-            <MudForm @ref="_prepareForm" @bind-IsValid="_isPrepareFormValid">
-                <MudSelect T="int" @bind-Value="_selectedWarehouseId" Label="Chọn kho *" Required="true"
-                           RequiredError="Vui lòng chọn kho" Variant="Variant.Outlined" Class="mb-4">
-                    @foreach (var warehouse in _availableWarehouses)
-                    {
-                        <MudSelectItem T="int" Value="@warehouse.WarehouseId">
-                            @warehouse.WarehouseName (@warehouse.WarehouseCode) - @warehouse.AvailableProducts.Count sản phẩm
-                        </MudSelectItem>
-                    }
-                </MudSelect>
+@if (_showPrepareMaterialsDialog)
+{
+    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center;">
+        <MudPaper Class="pa-4" Style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <MudText Typo="Typo.h6" Class="mb-4">Chuẩn bị vật tư từ kho</MudText>
+            @if (_loadingWarehouses)
+            {
+                <MudProgressLinear Indeterminate="true" Class="my-4" />
+            }
+            else if (_availableWarehouses?.Any() != true)
+            {
+                <MudAlert Severity="Severity.Warning">Không có kho nào có đủ tồn kho cho các sản phẩm cần lắp.</MudAlert>
+            }
+            else
+            {
+                <MudForm @ref="_prepareForm" @bind-IsValid="_isPrepareFormValid">
+                    <MudSelect T="int" @bind-Value="_selectedWarehouseId" Label="Chọn kho *" Required="true"
+                               RequiredError="Vui lòng chọn kho" Variant="Variant.Outlined" Class="mb-4">
+                        @foreach (var warehouse in _availableWarehouses)
+                        {
+                            <MudSelectItem T="int" Value="@warehouse.WarehouseId">
+                                @warehouse.WarehouseName (@warehouse.WarehouseCode) - @warehouse.AvailableProducts.Count sản phẩm
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
 
-                @if (_selectedWarehouseId > 0)
-                {
-                    var selectedWarehouse = _availableWarehouses.FirstOrDefault(w => w.WarehouseId == _selectedWarehouseId);
-                    @if (selectedWarehouse != null)
+                    @if (_selectedWarehouseId > 0)
                     {
-                        <MudText Typo="Typo.subtitle2" Class="mb-2">Sản phẩm có sẵn trong kho:</MudText>
-                        <MudTable Items="selectedWarehouse.AvailableProducts" Dense="true" Hover="true">
-                            <HeaderContent>
-                                <MudTh>Sản phẩm</MudTh>
-                                <MudTh>SL cần</MudTh>
-                                <MudTh>SL tồn</MudTh>
-                                <MudTh>SL lấy</MudTh>
-                            </HeaderContent>
-                            <RowTemplate>
-                                <MudTd>
-                                    <MudText>@context.ProductName</MudText>
-                                    <MudText Typo="Typo.caption">@context.Sku</MudText>
-                                </MudTd>
-                                <MudTd>
-                                    @{ var requiredQty = GetRequiredQuantity(context.ProductId); }
-                                    <MudText>@requiredQty</MudText>
-                                </MudTd>
-                                <MudTd>
-                                    <MudText Color="Color.Success">@context.AvailableStock</MudText>
-                                </MudTd>
-                                <MudTd>
-                                    <MudNumericField T="int" @bind-Value="GetMaterialItem(context.ProductId, context.VariantId).Quantity"
-                                                     Min="0" Max="Math.Min(context.AvailableStock, GetRequiredQuantity(context.ProductId))"
-                                                     Variant="Variant.Outlined" Dense="true"
-                                                     Required="GetMaterialItem(context.ProductId, context.VariantId).Quantity > 0" />
-                                </MudTd>
-                            </RowTemplate>
-                        </MudTable>
+                        var selectedWarehouse = _availableWarehouses.FirstOrDefault(w => w.WarehouseId == _selectedWarehouseId);
+                        @if (selectedWarehouse != null)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Sản phẩm có sẵn trong kho:</MudText>
+                            <MudTable Items="selectedWarehouse.AvailableProducts" Dense="true" Hover="true">
+                                <HeaderContent>
+                                    <MudTh>Sản phẩm</MudTh>
+                                    <MudTh>SL cần</MudTh>
+                                    <MudTh>SL tồn</MudTh>
+                                    <MudTh>SL lấy</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd>
+                                        <MudText>@context.ProductName</MudText>
+                                        <MudText Typo="Typo.caption">@context.Sku</MudText>
+                                    </MudTd>
+                                    <MudTd>
+                                        @{ var requiredQty = GetRequiredQuantity(context.ProductId); }
+                                        <MudText>@requiredQty</MudText>
+                                    </MudTd>
+                                    <MudTd>
+                                        <MudText Color="Color.Success">@context.AvailableStock</MudText>
+                                    </MudTd>
+                                    <MudTd>
+                                        <MudNumericField T="int" @bind-Value="GetMaterialItem(context.ProductId, context.VariantId).Quantity"
+                                                         Min="0" Max="Math.Min(context.AvailableStock, GetRequiredQuantity(context.ProductId))"
+                                                         Variant="Variant.Outlined" Dense="true"
+                                                         Required="GetMaterialItem(context.ProductId, context.VariantId).Quantity > 0" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
 
-                        <MudAlert Severity="Severity.Info" Class="mt-3">
-                            <MudText Typo="Typo.body2">
-                                <b>Ghi chú:</b> Chỉ cần lấy đủ số lượng cần thiết cho lắp đặt. Vật tư thừa có thể trả lại kho sau khi hoàn thành.
-                            </MudText>
-                        </MudAlert>
+                            <MudAlert Severity="Severity.Info" Class="mt-3">
+                                <MudText Typo="Typo.body2">
+                                    <b>Ghi chú:</b> Chỉ cần lấy đủ số lượng cần thiết cho lắp đặt. Vật tư thừa có thể trả lại kho sau khi hoàn thành.
+                                </MudText>
+                            </MudAlert>
+                        }
                     }
-                }
-            </MudForm>
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="() => _showPrepareMaterialsDialog = false">Hủy</MudButton>
-        <MudButton Color="Color.Success" OnClick="ConfirmPrepareMaterials"
-                   Disabled="!_isPrepareFormValid || _selectedWarehouseId == 0 || _loadingWarehouses">Xác nhận lấy hàng</MudButton>
-    </DialogActions>
-</MudDialog>
+                </MudForm>
+            }
+            <div class="d-flex justify-end mt-4">
+                <MudButton OnClick="() => _showPrepareMaterialsDialog = false" Variant="Variant.Outlined" Class="mr-2">Hủy</MudButton>
+                <MudButton Color="Color.Success" OnClick="ConfirmPrepareMaterials"
+                           Disabled="!_isPrepareFormValid || _selectedWarehouseId == 0 || _loadingWarehouses">Xác nhận lấy hàng</MudButton>
+            </div>
+        </MudPaper>
+    </div>
+}
 
 @code {
     [Parameter]
@@ -396,7 +422,8 @@ else
 
     private async Task<int> GetCurrentTechnicianId()
     {
-        return 1;
+        var technicianId = await AuthService.GetTechnicianIdAsync();
+        return technicianId ?? 0;
     }
 
     private async Task AcceptBooking()
@@ -548,32 +575,14 @@ else
         }
     }
 
-    private static Color GetStatusColor(string status)
+    private static Color GetShipmentStatusColor(string status)
     {
-        return status switch
-        {
-            "Assigned" => Color.Warning,
-            "Preparing" => Color.Info,
-            "OnTheWay" => Color.Primary,
-            "Installing" => Color.Secondary,
-            "Completed" => Color.Success,
-            "Cancelled" => Color.Error,
-            _ => Color.Default
-        };
+        return StatusHelper.GetShipmentStatusColor(status);
     }
 
-    private static string GetStatusText(string status)
+    private static string GetShipmentStatusText(string status)
     {
-        return status switch
-        {
-            "Assigned" => "Chờ xác nhận",
-            "Preparing" => "Chuẩn bị",
-            "OnTheWay" => "Đang đi",
-            "Installing" => "Đang lắp",
-            "Completed" => "Hoàn thành",
-            "Cancelled" => "Đã hủy",
-            _ => status
-        };
+        return StatusHelper.GetShipmentStatusText(status);
     }
 
     // Prepare Materials methods
@@ -582,6 +591,7 @@ else
         _selectedWarehouseId = 0;
         _selectedMaterials = new List<MaterialPreparationItem>();
         _showPrepareMaterialsDialog = true;
+        StateHasChanged();
         await LoadAvailableWarehouses();
     }
 

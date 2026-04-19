@@ -52,7 +52,12 @@ namespace Infrastructure.Configuration
                 .WithOne(os => os.Order)
                 .HasForeignKey(os => os.OrderId)
                 .OnDelete(DeleteBehavior.Cascade);
-                
+
+            builder.HasOne(o => o.PaymentTransaction)
+                .WithOne()
+                .HasForeignKey<PaymentTransaction>(pt => pt.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             builder.Ignore(o => o.DomainEvents);
         }
     }

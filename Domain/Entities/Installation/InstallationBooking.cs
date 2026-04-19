@@ -25,6 +25,7 @@ public class InstallationBooking : AggregateRoot
         public string? Notes { get; private set; }
         public bool IsUninstall { get; private set; } = false;
         public bool IsWarranty { get; private set; } = false;
+        public int CustomerRescheduleCount { get; private set; } = 0;
 
         public virtual Entities.Sales.Order Order { get; private set; } = null!;
         public virtual TechnicianProfile Technician { get; private set; } = null!;
@@ -121,6 +122,27 @@ public class InstallationBooking : AggregateRoot
             CustomerRating = rating;
         }
 
+        public void CustomerReschedule(int newSlotId, DateTime newDate)
+        {
+            if (Status == InstallationStatus.Completed)
+                throw new BusinessRuleViolationException("BookingCompleted", "Không thể đổi lịch khi đã hoàn thành");
+
+            if (CustomerRescheduleCount >= 1)
+                throw new BusinessRuleViolationException("RescheduleLimit", "Bạn chỉ được đổi lịch 1 lần");
+
+            SlotId = newSlotId;
+            ScheduledDate = newDate;
+            CustomerRescheduleCount++;
+            // Keep status as Assigned so technician can still accept/reject the rescheduled booking
+            // Only change to Rescheduled if we want to track the reschedule event separately
+            if (Status == InstallationStatus.Confirmed)
+            {
+                // If already confirmed, change to Rescheduled to require re-confirmation
+                Status = InstallationStatus.Rescheduled;
+            }
+            // Otherwise keep as Assigned so technician can accept the new time
+        }
+
         public void Cancel(string reason)
         {
             if (Status == InstallationStatus.Completed)
@@ -132,8 +154,8 @@ public class InstallationBooking : AggregateRoot
 
         public void Accept()
         {
-            if (Status != InstallationStatus.Assigned)
-                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể tiếp nhận lịch ở trạng thái đã phân công");
+            if (Status != InstallationStatus.Assigned && Status != InstallationStatus.Rescheduled)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể tiếp nhận lịch ở trạng thái đã phân công hoặc đã đổi lịch");
 
             Status = InstallationStatus.Confirmed;
 

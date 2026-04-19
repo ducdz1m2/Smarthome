@@ -63,6 +63,15 @@ public class ReturnOrderService : IReturnOrderService
         if (order == null)
             throw new DomainException("Không tìm thấy đơn hàng");
 
+        // Check if order is within 1 month for return eligibility
+        var lastShipment = order.Shipments.OrderByDescending(s => s.DeliveredAt).FirstOrDefault();
+        if (lastShipment?.DeliveredAt == null)
+            throw new DomainException("Không thể xác nhận ngày giao hàng để xử lý yêu cầu hoàn trả");
+
+        var daysSinceDelivery = (DateTime.UtcNow - lastShipment.DeliveredAt.Value).TotalDays;
+        if (daysSinceDelivery > 30)
+            throw new DomainException("Chỉ có thể hoàn trả trong vòng 30 ngày kể từ ngày giao hàng");
+
         // Check if there's already a pending return for this order
         if (await _returnOrderRepository.ExistsPendingReturnForOrderAsync(request.OrderId))
             throw new DomainException("Đơn hàng đã có yêu cầu trả hàng đang chờ xử lý");
@@ -265,9 +274,9 @@ public class ReturnOrderService : IReturnOrderService
             return ReturnType.Refund;
         }
 
-        // Simple logic: if order was delivered within 7 days, refund
+        // Simple logic: if order was delivered within 30 days, refund
         // Otherwise it's an exchange (simplified logic)
         var daysSinceDelivery = (DateTime.UtcNow - lastShipment.DeliveredAt.Value).TotalDays;
-        return daysSinceDelivery <= 7 ? ReturnType.Refund : ReturnType.Exchange;
+        return daysSinceDelivery <= 30 ? ReturnType.Refund : ReturnType.Exchange;
     }
 }

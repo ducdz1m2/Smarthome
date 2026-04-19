@@ -266,5 +266,23 @@ namespace Web.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+
+        /// <summary>
+        /// Customer reschedule booking (max 1 time)
+        /// </summary>
+        [HttpPost("{bookingId}/customer-reschedule")]
+        [Authorize]
+        public async Task<ActionResult> CustomerReschedule(int bookingId, [FromBody] RescheduleInstallationRequest request)
+        {
+            try
+            {
+                await _installationService.CustomerRescheduleAsync(bookingId, request);
+                return Ok(new { message = "Đã đổi lịch thành công" });
+            }
+            catch (DomainException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
     }
 }

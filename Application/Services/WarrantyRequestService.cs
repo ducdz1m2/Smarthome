@@ -16,19 +16,25 @@ public class WarrantyRequestService : IWarrantyRequestService
     private readonly IInstallationService _installationService;
     private readonly IInstallationSlotService _slotService;
     private readonly ITechnicianProfileService _technicianProfileService;
+    private readonly IProductVariantRepository _productVariantRepository;
+    private readonly IInventoryService _inventoryService;
 
     public WarrantyRequestService(
         IWarrantyRequestRepository warrantyRequestRepository,
         IOrderRepository orderRepository,
         IInstallationService installationService,
         IInstallationSlotService slotService,
-        ITechnicianProfileService technicianProfileService)
+        ITechnicianProfileService technicianProfileService,
+        IProductVariantRepository productVariantRepository,
+        IInventoryService inventoryService)
     {
         _warrantyRequestRepository = warrantyRequestRepository;
         _orderRepository = orderRepository;
         _installationService = installationService;
         _slotService = slotService;
         _technicianProfileService = technicianProfileService;
+        _productVariantRepository = productVariantRepository;
+        _inventoryService = inventoryService;
     }
 
     public async Task<List<WarrantyRequestResponse>> GetAllAsync()
@@ -79,7 +85,7 @@ public class WarrantyRequestService : IWarrantyRequestService
         // Add items
         foreach (var item in request.Items)
         {
-            warrantyRequest.AddItem(item.OrderItemId, item.Quantity, item.Description);
+            warrantyRequest.AddItem(item.OrderItemId, item.Quantity, item.Description, item.IsDamaged);
         }
 
         await _warrantyRequestRepository.AddAsync(warrantyRequest);
@@ -184,13 +190,42 @@ public class WarrantyRequestService : IWarrantyRequestService
 
     public async Task CompleteAsync(int id, string? technicianNotes = null)
     {
-        var warrantyRequest = await _warrantyRequestRepository.GetByIdAsync(id);
+        var warrantyRequest = await _warrantyRequestRepository.GetByIdWithItemsAsync(id);
         if (warrantyRequest == null)
             throw new DomainException("Không tìm thấy yêu cầu bảo hành");
 
         warrantyRequest.Complete(technicianNotes);
+
+        // Return non-damaged products to inventory
+        foreach (var item in warrantyRequest.Items.Where(i => !i.IsDamaged && !i.ReturnedToInventory))
+        {
+            await ReturnProductToInventoryAsync(item);
+            item.MarkAsReturnedToInventory();
+        }
+
         _warrantyRequestRepository.Update(warrantyRequest);
         await _warrantyRequestRepository.SaveChangesAsync();
+    }
+
+    private async Task ReturnProductToInventoryAsync(WarrantyRequestItem warrantyItem)
+    {
+        // Get order item to find product variant
+        var order = await _orderRepository.GetByIdWithDetailsAsync(warrantyItem.WarrantyRequestId);
+        if (order == null) return;
+
+        var orderItem = order.Items.FirstOrDefault(oi => oi.Id == warrantyItem.OrderItemId);
+        if (orderItem == null) return;
+
+        // Return to inventory
+        if (orderItem.VariantId.HasValue)
+        {
+            var variant = await _productVariantRepository.GetByIdAsync(orderItem.VariantId.Value);
+            if (variant != null)
+            {
+                variant.AddStock(warrantyItem.Quantity);
+                await _productVariantRepository.SaveChangesAsync();
+            }
+        }
     }
 
     private WarrantyRequestResponse MapToResponse(WarrantyRequest warrantyRequest)

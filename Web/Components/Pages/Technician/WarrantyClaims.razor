@@ -3,6 +3,7 @@
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @using Web.Services
+@using Web.Helpers
 @inject IInstallationService InstallationService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
@@ -39,7 +40,7 @@ else
             <MudTd>@context.ScheduledDate.Date.ToString("dd/MM/yyyy")</MudTd>
             <MudTd>@context.StartTime?.ToString("hh\\:mm") - @context.EndTime?.ToString("hh\\:mm")</MudTd>
             <MudTd>
-                <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status)">@GetStatusText(context.Status)</MudChip>
+                <MudChip T="string" Size="Size.Small" Color="StatusHelper.GetInstallationStatusColor(context.Status)">@StatusHelper.GetInstallationStatusText(context.Status)</MudChip>
             </MudTd>
             <MudTd>
                 <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
@@ -168,31 +169,4 @@ else
         }
     }
 
-    private static Color GetStatusColor(string status)
-    {
-        return status switch
-        {
-            "Assigned" => Color.Warning,
-            "Preparing" => Color.Info,
-            "OnTheWay" => Color.Primary,
-            "Installing" => Color.Secondary,
-            "Completed" => Color.Success,
-            "Cancelled" => Color.Error,
-            _ => Color.Default
-        };
-    }
-
-    private static string GetStatusText(string status)
-    {
-        return status switch
-        {
-            "Assigned" => "Chờ xác nhận",
-            "Preparing" => "Chuẩn bị",
-            "OnTheWay" => "Đang đi",
-            "Installing" => "Đang lắp",
-            "Completed" => "Hoàn thành",
-            "Cancelled" => "Đã hủy",
-            _ => status
-        };
-    }
 }

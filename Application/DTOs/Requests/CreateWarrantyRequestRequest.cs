@@ -15,4 +15,5 @@ public class WarrantyRequestItemDto
     public int OrderItemId { get; set; }
     public int Quantity { get; set; }
     public string Description { get; set; } = string.Empty;
+    public bool IsDamaged { get; set; } = false;
 }

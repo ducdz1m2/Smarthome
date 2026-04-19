@@ -2,8 +2,10 @@
 @using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
-@using MudBlazor
-@layout AdminLayout
+@using Domain.Enums
+@using Microsoft.AspNetCore.Authorization
+@using Web.Helpers
+
 @inject IInstallationService InstallationService
 @inject ITechnicianProfileService TechnicianService
 @inject ISnackbar Snackbar
@@ -76,8 +78,8 @@
             }
         </MudTd>
         <MudTd DataLabel="Trạng thái">
-            <MudChip T="string" Color="@GetStatusColor(context.Status, context.IsUninstall)" Size="Size.Small">
-                @GetStatusText(context.Status, context.IsUninstall)
+            <MudChip T="string" Color="@StatusHelper.GetInstallationStatusColor(context.Status, context.IsUninstall)" Size="Size.Small">
+                @StatusHelper.GetInstallationStatusText(context.Status, context.IsUninstall)
             </MudChip>
         </MudTd>
         <MudTd DataLabel="Đánh giá">
@@ -205,67 +207,5 @@
                 Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
             }
         }
-    }
-
-    private static Color GetStatusColor(string status, bool isUninstall)
-    {
-        if (isUninstall)
-        {
-            return status switch
-            {
-                "Assigned" => Color.Warning,
-                "Preparing" => Color.Warning,
-                "OnTheWay" => Color.Warning,
-                "Installing" => Color.Warning,
-                "Completed" => Color.Success,
-                "Cancelled" => Color.Error,
-                _ => Color.Default
-            };
-        }
-
-        return status switch
-        {
-            "Assigned" => Color.Info,
-            "Preparing" => Color.Primary,
-            "OnTheWay" => Color.Secondary,
-            "Installing" => Color.Tertiary,
-            "Completed" => Color.Success,
-            "Cancelled" => Color.Error,
-            // Legacy statuses
-            "Pending" => Color.Default,
-            "TechnicianAssigned" => Color.Info,
-            _ => Color.Default
-        };
-    }
-
-    private static string GetStatusText(string status, bool isUninstall)
-    {
-        if (isUninstall)
-        {
-            return status switch
-            {
-                "Assigned" => "Chờ KT tháo",
-                "Preparing" => "KT chuẩn bị tháo",
-                "OnTheWay" => "Đang đi tháo",
-                "Installing" => "Đang tháo",
-                "Completed" => "Đã tháo xong",
-                "Cancelled" => "Đã hủy tháo",
-                _ => status
-            };
-        }
-
-        return status switch
-        {
-            "Assigned" => "Chờ KT xác nhận",
-            "Preparing" => "KT chuẩn bị",
-            "OnTheWay" => "Đang đi",
-            "Installing" => "Đang lắp",
-            "Completed" => "Hoàn thành",
-            "Cancelled" => "Đã hủy",
-            // Legacy statuses
-            "Pending" => "Chờ xử lý",
-            "TechnicianAssigned" => "Đã phân công",
-            _ => status
-        };
     }
 }

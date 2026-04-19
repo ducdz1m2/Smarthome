@@ -9,6 +9,7 @@
 @inject ICategoryService CategoryService
 @inject IBrandService BrandService
 @inject ISupplierService SupplierService
+@inject IInventoryService InventoryService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
@@ -491,6 +492,30 @@
             try
             {
                 _variants = await VariantService.GetByProductIdAsync(ProductId.Value);
+
+                // Load warehouse stock for each variant
+                try
+                {
+                    var productInventory = await InventoryService.GetProductInventoryByIdAsync(ProductId.Value);
+                    Console.WriteLine($"[ProductDialog] ProductInventory loaded: {productInventory != null}");
+                    if (productInventory != null)
+                    {
+                        Console.WriteLine($"[ProductDialog] Variants count: {productInventory.Variants.Count}");
+                        foreach (var variant in _variants)
+                        {
+                            var variantStock = productInventory.Variants.FirstOrDefault(v => v.VariantId == variant.Id);
+                            Console.WriteLine($"[ProductDialog] Variant {variant.Id} stock found: {variantStock != null}, total: {variantStock?.TotalQuantity ?? 0}");
+                            if (variantStock != null)
+                            {
+                                variant.StockQuantity = variantStock.TotalQuantity;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ProductDialog] Error loading warehouse stock: {ex.Message}");
+                }
             }
             catch (Exception ex)
             {
@@ -570,7 +595,7 @@
                 await VariantService.ActivateAsync(variantId);
             else
                 await VariantService.DeactivateAsync(variantId);
-            
+
             Snackbar.Add($"Đã {(isActive ? "kích hoạt" : "vô hiệu hóa")} phân loại", Severity.Success);
             await LoadVariants();
         }

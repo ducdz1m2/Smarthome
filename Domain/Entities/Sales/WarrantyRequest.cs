@@ -37,12 +37,12 @@ public class WarrantyRequest : AggregateRoot
         };
     }
 
-    public void AddItem(int orderItemId, int quantity, string itemDescription)
+    public void AddItem(int orderItemId, int quantity, string itemDescription, bool isDamaged = false)
     {
         if (Status != WarrantyRequestStatus.Pending)
             throw new BusinessRuleViolationException("WarrantyRequestStatus", "Không thể thêm sản phẩm vào yêu cầu đã xử lý");
 
-        var item = WarrantyRequestItem.Create(Id, orderItemId, quantity, itemDescription);
+        var item = WarrantyRequestItem.Create(Id, orderItemId, quantity, itemDescription, isDamaged);
         Items.Add(item);
     }
 
@@ -90,17 +90,25 @@ public class WarrantyRequestItem : Entity
     public int OrderItemId { get; private set; }
     public int Quantity { get; private set; }
     public string Description { get; private set; } = string.Empty;
+    public bool IsDamaged { get; private set; } = false;
+    public bool ReturnedToInventory { get; private set; } = false;
 
     private WarrantyRequestItem() { }
 
-    public static WarrantyRequestItem Create(int warrantyRequestId, int orderItemId, int quantity, string description)
+    public static WarrantyRequestItem Create(int warrantyRequestId, int orderItemId, int quantity, string description, bool isDamaged = false)
     {
         return new WarrantyRequestItem
         {
             WarrantyRequestId = warrantyRequestId,
             OrderItemId = orderItemId,
             Quantity = quantity,
-            Description = description
+            Description = description,
+            IsDamaged = isDamaged
         };
+    }
+
+    public void MarkAsReturnedToInventory()
+    {
+        ReturnedToInventory = true;
     }
 }

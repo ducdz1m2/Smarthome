@@ -15,6 +15,8 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 @inject CurrentUserService CurrentUserService
+@inject IVNPayService VNPayService
+@inject HttpClient Http
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
     <MudText Typo="Typo.h4" Class="mb-4">Thanh toán</MudText>
@@ -150,15 +152,13 @@
                             </MudRadio>
                             
                             <MudDivider Class="my-2" />
-                            
-                            <MudRadio Value="@("VNPAY")" Disabled="true">
+
+                            <MudRadio Value="@("VNPAY")">
                                 <div class="d-flex align-center gap-2">
-                                    <MudIcon Icon="@Icons.Material.Filled.CreditCard" Color="Color.Secondary" />
+                                    <MudIcon Icon="@Icons.Material.Filled.CreditCard" Color="Color.Primary" />
                                     <div>
-                                        <MudText Typo="Typo.body1" Class="fw-bold" Color="Color.Secondary">Thanh toán VNPAY</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning">Đang phát triển</MudChip>
-                                        </MudText>
+                                        <MudText Typo="Typo.body1" Class="fw-bold">Thanh toán VNPAY</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Thanh toán qua cổng thanh toán VNPAY</MudText>
                                     </div>
                                 </div>
                             </MudRadio>
@@ -560,16 +560,37 @@
             // Set shipping fee
             _request.ShippingFee = _shippingFee;
 
+            // Set payment method
+            _request.PaymentMethod = _paymentMethod == "VNPAY" ? Domain.Enums.PaymentMethod.VNPay : Domain.Enums.PaymentMethod.COD;
+
             // Create order
             var orderId = await OrderService.CreateAsync(_request);
 
             // Clear cart
             await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "cart");
 
-            Snackbar.Add("Đặt hàng thành công!", Severity.Success);
-            
-            // Navigate to order confirmation or orders page
-            NavigationManager.NavigateTo("/orders");
+            // Handle VNPay payment
+            if (_paymentMethod == "VNPAY")
+            {
+                var orderInfo = $"Thanh toán đơn hàng {orderId}";
+                var vnPayResponse = await VNPayService.CreatePaymentUrlAsync(orderId, _total, orderInfo);
+
+                if (vnPayResponse.Success)
+                {
+                    // Redirect to VNPay payment page
+                    NavigationManager.NavigateTo(vnPayResponse.PaymentUrl, forceLoad: true);
+                }
+                else
+                {
+                    Snackbar.Add($"Lỗi khi tạo URL thanh toán VNPAY: {vnPayResponse.Message}", Severity.Error);
+                    NavigationManager.NavigateTo($"/orders/{orderId}");
+                }
+            }
+            else
+            {
+                Snackbar.Add("Đặt hàng thành công!", Severity.Success);
+                NavigationManager.NavigateTo("/orders");
+            }
         }
         catch (Exception ex)
         {

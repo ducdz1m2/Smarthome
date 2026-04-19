@@ -1,0 +1,122 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IInstallationService InstallationService
+@inject IInstallationSlotService SlotService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Đổi lịch lắp đặt</MudText>
+        
+        <MudDatePicker T="DateTime?" Label="Ngày mới" @bind-Date="_newDate" MinDate="@DateTime.Today" />
+        
+        @if (_newDate.HasValue)
+        {
+            @if (_isLoadingSlots)
+            {
+                <MudProgressCircular Class="my-4" Size="Size.Small" Indeterminate="true" />
+            }
+            else if (_availableSlots.Any())
+            {
+                <MudSelect T="int?" Label="Khung giờ" @bind-Value="_newSlotId" Class="mt-4">
+                    @foreach (var slot in _availableSlots)
+                    {
+                        <MudSelectItem T="int?" Value="@slot.Id">@slot.StartTime.ToString(@"hh\:mm") - @slot.EndTime.ToString(@"hh\:mm")</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning" Class="mt-4">
+                    <MudText Typo="Typo.body2">Không có khung giờ nào khả dụng</MudText>
+                </MudAlert>
+            }
+        }
+
+        <MudAlert Severity="Severity.Info" Class="mt-4">
+            <MudText Typo="Typo.body2">Bạn chỉ được đổi lịch 1 lần</MudText>
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Confirm" Disabled="@(!_newDate.HasValue || !_newSlotId.HasValue)">
+            Xác nhận
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int BookingId { get; set; }
+
+    [Parameter]
+    public DateTime CurrentDate { get; set; }
+
+    [Parameter]
+    public int CurrentSlotId { get; set; }
+
+    private DateTime? _newDate;
+    private int? _newSlotId;
+    private List<InstallationSlotListResponse> _availableSlots = new();
+    private bool _isLoadingSlots = false;
+
+    protected override void OnInitialized()
+    {
+        _newDate = CurrentDate;
+        _newSlotId = CurrentSlotId;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_newDate.HasValue)
+        {
+            await LoadAvailableSlotsAsync(_newDate.Value);
+        }
+    }
+
+    private async Task LoadAvailableSlotsAsync(DateTime date)
+    {
+        _isLoadingSlots = true;
+        try
+        {
+            var allSlots = await SlotService.GetAllAsync();
+            _availableSlots = allSlots.Where(s => !s.IsBooked).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải khung giờ: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingSlots = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Confirm()
+    {
+        if (!_newDate.HasValue || !_newSlotId.HasValue) return;
+
+        try
+        {
+            var request = new RescheduleInstallationRequest
+            {
+                NewSlotId = _newSlotId.Value,
+                NewDate = _newDate.Value
+            };
+
+            await InstallationService.CustomerRescheduleAsync(BookingId, request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+}

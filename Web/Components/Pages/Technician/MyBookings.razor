@@ -4,6 +4,7 @@
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @using Web.Services
+@using Web.Helpers
 @inject IInstallationService InstallationService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
@@ -67,6 +68,8 @@
     private List<InstallationBookingListResponse> _warrantyBookings = new();
     private List<InstallationBookingListResponse> _uninstallBookings = new();
     private int _activeTabIndex = 0;
+    private int _currentPageValue = 1;
+    private int _pageSize = 5;
     
     private DialogOptions dialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
     
@@ -151,6 +154,7 @@
     private void OnTabChanged(int index)
     {
         _activeTabIndex = index;
+        _currentPageValue = 1; // Reset to first page when changing tabs
         var type = index switch
         {
             0 => "installation",
@@ -161,8 +165,28 @@
         NavigationManager.NavigateTo($"/technician/bookings/{type}");
     }
 
+    private int GetTotalPages(List<InstallationBookingListResponse> bookings)
+    {
+        return (int)Math.Ceiling(bookings.Count / (double)_pageSize);
+    }
+
+    private List<InstallationBookingListResponse> GetPagedBookings(List<InstallationBookingListResponse> bookings)
+    {
+        var skip = (_currentPageValue - 1) * _pageSize;
+        return bookings.Skip(skip).Take(_pageSize).ToList();
+    }
+
+    private void ChangePage(int page)
+    {
+        _currentPageValue = page;
+        StateHasChanged();
+    }
+
     private RenderFragment RenderBookingTable(List<InstallationBookingListResponse> bookings, string bookingType)
     {
+        var pagedBookings = GetPagedBookings(bookings);
+        var totalPages = GetTotalPages(bookings);
+        
         return @<text>
             @if (!bookings.Any())
             {
@@ -170,7 +194,7 @@
             }
             else
             {
-                <MudTable Items="bookings" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+                <MudTable Items="pagedBookings" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
                     <HeaderContent>
                         <MudTh>Mã đơn</MudTh>
                         <MudTh>Khách hàng</MudTh>
@@ -191,7 +215,7 @@
                             @{
                                 var isUninstall = bookingType == "uninstall";
                             }
-                            <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status, isUninstall)">@GetStatusText(context.Status, isUninstall)</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="StatusHelper.GetInstallationStatusColor(context.Status, isUninstall)">@StatusHelper.GetInstallationStatusText(context.Status, isUninstall)</MudChip>
                         </MudTd>
                         <MudTd>
                             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
@@ -224,6 +248,25 @@
                         </MudTd>
                     </RowTemplate>
                 </MudTable>
+
+                @if (totalPages > 1)
+                {
+                    <div class="d-flex justify-center align-center mt-4 gap-2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   Disabled="@(_currentPageValue == 1)"
+                                   OnClick="() => ChangePage(_currentPageValue - 1)">
+                            Trang trước
+                        </MudButton>
+                        <MudText Typo="Typo.body2" Class="mx-2">
+                            Trang @_currentPageValue / @totalPages
+                        </MudText>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   Disabled="@(_currentPageValue == totalPages)"
+                                   OnClick="() => ChangePage(_currentPageValue + 1)">
+                            Trang sau
+                        </MudButton>
+                    </div>
+                }
             }
         </text>;
     }
@@ -301,64 +344,6 @@
             Console.WriteLine($"[CompleteBooking] Stack trace: {ex.StackTrace}");
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
-    }
-
-    private static Color GetStatusColor(string status, bool isUninstall)
-    {
-        if (isUninstall)
-        {
-            return status switch
-            {
-                "Assigned" => Color.Warning,
-                "Preparing" => Color.Warning,
-                "OnTheWay" => Color.Warning,
-                "Installing" => Color.Warning,
-                "Completed" => Color.Success,
-                "Cancelled" => Color.Error,
-                _ => Color.Default
-            };
-        }
-
-        return status switch
-        {
-            "Assigned" => Color.Info,
-            "Confirmed" => Color.Primary,
-            "Preparing" => Color.Primary,
-            "OnTheWay" => Color.Secondary,
-            "Installing" => Color.Tertiary,
-            "Completed" => Color.Success,
-            "Cancelled" => Color.Error,
-            _ => Color.Default
-        };
-    }
-
-    private static string GetStatusText(string status, bool isUninstall)
-    {
-        if (isUninstall)
-        {
-            return status switch
-            {
-                "Assigned" => "Chờ KT tháo",
-                "Preparing" => "KT chuẩn bị tháo",
-                "OnTheWay" => "Đang đi tháo",
-                "Installing" => "Đang tháo",
-                "Completed" => "Đã tháo xong",
-                "Cancelled" => "Đã hủy tháo",
-                _ => status
-            };
-        }
-
-        return status switch
-        {
-            "Assigned" => "Chờ xác nhận",
-            "Confirmed" => "Đã xác nhận",
-            "Preparing" => "Đang chuẩn bị",
-            "OnTheWay" => "Đang đi",
-            "Installing" => "Đang lắp",
-            "Completed" => "Hoàn thành",
-            "Cancelled" => "Đã hủy",
-            _ => status
-        };
     }
 
     private async Task OpenPrepareMaterialsDialog(int bookingId)

@@ -364,6 +364,11 @@ namespace Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("WarrantyPeriod")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(12);
+
                     b.HasKey("Id");
 
                     b.HasIndex("ProductId");
@@ -914,6 +919,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("CustomerRating")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CustomerRescheduleCount")
                         .HasColumnType("int");
 
                     b.Property<string>("CustomerSignature")
@@ -2200,7 +2208,8 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex("OrderId")
+                        .IsUnique();
 
                     b.HasIndex("TransactionCode")
                         .IsUnique()
@@ -2428,7 +2437,8 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int>("OrderId")
                         .HasColumnType("int");
@@ -2440,7 +2450,8 @@ namespace Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("TechnicianNotes")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -2453,7 +2464,11 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("WarrantyRequests");
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("WarrantyRequests", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Sales.WarrantyRequestItem", b =>
@@ -2473,13 +2488,24 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsDamaged")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<int>("OrderItemId")
                         .HasColumnType("int");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
+
+                    b.Property<bool>("ReturnedToInventory")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -2492,9 +2518,11 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OrderItemId");
+
                     b.HasIndex("WarrantyRequestId");
 
-                    b.ToTable("WarrantyRequestItem");
+                    b.ToTable("WarrantyRequestItems", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Shipping.ShippingRate", b =>
@@ -3268,6 +3296,15 @@ namespace Infrastructure.Migrations
                     b.Navigation("OrderItem");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Sales.PaymentTransaction", b =>
+                {
+                    b.HasOne("Domain.Entities.Sales.Order", null)
+                        .WithOne("PaymentTransaction")
+                        .HasForeignKey("Domain.Entities.Sales.PaymentTransaction", "OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.Entities.Sales.ReturnOrderItem", b =>
                 {
                     b.HasOne("Domain.Entities.Sales.ReturnOrder", null)
@@ -3451,6 +3488,8 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Entities.Sales.Order", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("PaymentTransaction");
 
                     b.Navigation("Shipments");
                 });

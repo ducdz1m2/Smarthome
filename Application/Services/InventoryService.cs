@@ -172,6 +172,30 @@ namespace Application.Services
             var totalQty = warehouseStocks.Sum(pw => pw.Quantity);
             var totalReserved = warehouseStocks.Sum(pw => pw.ReservedQuantity);
 
+            // Build variant responses with warehouse stocks
+            var variantResponses = new List<ProductVariantInventoryResponse>();
+            foreach (var variant in variants)
+            {
+                var variantStocks = warehouseStocks.Where(pw => pw.VariantId == variant.Id).ToList();
+                variantResponses.Add(new ProductVariantInventoryResponse
+                {
+                    VariantId = variant.Id,
+                    Sku = variant.Sku.Value,
+                    Price = variant.Price.Amount,
+                    StockQuantity = variant.StockQuantity,
+                    Attributes = variant.GetAttributes(),
+                    IsActive = variant.IsActive,
+                    WarehouseStocks = variantStocks.Select(pw => new WarehouseStockDetailResponse
+                    {
+                        WarehouseId = pw.WarehouseId,
+                        WarehouseName = pw.Warehouse?.Name ?? "",
+                        WarehouseCode = pw.Warehouse?.Code ?? "",
+                        Quantity = pw.Quantity,
+                        ReservedQuantity = pw.ReservedQuantity
+                    }).ToList()
+                });
+            }
+
             return new ProductInventoryResponse
             {
                 ProductId = product.Id,
@@ -194,7 +218,8 @@ namespace Application.Services
                     WarehouseCode = pw.Warehouse?.Code ?? "",
                     Quantity = pw.Quantity,
                     ReservedQuantity = pw.ReservedQuantity
-                }).ToList()
+                }).ToList(),
+                Variants = variantResponses
             };
         }
 

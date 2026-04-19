@@ -404,7 +404,31 @@ namespace Application.Services
             }
 
             booking.Reschedule(request.NewSlotId, request.NewDate);
-            newSlot.Book(booking.Id);
+
+            await _bookingRepository.SaveChangesAsync();
+        }
+
+        public async Task CustomerRescheduleAsync(int id, RescheduleInstallationRequest request)
+        {
+            var booking = await _bookingRepository.GetByIdAsync(id);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            var newSlot = await _slotRepository.GetByIdAsync(request.NewSlotId);
+            if (newSlot == null)
+                throw new DomainException("Không tìm thấy slot mới");
+
+            if (newSlot.IsBooked)
+                throw new DomainException("Slot mới đã được đặt");
+
+            // Release old slot
+            var oldSlot = await _slotRepository.GetByIdAsync(booking.SlotId);
+            if (oldSlot != null)
+            {
+                oldSlot.Release();
+            }
+
+            booking.CustomerReschedule(request.NewSlotId, request.NewDate);
 
             await _bookingRepository.SaveChangesAsync();
         }
@@ -751,6 +775,7 @@ namespace Application.Services
                 Notes = booking.Notes,
                 CreatedAt = booking.CreatedAt,
                 IsUninstall = booking.IsUninstall,
+                CustomerRescheduleCount = booking.CustomerRescheduleCount,
 
                 // Load technician rating content
                 CustomerRatingContent = null,
