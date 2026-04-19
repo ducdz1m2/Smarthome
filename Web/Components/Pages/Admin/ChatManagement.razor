@@ -17,7 +17,7 @@
 <div class="chat-container">
     <div class="chat-sidebar">
         <div class="chat-sidebar-header">
-            <MudText Typo="Typo.h6" Class="mb-0">Hỗ trợ khách hàng</MudText>
+            <MudText Typo="Typo.h6" Class="mb-0">@GetSidebarHeaderName()</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">@_chatRooms.Count cuộc hội thoại</MudText>
         </div>
         
@@ -1022,7 +1022,24 @@
     private string GetSelectedRoomName()
     {
         var room = _chatRooms.FirstOrDefault(r => r.Id == SelectedChatRoomId);
-        return room?.Title ?? "";
+        if (room == null) return "";
+        
+        var customerParticipant = room.Participants.FirstOrDefault(p => p.UserType == "Customer");
+        return customerParticipant?.UserName ?? room.Title;
+    }
+
+    private string GetSidebarHeaderName()
+    {
+        if (SelectedChatRoomId == 0)
+        {
+            return "Hỗ trợ khách hàng";
+        }
+        
+        var room = _chatRooms.FirstOrDefault(r => r.Id == SelectedChatRoomId);
+        if (room == null) return "Hỗ trợ khách hàng";
+        
+        var customerParticipant = room.Participants.FirstOrDefault(p => p.UserType == "Customer");
+        return customerParticipant?.UserName ?? "Hỗ trợ khách hàng";
     }
 
     private async Task ScrollToBottom()

@@ -1,5 +1,6 @@
 using Domain.Abstractions;
 using Domain.Enums;
+using Domain.Entities.Identity;
 
 namespace Domain.Entities.Communication;
 
@@ -18,6 +19,7 @@ public class ChatParticipant : Entity
     public DateTime? LastActivityAt { get; private set; }
 
     public virtual ChatRoom ChatRoom { get; private set; } = null!;
+    public virtual ApplicationUser User { get; private set; } = null!;
 
     private ChatParticipant() { }
 

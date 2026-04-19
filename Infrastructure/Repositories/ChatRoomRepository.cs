@@ -21,11 +21,13 @@ public class ChatRoomRepository : IChatRoomRepository
     public async Task<ChatRoom?> GetByIdWithParticipantsAsync(int id)
         => await _context.ChatRooms
             .Include(r => r.Participants)
+                .ThenInclude(p => p.User)
             .FirstOrDefaultAsync(r => r.Id == id);
 
     public async Task<ChatRoom?> GetByIdWithMessagesAsync(int id, int messageLimit = 50)
         => await _context.ChatRooms
             .Include(r => r.Participants)
+                .ThenInclude(p => p.User)
             .Include(r => r.Messages)
                 .ThenInclude(m => m.Attachments)
             .FirstOrDefaultAsync(r => r.Id == id);
@@ -57,6 +59,7 @@ public class ChatRoomRepository : IChatRoomRepository
     public async Task<List<ChatRoom>> GetActiveSupportRoomsAsync()
         => await _context.ChatRooms
             .Include(r => r.Participants)
+                .ThenInclude(p => p.User)
             .Include(r => r.Messages.OrderByDescending(m => m.SentAt))
                 .ThenInclude(m => m.Attachments)
             .Where(r => r.Type == ChatRoomType.Support && r.IsActive)
