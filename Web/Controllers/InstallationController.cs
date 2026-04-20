@@ -118,11 +118,19 @@ namespace Web.Controllers
         {
             try
             {
+                Console.WriteLine($"[PrepareMaterials Controller] Received request for booking {bookingId}");
                 await _installationService.PrepareMaterialsFromWarehouseAsync(bookingId, request);
+                Console.WriteLine($"[PrepareMaterials Controller] PrepareMaterialsFromWarehouseAsync completed successfully for booking {bookingId}");
                 return Ok(new { message = "Đã chuẩn bị vật tư từ kho thành công" });
             }
             catch (DomainException ex)
             {
+                Console.WriteLine($"[PrepareMaterials Controller] DomainException: {ex.Message}");
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[PrepareMaterials Controller] Exception: {ex.Message}");
                 return BadRequest(new { error = ex.Message });
             }
         }
@@ -278,6 +286,24 @@ namespace Web.Controllers
             {
                 await _installationService.CustomerRescheduleAsync(bookingId, request);
                 return Ok(new { message = "Đã đổi lịch thành công" });
+            }
+            catch (DomainException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Update IsWarranty flag for a booking (admin only)
+        /// </summary>
+        [HttpPut("{bookingId}/is-warranty")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> UpdateIsWarranty(int bookingId, [FromBody] bool isWarranty)
+        {
+            try
+            {
+                await _installationService.UpdateIsWarrantyAsync(bookingId, isWarranty);
+                return Ok(new { message = $"Đã cập nhật IsWarranty thành {isWarranty}" });
             }
             catch (DomainException ex)
             {

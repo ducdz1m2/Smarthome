@@ -57,6 +57,13 @@ namespace Application.Services
             return responses.ToList();
         }
 
+        public async Task<WarrantyResponse?> GetByOrderItemIdAsync(int orderItemId)
+        {
+            var warranty = await _warrantyRepository.GetByOrderItemIdAsync(orderItemId);
+            if (warranty == null) return null;
+            return await MapToResponseAsync(warranty);
+        }
+
         public async Task<List<WarrantyResponse>> GetActiveWarrantiesAsync()
         {
             var warranties = await _warrantyRepository.GetActiveWarrantiesAsync();
@@ -65,12 +72,14 @@ namespace Application.Services
             return responses.ToList();
         }
 
-        public async Task<int> CreateAsync(int orderItemId, int productId, int durationInMonths)
+        public async Task<int> CreateAsync(int productId, int? variantId, int orderItemId, int durationInMonths)
         {
-            if (await _warrantyRepository.ExistsAsync(orderItemId))
+            // Check if warranty already exists for this product instance
+            var existingWarranty = await _warrantyRepository.GetByOrderItemIdAsync(orderItemId);
+            if (existingWarranty != null)
                 throw new DomainException("Sản phẩm này đã có bảo hành");
 
-            var warranty = Warranty.Create(orderItemId, productId, durationInMonths);
+            var warranty = Warranty.Create(productId, variantId, orderItemId, durationInMonths);
             await _warrantyRepository.AddAsync(warranty);
             await _warrantyRepository.SaveChangesAsync();
             return warranty.Id;
@@ -185,11 +194,10 @@ namespace Application.Services
                 OrderItemId = warranty.OrderItemId,
                 ProductId = warranty.ProductId,
                 ProductName = product?.Name ?? "Unknown",
-                SerialNumber = "",
                 StartDate = warranty.StartDate,
                 EndDate = warranty.EndDate,
                 Status = warranty.Status.ToString(),
-                WarrantyPeriodMonths = (warranty.EndDate - warranty.StartDate).Days / DaysPerMonth,
+                WarrantyPeriodMonths = warranty.DurationMonths,
                 Claims = new List<WarrantyClaimRepsonse>()
             };
         }

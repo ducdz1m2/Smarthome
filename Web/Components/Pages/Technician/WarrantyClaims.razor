@@ -7,7 +7,6 @@
 @inject IInstallationService InstallationService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
-@inject IDialogService DialogService
 @inject IAuthService AuthService
 
 <MudText Typo="Typo.h4" Class="mb-4">Đơn bảo hành của tôi</MudText>
@@ -26,8 +25,7 @@ else
         <HeaderContent>
             <MudTh>Mã đơn</MudTh>
             <MudTh>Khách hàng</MudTh>
-            <MudTh>Ngày lắp</MudTh>
-            <MudTh>Khung giờ</MudTh>
+            <MudTh>Ngày làm</MudTh>
             <MudTh>Trạng thái</MudTh>
             <MudTh>Thao tác</MudTh>
         </HeaderContent>
@@ -38,7 +36,6 @@ else
                 <MudText Typo="Typo.caption">@context.CustomerPhone</MudText>
             </MudTd>
             <MudTd>@context.ScheduledDate.Date.ToString("dd/MM/yyyy")</MudTd>
-            <MudTd>@context.StartTime?.ToString("hh\\:mm") - @context.EndTime?.ToString("hh\\:mm")</MudTd>
             <MudTd>
                 <MudChip T="string" Size="Size.Small" Color="StatusHelper.GetInstallationStatusColor(context.Status)">@StatusHelper.GetInstallationStatusText(context.Status)</MudChip>
             </MudTd>
@@ -50,20 +47,10 @@ else
                     <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" Class="ml-2"
                                OnClick="() => AcceptBooking(context.Id)">Tiếp nhận</MudButton>
                 }
-                @if (context.Status == "Preparing")
+                @if (context.Status == "Confirmed")
                 {
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Class="ml-2"
-                               OnClick="() => StartTravel(context.Id)">Bắt đầu đi</MudButton>
-                }
-                @if (context.Status == "OnTheWay")
-                {
-                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" Size="Size.Small" Class="ml-2"
-                               OnClick="() => StartInstallation(context.Id)">Bắt đầu lắp</MudButton>
-                }
-                @if (context.Status == "Installing")
-                {
-                    <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" Class="ml-2"
-                               OnClick="() => CompleteBooking(context.Id)">Hoàn thành</MudButton>
+                               OnClick="() => StartWarranty(context.Id)">Bắt đầu bảo hành</MudButton>
                 }
             </MudTd>
         </RowTemplate>
@@ -121,46 +108,12 @@ else
         }
     }
 
-    private async Task StartTravel(int id)
+    private async Task StartWarranty(int id)
     {
         try
         {
-            await InstallationService.StartTravelAsync(id);
-            Snackbar.Add("Đã bắt đầu đi", Severity.Success);
-            await LoadWarrantyBookings();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
-        }
-    }
-
-    private async Task StartInstallation(int id)
-    {
-        try
-        {
-            await InstallationService.StartInstallationAsync(id);
-            Snackbar.Add("Đã bắt đầu lắp", Severity.Success);
-            await LoadWarrantyBookings();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
-        }
-    }
-
-    private async Task CompleteBooking(int id)
-    {
-        try
-        {
-            var request = new CompleteInstallationRequest
-            {
-                CustomerSignature = "Signed",
-                CustomerRating = 5,
-                Notes = "Warranty completed"
-            };
-            await InstallationService.CompleteAsync(id, request);
-            Snackbar.Add("Đã hoàn thành đơn bảo hành", Severity.Success);
+            await InstallationService.StartWarrantyAsync(id);
+            Snackbar.Add("Đã bắt đầu bảo hành", Severity.Success);
             await LoadWarrantyBookings();
         }
         catch (Exception ex)

@@ -38,16 +38,40 @@ public class ChatRoomRepository : IChatRoomRepository
             .ToListAsync();
 
     public async Task<List<ChatRoom>> GetByUserIdAsync(int userId, UserType userType)
-        => await _context.ChatRooms
-            .AsNoTracking()
-            .Where(r => r.Participants.Any(p => p.UserId == userId && p.UserType == userType))
-            .ToListAsync();
+    {
+        try
+        {
+            return await _context.ChatRooms
+                .Include(r => r.Participants)
+                .ThenInclude(p => p.User)
+                .AsNoTracking()
+                .Where(r => r.Participants.Any(p => p.UserId == userId && p.UserType == userType))
+                .ToListAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Context was disposed, return empty list
+            return new List<ChatRoom>();
+        }
+    }
 
     public async Task<List<ChatRoom>> GetByParticipantAsync(int userId, UserType userType)
-        => await _context.ChatRooms
-            .AsNoTracking()
-            .Where(r => r.Participants.Any(p => p.UserId == userId && p.UserType == userType))
-            .ToListAsync();
+    {
+        try
+        {
+            return await _context.ChatRooms
+                .Include(r => r.Participants)
+                .ThenInclude(p => p.User)
+                .AsNoTracking()
+                .Where(r => r.Participants.Any(p => p.UserId == userId && p.UserType == userType))
+                .ToListAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Context was disposed, return empty list
+            return new List<ChatRoom>();
+        }
+    }
 
     public async Task<ChatRoom?> GetOneToOneRoomAsync(int user1Id, UserType user1Type, int user2Id, UserType user2Type)
         => await _context.ChatRooms

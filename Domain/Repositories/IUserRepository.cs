@@ -40,7 +40,7 @@ public interface IUserAddressRepository : IRepository<UserAddress>
 public interface IWarrantyRepository : IRepository<Warranty>
 {
     Task<Warranty?> GetByIdWithClaimsAsync(int id, CancellationToken cancellationToken = default);
-    Task<Warranty?> GetByOrderItemAsync(int orderItemId, CancellationToken cancellationToken = default);
+    Task<Warranty?> GetByOrderItemIdAsync(int orderItemId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Warranty>> GetByUserAsync(int userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Warranty>> GetByProductAsync(int productId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Warranty>> GetActiveAsync(CancellationToken cancellationToken = default);

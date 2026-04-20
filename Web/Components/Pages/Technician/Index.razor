@@ -5,6 +5,7 @@
 @using Domain.Enums
 @using Web.Helpers
 @using Web.Services
+@using MudBlazor
 
 @inject IInstallationService InstallationService
 @inject ITechnicianProfileService TechnicianService
@@ -23,43 +24,118 @@ else
     <MudGrid>
         <!-- Stats Cards -->
         <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2" Class="pa-4">
+            <MudCard Elevation="3" Class="pa-4 stat-card">
                 <MudCardContent>
-                    <MudText Typo="Typo.body2" Color="Color.Primary">Chờ xác nhận</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight: 600;">@_pendingCount</MudText>
+                    <div class="d-flex align-center mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Large" Color="Color.Primary" Class="mr-2"/>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Chờ xác nhận</MudText>
+                    </div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_pendingCount</MudText>
                 </MudCardContent>
                 <MudCardActions>
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/technician/bookings?status=pending">Xem ngay</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/technician/bookings?status=pending" FullWidth="true">Xem ngay</MudButton>
                 </MudCardActions>
             </MudCard>
         </MudItem>
-        
+
         <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2" Class="pa-4">
+            <MudCard Elevation="3" Class="pa-4 stat-card">
                 <MudCardContent>
-                    <MudText Typo="Typo.body2" Color="Color.Info">Lịch hôm nay</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight: 600;">@_todayCount</MudText>
+                    <div class="d-flex align-center mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Today" Size="Size.Large" Color="Color.Info" Class="mr-2"/>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Lịch hôm nay</MudText>
+                    </div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_todayCount</MudText>
                 </MudCardContent>
                 <MudCardActions>
-                    <MudButton Variant="Variant.Text" Color="Color.Info" Href="/technician/bookings">Xem lịch</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Info" Href="/technician/bookings" FullWidth="true">Xem lịch</MudButton>
                 </MudCardActions>
             </MudCard>
         </MudItem>
-        
+
         <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2" Class="pa-4">
+            <MudCard Elevation="3" Class="pa-4 stat-card">
                 <MudCardContent>
-                    <MudText Typo="Typo.body2" Color="Color.Success">Hoàn thành tuần này</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight: 600;">@_completedThisWeek</MudText>
+                    <div class="d-flex align-center mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" Class="mr-2"/>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Hoàn thành tuần này</MudText>
+                    </div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_completedThisWeek</MudText>
                 </MudCardContent>
             </MudCard>
         </MudItem>
-        
+
         <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2" Class="pa-4">
+            <MudCard Elevation="3" Class="pa-4 stat-card">
                 <MudCardContent>
-                    <MudText Typo="Typo.body2">Đánh giá TB</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight: 600;">@_averageRating.ToString("F1") ⭐</MudText>
+                    <div class="d-flex align-center mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Large" Color="Color.Warning" Class="mr-2"/>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Đánh giá TB</MudText>
+                    </div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_averageRating.ToString("F1") ⭐</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Performance Chart -->
+        <MudItem xs="12" md="8" class="mt-4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Hiệu suất công việc (7 ngày gần nhất)</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudChart T="double" ChartType="ChartType.Bar"
+                              ChartSeries="@GetPerformanceSeries()"
+                              xaxislabels="@GetLast7Days()"
+                              ChartOptions="@(_chartOptions)"
+                              Width="100%" Height="300px" />
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="4" class="mt-4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Thống kê tổng quan</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="object" Dense="true">
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Tổng lịch đã nhận</span>
+                                <MudText Style="font-weight: bold;">@_allBookings.Count</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đã hoàn thành</span>
+                                <MudText Color="Color.Success" Style="font-weight: bold;">@_completedTotal</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đang xử lý</span>
+                                <MudText Color="Color.Info" Style="font-weight: bold;">@_inProgressTotal</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Đã hủy</span>
+                                <MudText Color="Color.Error" Style="font-weight: bold;">@_cancelledTotal</MudText>
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                        <MudListItem>
+                            <div class="d-flex justify-space-between">
+                                <span>Tỷ lệ hoàn thành</span>
+                                <MudText Color="Color.Primary" Style="font-weight: bold;">@_completionRate%</MudText>
+                            </div>
+                        </MudListItem>
+                    </MudList>
                 </MudCardContent>
             </MudCard>
         </MudItem>
@@ -72,7 +148,7 @@ else
                     <MudText Typo="Typo.h6">Bạn có @_pendingCount lịch lắp đặt chờ xác nhận!</MudText>
                 </MudAlert>
             </MudItem>
-            
+
             <MudItem xs="12">
                 <MudText Typo="Typo.h6" Class="mt-4 mb-2">Lịch chờ xác nhận</MudText>
                 <MudTable Items="_pendingBookings" Dense="true" Hover="true" Striped="true">
@@ -92,7 +168,7 @@ else
                         <MudTd>@context.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
                         <MudTd>@context.StartTime?.ToString("hh\\:mm") - @context.EndTime?.ToString("hh\\:mm")</MudTd>
                         <MudTd>
-                            <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" 
+                            <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
                                        OnClick="() => AcceptBooking(context.Id)">Tiếp nhận</MudButton>
                             <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" Class="ml-2"
                                        OnClick="() => OpenRejectDialog(context)">Từ chối</MudButton>
@@ -154,18 +230,23 @@ else
     private int _warrantyCount = 0;
     private int _completedThisWeek = 0;
     private double _averageRating = 0;
-    
+    private int _completedTotal = 0;
+    private int _inProgressTotal = 0;
+    private int _cancelledTotal = 0;
+    private double _completionRate = 0;
+
     private List<InstallationBookingListResponse> _pendingBookings = new();
     private List<InstallationBookingListResponse> _todayBookings = new();
     private List<InstallationBookingListResponse> _allBookings = new();
-    
+
     private bool _showRejectDialog = false;
     private MudForm _rejectForm = null!;
     private bool _isRejectFormValid = false;
     private string _rejectReason = "";
     private int _selectedBookingId = 0;
-    
+
     private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+    private readonly ChartOptions _chartOptions = new() { ShowLegend = true };
 
     protected override async Task OnInitializedAsync()
     {
@@ -186,7 +267,7 @@ else
         try
         {
             _loading = true;
-            
+
             var technicianId = await GetCurrentTechnicianId();
             if (technicianId == 0)
             {
@@ -197,7 +278,7 @@ else
             // Load pending bookings
             _pendingBookings = await InstallationService.GetPendingForTechnicianAsync(technicianId);
             _pendingCount = _pendingBookings.Count;
-            
+
             // Load all bookings for stats
             _allBookings = await InstallationService.GetByTechnicianAsync(technicianId);
 
@@ -208,11 +289,20 @@ else
 
             // Warranty bookings
             _warrantyCount = _allBookings.Count(b => b.IsWarranty && b.Status != "Completed" && b.Status != "Cancelled");
-            
+
             // Completed this week
             var startOfWeek = today.AddDays(-(int)today.DayOfWeek);
             _completedThisWeek = _allBookings.Count(b => b.Status == "Completed" && b.CompletedAt >= startOfWeek);
-            
+
+            // Total statistics
+            _completedTotal = _allBookings.Count(b => b.Status == "Completed");
+            _inProgressTotal = _allBookings.Count(b => b.Status == "InProgress" || b.Status == "Assigned");
+            _cancelledTotal = _allBookings.Count(b => b.Status == "Cancelled");
+
+            // Completion rate
+            var totalProcessed = _completedTotal + _cancelledTotal;
+            _completionRate = totalProcessed > 0 ? (double)_completedTotal / totalProcessed * 100 : 0;
+
             // Average rating
             var completedBookings = _allBookings.Where(b => b.Status == "Completed" && b.CustomerRating.HasValue).ToList();
             _averageRating = completedBookings.Any() ? completedBookings.Average(b => b.CustomerRating!.Value) : 5.0;
@@ -275,6 +365,39 @@ else
     private static Color GetTimelineColor(string status)
     {
         return StatusHelper.GetInstallationStatusColor(status);
+    }
+
+    private List<ChartSeries<double>> GetPerformanceSeries()
+    {
+        var last7Days = Enumerable.Range(0, 7)
+            .Select(i => DateTime.Today.AddDays(-i))
+            .Reverse()
+            .ToList();
+
+        var completedByDay = last7Days.Select(date =>
+        {
+            return _allBookings.Count(b =>
+                b.Status == "Completed" &&
+                b.CompletedAt.HasValue &&
+                b.CompletedAt.Value.Date == date);
+        }).Select(count => (double)count).ToList();
+
+        return new List<ChartSeries<double>>
+        {
+            new ChartSeries<double>
+            {
+                Name = "Lịch hoàn thành",
+                Data = completedByDay.ToArray()
+            }
+        };
+    }
+
+    private string[] GetLast7Days()
+    {
+        return Enumerable.Range(0, 7)
+            .Select(i => DateTime.Today.AddDays(-i).ToString("dd/MM"))
+            .Reverse()
+            .ToArray();
     }
 
 }

@@ -14,4 +14,5 @@ public interface IWarrantyRequestService
     Task RejectAsync(int id, string reason);
     Task StartAsync(int id);
     Task CompleteAsync(int id, string? technicianNotes = null);
+    Task MarkItemAsReturnedAsync(int itemId);
 }

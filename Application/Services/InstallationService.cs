@@ -2,18 +2,19 @@ using Application.DTOs.Requests;
 using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
-using Domain.Entities.Catalog;
+using Domain.Abstractions;
 using Domain.Entities.Installation;
 using Domain.Entities.Inventory;
 using Domain.Entities.Sales;
 using Domain.Enums;
 using Domain.Exceptions;
+using Domain.Services;
 using Domain.Interfaces;
 using Domain.ValueObjects;
 
 namespace Application.Services
 {
-    public class InstallationService : IInstallationService
+    public class InstallationService : Application.Interfaces.Services.IInstallationService
     {
         private readonly IInstallationBookingRepository _bookingRepository;
         private readonly ITechnicianProfileRepository _technicianRepository;
@@ -29,6 +30,8 @@ namespace Application.Services
         private readonly IProductVariantRepository _productVariantRepository;
         private readonly IProductVariantService _productVariantService;
         private readonly ITechnicianRatingService _technicianRatingService;
+        private readonly Domain.Repositories.IInstallationMaterialRepository _installationMaterialRepository;
+        private readonly IWarrantyRepository _warrantyRepository;
 
         public InstallationService(
             IInstallationBookingRepository bookingRepository,
@@ -44,7 +47,9 @@ namespace Application.Services
             IProductRepository productRepository,
             IProductVariantRepository productVariantRepository,
             IProductVariantService productVariantService,
-            ITechnicianRatingService technicianRatingService)
+            ITechnicianRatingService technicianRatingService,
+            Domain.Repositories.IInstallationMaterialRepository installationMaterialRepository,
+            IWarrantyRepository warrantyRepository)
         {
             _bookingRepository = bookingRepository;
             _technicianRepository = technicianRepository;
@@ -58,8 +63,10 @@ namespace Application.Services
             _currentUserService = currentUserService;
             _productRepository = productRepository;
             _productVariantRepository = productVariantRepository;
+            _warrantyRepository = warrantyRepository;
             _productVariantService = productVariantService;
             _technicianRatingService = technicianRatingService;
+            _installationMaterialRepository = installationMaterialRepository;
         }
 
         public async Task<List<InstallationBookingListResponse>> GetAllAsync()
@@ -111,26 +118,56 @@ namespace Application.Services
             if (technician == null)
                 throw new DomainException("Không tìm thấy kỹ thuật viên");
 
-            // Verify slot exists and is available
-            var slot = await _slotRepository.GetByIdAsync(request.SlotId);
-            if (slot == null)
-                throw new DomainException("Không tìm thấy slot");
+            // For warranty bookings, SlotId and ScheduledDate are optional
+            if (!request.IsWarranty)
+            {
+                // Verify slot exists and is available
+                var slot = await _slotRepository.GetByIdAsync(request.SlotId);
+                if (slot == null)
+                    throw new DomainException("Không tìm thấy slot");
 
-            if (slot.IsBooked)
-                throw new DomainException("Slot đã được đặt");
+                if (slot.IsBooked)
+                    throw new DomainException("Slot đã được đặt");
+            }
+
+            // Auto-detect if this is a warranty booking by checking if order has warranty request
+            if (!request.IsWarranty)
+            {
+                var hasWarrantyRequest = await _warrantyRequestRepository.ExistsPendingWarrantyForOrderAsync(request.OrderId);
+                if (hasWarrantyRequest)
+                {
+                    Console.WriteLine($"[InstallationService.CreateAsync] Auto-detected warranty booking for order {request.OrderId}");
+                    request.IsWarranty = true;
+                }
+            }
 
             // Check if order already has a booking (skip for uninstall and warranty bookings)
             if (!request.IsUninstall && !request.IsWarranty && await _bookingRepository.ExistsByOrderIdAsync(request.OrderId))
                 throw new DomainException("Đơn hàng đã có lịch lắp đặt");
 
-            var booking = InstallationBooking.Create(
-                request.OrderId,
-                request.TechnicianId,
-                request.SlotId,
-                request.ScheduledDate
-            );
+            InstallationBooking booking;
 
-            Console.WriteLine($"[InstallationService.CreateAsync] Booking created with ID: {booking.Id}");
+            if (request.IsWarranty)
+            {
+                // For warranty bookings, create without slot initially
+                booking = InstallationBooking.CreateWarranty(
+                    request.OrderId,
+                    request.TechnicianId,
+                    request.WarrantyRequestId
+                );
+                Console.WriteLine($"[InstallationService.CreateAsync] Created warranty booking with ID: {booking.Id}");
+            }
+            else
+            {
+                booking = InstallationBooking.Create(
+                    request.OrderId,
+                    request.TechnicianId,
+                    request.SlotId,
+                    request.ScheduledDate
+                );
+
+                Console.WriteLine($"[InstallationService.CreateAsync] Booking created with ID: {booking.Id}");
+            }
 
             // Set IsUninstall flag
             if (request.IsUninstall)
@@ -151,11 +188,19 @@ namespace Application.Services
 
             Console.WriteLine($"[InstallationService.CreateAsync] Booking saved to database");
 
-            // Mark slot as booked
-            slot.Book(booking.Id);
-            await _slotRepository.SaveChangesAsync();
+            // Mark slot as booked (only for non-warranty bookings)
+            if (!request.IsWarranty)
+            {
+                var slot = await _slotRepository.GetByIdAsync(request.SlotId);
+                if (slot != null)
+                {
+                    slot.Book(booking.Id);
+                    await _slotRepository.SaveChangesAsync();
+                    Console.WriteLine($"[InstallationService.CreateAsync] Slot marked as booked");
+                }
+            }
 
-            Console.WriteLine($"[InstallationService.CreateAsync] Slot marked as booked. Returning booking ID: {booking.Id}");
+            Console.WriteLine($"[InstallationService.CreateAsync] Returning booking ID: {booking.Id}");
             return booking.Id;
         }
 
@@ -179,6 +224,17 @@ namespace Application.Services
             await _bookingRepository.SaveChangesAsync();
         }
 
+        public async Task UpdateIsWarrantyAsync(int id, bool isWarranty)
+        {
+            var booking = await _bookingRepository.GetByIdAsync(id);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            booking.SetIsWarranty(isWarranty);
+            _bookingRepository.Update(booking);
+            await _bookingRepository.SaveChangesAsync();
+        }
+
         public async Task AssignTechnicianAsync(int id, int technicianId, int slotId)
         {
             var booking = await _bookingRepository.GetByIdAsync(id);
@@ -193,11 +249,14 @@ namespace Application.Services
                 throw new DomainException("Slot đã được đặt bởi lịch khác");
 
             // Release old slot if exists
-            var oldSlot = await _slotRepository.GetByIdAsync(booking.SlotId);
-            if (oldSlot != null && oldSlot.Id != slotId)
+            if (booking.SlotId.HasValue)
             {
-                oldSlot.Release();
-                await _slotRepository.SaveChangesAsync();
+                var oldSlot = await _slotRepository.GetByIdAsync(booking.SlotId.Value);
+                if (oldSlot != null && oldSlot.Id != slotId)
+                {
+                    oldSlot.Release();
+                    await _slotRepository.SaveChangesAsync();
+                }
             }
 
             booking.AssignTechnician(technicianId, slotId);
@@ -218,10 +277,13 @@ namespace Application.Services
 
         public async Task StartTravelAsync(int id)
         {
+            Console.WriteLine($"[StartTravelAsync] Loading booking {id} from database");
             var booking = await _bookingRepository.GetByIdAsync(id);
             if (booking == null)
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
+            Console.WriteLine($"[StartTravelAsync] Booking {id} loaded - Status: {booking.Status}, MaterialsPrepared: {booking.MaterialsPrepared}, IsUninstall: {booking.IsUninstall}");
+            
             booking.StartTravel();
             await _bookingRepository.SaveChangesAsync();
 
@@ -232,6 +294,8 @@ namespace Application.Services
                 order.UpdateStatusFromInstallation(OrderStatus.Installing);
                 await _orderRepository.SaveChangesAsync();
             }
+            
+            Console.WriteLine($"[StartTravelAsync] Booking {id} completed - Status: {booking.Status}");
         }
 
         public async Task StartInstallationAsync(int id)
@@ -244,6 +308,18 @@ namespace Application.Services
             await _bookingRepository.SaveChangesAsync();
 
             // Order status already set to Installing by StartTravelAsync
+        }
+
+        public async Task StartWarrantyAsync(int id)
+        {
+            var booking = await _bookingRepository.GetByIdAsync(id);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            Console.WriteLine($"[StartWarrantyAsync] Booking ID: {id}, Status: {booking.Status}, IsWarranty: {booking.IsWarranty}");
+            booking.StartWarranty();
+            Console.WriteLine($"[StartWarrantyAsync] After StartWarranty - Status: {booking.Status}");
+            await _bookingRepository.SaveChangesAsync();
         }
 
         public async Task CompleteAsync(int id, CompleteInstallationRequest request)
@@ -271,6 +347,42 @@ namespace Application.Services
 
             await _bookingRepository.SaveChangesAsync();
             Console.WriteLine($"[CompleteAsync] After save booking - Booking ID: {booking.Id}, Status: {booking.Status}");
+
+            // Track which technician installed the product (for warranty/uninstall assignment)
+            // Only for regular installations, not warranty or uninstall
+            if (!booking.IsWarranty && !booking.IsUninstall && booking.Order != null)
+            {
+                try
+                {
+                    Console.WriteLine($"[CompleteAsync] Tracking installation technician for order {booking.OrderId}");
+
+                    // Find warranties linked to order items in this order
+                    foreach (var orderItem in booking.Order.Items)
+                    {
+                        var warranty = await _warrantyRepository.GetByOrderItemIdAsync(orderItem.Id);
+                        if (warranty != null)
+                        {
+                            // Update the warranty to track which technician installed it
+                            warranty.SetInstalledByTechnicianId(booking.TechnicianId);
+                            _warrantyRepository.Update(warranty);
+                            Console.WriteLine($"[CompleteAsync] Updated warranty {warranty.Id} with technician {booking.TechnicianId} for order item {orderItem.Id}");
+                        }
+                    }
+                    await _warrantyRepository.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[CompleteAsync] Error tracking installation technician: {ex.Message}");
+                    // Don't fail the installation if this fails
+                }
+            }
+
+            // If this is a warranty booking with damaged products, update warranty request items
+            if (booking.IsWarranty && request.DamagedProducts.Any())
+            {
+                Console.WriteLine($"[CompleteAsync] Processing damaged products for warranty booking");
+                await UpdateWarrantyRequestDamagedProductsAsync(booking.OrderId, request.DamagedProducts);
+            }
 
             // Update order status to Completed
             var order = await _orderRepository.GetByIdAsync(booking.OrderId);
@@ -333,53 +445,69 @@ namespace Application.Services
                 Console.WriteLine($"[CompleteAsync] This is a regular installation booking, not updating return order");
             }
 
-            // If this is a warranty booking, update the warranty request status to Completed
-            if (booking.IsWarranty)
+            // Return unused materials to warehouse
+            Console.WriteLine($"[CompleteAsync] Checking for materials to return to warehouse");
+            try
             {
-                Console.WriteLine($"[CompleteAsync] This is a warranty booking, updating warranty request status");
-                Console.WriteLine($"[CompleteAsync] Booking OrderId: {booking.OrderId}");
-                try
+                var materials = await _installationMaterialRepository.GetByBookingAsync(booking.Id);
+                Console.WriteLine($"[CompleteAsync] Found {materials.Count} materials for booking {booking.Id}");
+
+                // Update material usage from request
+                if (request.MaterialUsages != null && request.MaterialUsages.Any())
                 {
-                    // Find warranty request by order ID
-                    var warrantyRequests = await _warrantyRequestRepository.GetByOrderIdAsync(booking.OrderId);
-                    Console.WriteLine($"[CompleteAsync] Found {warrantyRequests.Count} warranty requests for order {booking.OrderId}");
-                    var warrantyRequest = warrantyRequests.FirstOrDefault();
-                    if (warrantyRequest != null)
+                    Console.WriteLine($"[CompleteAsync] Processing {request.MaterialUsages.Count} material usage records");
+                    foreach (var usage in request.MaterialUsages)
                     {
-                        Console.WriteLine($"[CompleteAsync] Warranty Request ID: {warrantyRequest.Id}, Current Status: {warrantyRequest.Status}");
-                        if (warrantyRequest.Status == Domain.Enums.WarrantyRequestStatus.Approved)
+                        var material = materials.FirstOrDefault(m => m.Id == usage.MaterialId);
+                        if (material != null)
                         {
-                            Console.WriteLine($"[CompleteAsync] Warranty request is Approved, starting then marking as completed");
-                            warrantyRequest.Start();
-                            warrantyRequest.Complete(request.Notes);
-                            _warrantyRequestRepository.Update(warrantyRequest);
-                            await _warrantyRequestRepository.SaveChangesAsync();
-                            Console.WriteLine($"[CompleteAsync] Warranty request marked as completed successfully");
-                        }
-                        else if (warrantyRequest.Status == Domain.Enums.WarrantyRequestStatus.InProgress)
-                        {
-                            Console.WriteLine($"[CompleteAsync] Warranty request is InProgress, marking as completed");
-                            warrantyRequest.Complete(request.Notes);
-                            _warrantyRequestRepository.Update(warrantyRequest);
-                            await _warrantyRequestRepository.SaveChangesAsync();
-                            Console.WriteLine($"[CompleteAsync] Warranty request marked as completed successfully");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"[CompleteAsync] Warranty request status is not Approved or InProgress, skipping. Status: {warrantyRequest.Status}");
+                            material.RecordUsage(usage.QuantityUsed);
+                            _installationMaterialRepository.Update(material);
+                            Console.WriteLine($"[CompleteAsync] Updated material {material.Id} usage to {usage.QuantityUsed}");
                         }
                     }
-                    else
+                }
+
+                foreach (var material in materials)
+                {
+                    if (material.WarehouseId.HasValue && material.QuantityUsed.HasValue)
                     {
-                        Console.WriteLine($"[CompleteAsync] No warranty request found for order {booking.OrderId}");
+                        var quantityToReturn = material.QuantityTaken - material.QuantityUsed.Value;
+                        if (quantityToReturn > 0)
+                        {
+                            Console.WriteLine($"[CompleteAsync] Returning {quantityToReturn} of product {material.ProductId} to warehouse {material.WarehouseId}");
+
+                            var productWarehouse = await _productWarehouseRepository
+                                .GetByProductVariantAndWarehouseAsync(material.ProductId, material.VariantId, material.WarehouseId.Value);
+
+                            if (productWarehouse != null)
+                            {
+                                productWarehouse.Receive(quantityToReturn);
+                                _productWarehouseRepository.Update(productWarehouse);
+                                Console.WriteLine($"[CompleteAsync] Updated existing ProductWarehouse");
+                            }
+                            else
+                            {
+                                productWarehouse = Domain.Entities.Inventory.ProductWarehouse.Create(
+                                    material.ProductId, material.VariantId, material.WarehouseId.Value, quantityToReturn);
+                                await _productWarehouseRepository.AddAsync(productWarehouse);
+                                Console.WriteLine($"[CompleteAsync] Created new ProductWarehouse");
+                            }
+
+                            // Update material QuantityReturned
+                            material.RecordReturn(quantityToReturn);
+                            _installationMaterialRepository.Update(material);
+                        }
                     }
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[CompleteAsync] Error updating warranty request: {ex.Message}");
-                    Console.WriteLine($"[CompleteAsync] Stack trace: {ex.StackTrace}");
-                    // Don't throw error, just log it
-                }
+
+                await _productWarehouseRepository.SaveChangesAsync();
+                Console.WriteLine($"[CompleteAsync] Successfully returned unused materials to warehouse");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[CompleteAsync] Error returning materials to warehouse: {ex.Message}");
+                Console.WriteLine($"[CompleteAsync] Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -397,10 +525,13 @@ namespace Application.Services
                 throw new DomainException("Slot mới đã được đặt");
 
             // Release old slot
-            var oldSlot = await _slotRepository.GetByIdAsync(booking.SlotId);
-            if (oldSlot != null)
+            if (booking.SlotId.HasValue)
             {
-                oldSlot.Release();
+                var oldSlot = await _slotRepository.GetByIdAsync(booking.SlotId.Value);
+                if (oldSlot != null)
+                {
+                    oldSlot.Release();
+                }
             }
 
             booking.Reschedule(request.NewSlotId, request.NewDate);
@@ -422,10 +553,13 @@ namespace Application.Services
                 throw new DomainException("Slot mới đã được đặt");
 
             // Release old slot
-            var oldSlot = await _slotRepository.GetByIdAsync(booking.SlotId);
-            if (oldSlot != null)
+            if (booking.SlotId.HasValue)
             {
-                oldSlot.Release();
+                var oldSlot = await _slotRepository.GetByIdAsync(booking.SlotId.Value);
+                if (oldSlot != null)
+                {
+                    oldSlot.Release();
+                }
             }
 
             booking.CustomerReschedule(request.NewSlotId, request.NewDate);
@@ -435,17 +569,41 @@ namespace Application.Services
 
         public async Task CancelAsync(int id, CancelInstallationRequest request)
         {
-            var booking = await _bookingRepository.GetByIdAsync(id);
+            var booking = await _bookingRepository.GetByIdWithDetailsAsync(id);
             if (booking == null)
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
             booking.Cancel(request.Reason);
 
             // Release slot
-            var slot = await _slotRepository.GetByIdAsync(booking.SlotId);
-            if (slot != null)
+            if (booking.SlotId.HasValue)
             {
-                slot.Release();
+                var slot = await _slotRepository.GetByIdAsync(booking.SlotId.Value);
+                if (slot != null)
+                {
+                    slot.Release();
+                }
+            }
+
+            // Return materials to warehouse
+            foreach (var material in booking.Materials.Where(m => m.WarehouseId.HasValue))
+            {
+                var productWarehouse = await _productWarehouseRepository
+                    .GetByProductVariantAndWarehouseAsync(material.ProductId, material.VariantId, material.WarehouseId!.Value);
+
+                if (productWarehouse != null)
+                {
+                    // Trả lại số lượng chưa sử dụng vào kho
+                    var used = material.QuantityUsed ?? 0;
+                    var returned = material.QuantityReturned ?? 0;
+                    var returnQty = material.QuantityTaken - used - returned;
+                    if (returnQty > 0)
+                    {
+                        productWarehouse.Receive(returnQty);
+                        _productWarehouseRepository.Update(productWarehouse);
+                        material.RecordReturn(returnQty);
+                    }
+                }
             }
 
             // Update technician stats
@@ -483,11 +641,13 @@ namespace Application.Services
 
         public async Task PrepareMaterialsFromWarehouseAsync(int bookingId, PrepareMaterialsRequest request)
         {
+            // Load booking with details (includes Materials collection)
             var booking = await _bookingRepository.GetByIdWithDetailsAsync(bookingId);
             if (booking == null)
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
-            if (booking.Status != InstallationStatus.Confirmed)
+            // For warranty bookings, allow preparing replacement products even if not in Confirmed status
+            if (booking.Status != InstallationStatus.Confirmed && !booking.IsWarranty)
                 throw new DomainException("Chỉ có thể chuẩn bị vật tư khi đang ở trạng thái Đã xác nhận");
 
             // Verify warehouse exists
@@ -514,6 +674,14 @@ namespace Application.Services
             Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] Starting loop for {request.Items.Count} items");
             foreach (var item in request.Items)
             {
+                // Check if material already exists for this product/variant
+                var existingMaterial = booking.Materials.FirstOrDefault(m => m.ProductId == item.ProductId && m.VariantId == item.VariantId);
+                if (existingMaterial != null)
+                {
+                    Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] Material already exists for ProductId={item.ProductId}, VariantId={item.VariantId}, skipping duplicate");
+                    continue;
+                }
+
                 // Check stock availability - try variant level first, then product level
                 var productWarehouse = await _productWarehouseRepository
                     .GetByProductVariantAndWarehouseAsync(item.ProductId, item.VariantId, request.WarehouseId);
@@ -538,7 +706,7 @@ namespace Application.Services
                 productWarehouse.Dispatch(item.Quantity);
                 var newAvailableStock = productWarehouse.GetAvailableStock();
                 Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] Product {item.ProductId} after dispatch: Quantity={productWarehouse.Quantity}, Reserved={productWarehouse.ReservedQuantity}, Available={newAvailableStock}");
-                
+
                 _productWarehouseRepository.Update(productWarehouse);
 
                 // Add material to booking
@@ -570,15 +738,91 @@ namespace Application.Services
             // Mark materials as prepared
             Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] About to call booking.PrepareMaterials(), current status: {booking.Status}");
             booking.PrepareMaterials();
-            Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] After booking.PrepareMaterials(), new status: {booking.Status}");
+            Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] After booking.PrepareMaterials(), new status: {booking.Status}, MaterialsPrepared: {booking.MaterialsPrepared}");
 
-            // Explicitly update the booking to ensure status change is tracked
+            // Explicitly update to ensure DbContext tracks the changes
             _bookingRepository.Update(booking);
 
             // Save all changes at once to avoid DbContext concurrency issues
             Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] About to save changes");
             await _bookingRepository.SaveChangesAsync();
             Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] Changes saved successfully");
+
+            // Reload booking to verify the changes were persisted
+            var reloadedBooking = await _bookingRepository.GetByIdAsync(bookingId);
+            Console.WriteLine($"[PrepareMaterialsFromWarehouseAsync] After reload - Status: {reloadedBooking?.Status}, MaterialsPrepared: {reloadedBooking?.MaterialsPrepared}");
+        }
+
+        /// <summary>
+        /// Cập nhật sản phẩm hỏng trong yêu cầu bảo hành
+        /// </summary>
+        private async Task UpdateWarrantyRequestDamagedProductsAsync(int orderId, List<DamagedProductItem> damagedProducts)
+        {
+            Console.WriteLine($"[UpdateWarrantyRequestDamagedProductsAsync] Processing damaged products for warranty booking, OrderId: {orderId}");
+
+            // Find warranty request linked to this booking
+            // WarrantyRequest has InstallationBookingId, so we need to find the booking first
+            var booking = await _bookingRepository.GetByIdAsync(orderId);
+            if (booking == null)
+            {
+                Console.WriteLine($"[UpdateWarrantyRequestDamagedProductsAsync] Booking not found for OrderId: {orderId}");
+                return;
+            }
+
+            Console.WriteLine($"[UpdateWarrantyRequestDamagedProductsAsync] Found booking ID: {booking.Id}");
+
+            // Find warranty request by InstallationBookingId
+            var warrantyRequests = await _warrantyRequestRepository.GetAllAsync();
+            var warrantyRequest = warrantyRequests.FirstOrDefault(wr => wr.InstallationBookingId == booking.Id);
+
+            if (warrantyRequest == null)
+            {
+                Console.WriteLine($"[UpdateWarrantyRequestDamagedProductsAsync] No warranty request found for booking {booking.Id}");
+                return;
+            }
+
+            Console.WriteLine($"[UpdateWarrantyRequestDamagedProductsAsync] Found warranty request {warrantyRequest.Id}");
+
+            // Load warranty request with items
+            var warrantyRequestWithItems = await _warrantyRequestRepository.GetByIdWithItemsAsync(warrantyRequest.Id);
+            if (warrantyRequestWithItems == null)
+            {
+                Console.WriteLine($"[UpdateWarrantyRequestDamagedProductsAsync] Failed to load warranty request with items");
+                return;
+            }
+
+            // Create or update warranty request items for damaged products
+            foreach (var damagedProduct in damagedProducts)
+            {
+                Console.WriteLine($"[UpdateWarrantyRequestDamagedProductsAsync] Processing damaged product: ProductId={damagedProduct.ProductId}, Quantity={damagedProduct.Quantity}, Reason={damagedProduct.Reason}");
+
+                // Check if an item already exists for this order item
+                var existingItem = warrantyRequestWithItems.Items.FirstOrDefault(i => i.OrderItemId == warrantyRequestWithItems.OrderItemId);
+
+                if (existingItem != null)
+                {
+                    // Update existing item
+                    existingItem.MarkAsDamaged();
+                    existingItem.UpdateDescription(damagedProduct.Reason);
+                    Console.WriteLine($"[UpdateWarrantyRequestDamagedProductsAsync] Updated existing item {existingItem.Id}");
+                }
+                else
+                {
+                    // Create new item
+                    var newItem = WarrantyRequestItem.Create(
+                        warrantyRequestWithItems.Id,
+                        warrantyRequestWithItems.OrderItemId,
+                        damagedProduct.Quantity,
+                        damagedProduct.Reason,
+                        isDamaged: true
+                    );
+                    warrantyRequestWithItems.Items.Add(newItem);
+                    Console.WriteLine($"[UpdateWarrantyRequestDamagedProductsAsync] Created new item for warranty request {warrantyRequestWithItems.Id}");
+                }
+            }
+
+            await _warrantyRequestRepository.SaveChangesAsync();
+            Console.WriteLine($"[UpdateWarrantyRequestDamagedProductsAsync] Saved changes to warranty request items");
         }
 
         /// <summary>
@@ -660,13 +904,16 @@ namespace Application.Services
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
             // Release slot
-            var slot = await _slotRepository.GetByIdAsync(booking.SlotId);
-            if (slot != null)
+            if (booking.SlotId.HasValue)
             {
-                slot.Release();
+                var slot = await _slotRepository.GetByIdAsync(booking.SlotId.Value);
+                if (slot != null)
+                {
+                    slot.Release();
+                }
             }
 
-            _bookingRepository.Delete(booking);
+            await _slotRepository.SaveChangesAsync();
             await _bookingRepository.SaveChangesAsync();
         }
 
@@ -693,10 +940,13 @@ namespace Application.Services
                 throw new DomainException("Bạn không được phân công cho lịch này");
 
             // Release slot when rejecting
-            var slot = await _slotRepository.GetByIdAsync(booking.SlotId);
-            if (slot != null)
+            if (booking.SlotId.HasValue)
             {
-                slot.Release();
+                var slot = await _slotRepository.GetByIdAsync(booking.SlotId.Value);
+                if (slot != null)
+                {
+                    slot.Release();
+                }
             }
 
             booking.Reject(request.Reason);
@@ -754,7 +1004,9 @@ namespace Application.Services
                 
                 // Technician info
                 TechnicianId = booking.TechnicianId,
-                TechnicianName = technician?.FullName ?? $"KTV #{booking.TechnicianId}",
+                TechnicianName = !string.IsNullOrEmpty(technician?.FullName) ? technician.FullName 
+                    : !string.IsNullOrEmpty(technician?.User?.FullName) ? technician.User.FullName 
+                    : $"KTV #{booking.TechnicianId}",
                 TechnicianPhone = technician?.PhoneNumber != null ? technician.PhoneNumber.ToString() : string.Empty,
                 
                 // Schedule info
@@ -775,6 +1027,7 @@ namespace Application.Services
                 Notes = booking.Notes,
                 CreatedAt = booking.CreatedAt,
                 IsUninstall = booking.IsUninstall,
+                IsWarranty = booking.IsWarranty,
                 CustomerRescheduleCount = booking.CustomerRescheduleCount,
 
                 // Load technician rating content
@@ -793,6 +1046,18 @@ namespace Application.Services
                     WarehouseId = m.WarehouseId,
                     WarehouseName = m.Warehouse?.Name,
                     PickedUpAt = m.PickedUpAt
+                }).GroupBy(m => new { m.ProductId, m.VariantId }).Select(g => new InstallationMaterialResponse
+                {
+                    Id = g.First().Id,
+                    ProductId = g.Key.ProductId,
+                    VariantId = g.Key.VariantId,
+                    ProductName = g.First().ProductName,
+                    QuantityTaken = g.Sum(x => x.QuantityTaken),
+                    QuantityUsed = g.Sum(x => x.QuantityUsed ?? 0),
+                    QuantityReturned = g.Sum(x => x.QuantityReturned ?? 0),
+                    WarehouseId = g.First().WarehouseId,
+                    WarehouseName = g.First().WarehouseName,
+                    PickedUpAt = g.First().PickedUpAt
                 }).ToList() ?? new List<InstallationMaterialResponse>()
             };
 
@@ -820,15 +1085,15 @@ namespace Application.Services
             foreach (var item in items)
             {
                 var product = await _productRepository.GetByIdWithDetailsAsync(item.ProductId);
-                string variantName = null;
-                string variantSku = null;
-                
+                string variantName = string.Empty;
+                string variantSku = string.Empty;
+
                 if (item.VariantId.HasValue)
                 {
                     var variant = await _productVariantRepository.GetByIdAsync(item.VariantId.Value);
                     if (variant != null)
                     {
-                        variantSku = variant.Sku?.Value;
+                        variantSku = variant.Sku?.Value ?? string.Empty;
                         // Try to get variant name from attributes if available
                         if (!string.IsNullOrEmpty(variant.AttributesJson))
                         {
@@ -844,13 +1109,13 @@ namespace Application.Services
                         }
                     }
                 }
-                
+
                 // Get main image
-                string mainImageUrl = null;
+                string mainImageUrl = string.Empty;
                 if (product?.Images != null && product.Images.Any())
                 {
                     var mainImage = product.Images.FirstOrDefault(i => i.IsMain) ?? product.Images.FirstOrDefault();
-                    mainImageUrl = mainImage?.Url;
+                    mainImageUrl = mainImage?.Url ?? string.Empty;
                 }
                 
                 result.Add(new InstallationProductItem

@@ -42,6 +42,7 @@ namespace Infrastructure.Repositories
                 .Include(p => p.Supplier)
                 .Include(p => p.Variants)
                 .Include(p => p.Images)
+                .Include(p => p.Comments)
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
 

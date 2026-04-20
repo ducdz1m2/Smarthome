@@ -71,6 +71,49 @@
                         </MudItem>
                     </MudGrid>
                 </MudTabPanel>
+
+                <MudTabPanel Text="Thông số kỹ thuật" Icon="@Icons.Material.Filled.Settings">
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <div class="d-flex justify-space-between align-center mb-3">
+                                <MudText Typo="Typo.subtitle1" Class="fw-bold">Thông số kỹ thuật</MudText>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
+                                           Size="Size.Small" StartIcon="@Icons.Material.Filled.Add"
+                                           OnClick="AddSpec">
+                                    Thêm thông số
+                                </MudButton>
+                            </div>
+                        </MudItem>
+                        @if (_specsList.Any())
+                        {
+                            @foreach (var spec in _specsList)
+                            {
+                                <MudItem xs="12" md="5">
+                                    <MudTextField @bind-Value="spec.Key" Label="Tên thông số"
+                                                  Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" md="5">
+                                    <MudTextField @bind-Value="spec.Value" Label="Giá trị"
+                                                  Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" md="2" Class="d-flex align-center">
+                                    <MudButton Variant="Variant.Text" Color="Color.Error"
+                                               OnClick="@(() => RemoveSpec(spec))" Size="Size.Small">
+                                        <MudIcon Icon="@Icons.Material.Filled.Delete" />
+                                    </MudButton>
+                                </MudItem>
+                            }
+                        }
+                        else
+                        {
+                            <MudItem xs="12">
+                                <MudAlert Severity="Severity.Info">
+                                    Chưa có thông số kỹ thuật nào. Nhấn "Thêm thông số" để bắt đầu.
+                                </MudAlert>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudTabPanel>
                 
                 <MudTabPanel Text="Hình ảnh" Icon="@Icons.Material.Filled.Image">
                     <MudFileUpload T="IReadOnlyList<IBrowserFile>"
@@ -249,6 +292,13 @@
     private List<ProductVariantListResponse> _variants = new();
     
     private string _sku = "";
+    private List<SpecEntry> _specsList = new();
+
+    public class SpecEntry
+    {
+        public string Key { get; set; } = "";
+        public string Value { get; set; } = "";
+    }
     
     private UpdateProductRequest _request = new()
     {
@@ -334,6 +384,9 @@
                 };
                 _sku = product.Sku;
                 _imageUrls = product.Images.Select(i => i.Url).ToList();
+
+                // Load specs into _specsList
+                _specsList = product.Specs.Select(kvp => new SpecEntry { Key = kvp.Key, Value = kvp.Value }).ToList();
                 
                 // Load variants for this product
                 await LoadVariants();
@@ -435,18 +488,23 @@
                 Snackbar.Add("Vui lòng chọn danh mục", Severity.Warning);
                 return;
             }
-            
+
             if (_request.BrandId <= 0)
             {
                 Snackbar.Add("Vui lòng chọn thương hiệu", Severity.Warning);
                 return;
             }
-            
+
             if (string.IsNullOrWhiteSpace(_sku))
             {
                 Snackbar.Add("Vui lòng nhập SKU", Severity.Warning);
                 return;
             }
+
+            // Convert _specsList to Dictionary for request
+            _request.Specs = _specsList
+                .Where(s => !string.IsNullOrWhiteSpace(s.Key) && !string.IsNullOrWhiteSpace(s.Value))
+                .ToDictionary(s => s.Key, s => s.Value);
 
             if (_isEdit)
             {
@@ -477,6 +535,18 @@
         {
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
+    }
+
+    private void AddSpec()
+    {
+        _specsList.Add(new SpecEntry { Key = "", Value = "" });
+        StateHasChanged();
+    }
+
+    private void RemoveSpec(SpecEntry spec)
+    {
+        _specsList.Remove(spec);
+        StateHasChanged();
     }
 
     private class UploadResult

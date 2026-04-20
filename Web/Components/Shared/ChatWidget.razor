@@ -2,6 +2,7 @@
 @using Application.DTOs.Requests
 @using Web.Services
 @using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
 @inject SignalRService SignalRService
 @inject IChatService ChatService
 @inject CurrentUserService CurrentUser
@@ -12,6 +13,7 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager NavigationManager
 @inject JwtTokenHandler JwtTokenHandler
+@inject ISnackbar Snackbar
 @implements IDisposable
 
 @if (!_isAdmin)
@@ -815,7 +817,17 @@
                 _sessionId = $"user_{userId}";
                 
                 // Get user's chat rooms first
-                var chatRooms = await ChatService.GetUserChatRoomsAsync(userId.Value, Domain.Enums.UserType.Customer);
+                List<ChatRoomResponse> chatRooms;
+                try
+                {
+                    chatRooms = await ChatService.GetUserChatRoomsAsync(userId.Value, Domain.Enums.UserType.Customer);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ChatWidget] Error loading chat rooms: {ex.Message}");
+                    chatRooms = new List<ChatRoomResponse>();
+                }
+                
                 if (chatRooms.Count > 0)
                 {
                     _chatRoomId = chatRooms.First().Id;
@@ -929,9 +941,26 @@
             // Create or get support chat room
             if (_chatRoomId == 0)
             {
-                Console.WriteLine($"[ChatWidget] Creating support chat room for user {userId}");
-                _chatRoomId = await ChatService.CreateSupportChatAsync(userId.Value);
-                Console.WriteLine($"[ChatWidget] Created support chat room: {_chatRoomId}");
+                // Validate userId before creating chat room
+                if (userId == null || userId <= 0)
+                {
+                    Console.WriteLine($"[ChatWidget] Invalid userId: {userId}. Cannot create chat room.");
+                    Snackbar.Add("Vui lòng đăng nhập để sử dụng chat.", Severity.Warning);
+                    return;
+                }
+
+                try
+                {
+                    Console.WriteLine($"[ChatWidget] Creating support chat room for user {userId}");
+                    _chatRoomId = await ChatService.CreateSupportChatAsync(userId.Value);
+                    Console.WriteLine($"[ChatWidget] Created support chat room: {_chatRoomId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ChatWidget] Failed to create chat room: {ex.Message}");
+                    Snackbar.Add("Không thể tạo phòng chat. Vui lòng thử lại sau.", Severity.Error);
+                    return;
+                }
                 
                 // Join SignalR group for this chat room
                 Console.WriteLine($"[ChatWidget] Joining SignalR group for chat room {_chatRoomId}");

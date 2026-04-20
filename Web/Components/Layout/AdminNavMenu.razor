@@ -2,57 +2,121 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject IAuthService AuthService
+@inject IJSRuntime JSRuntime
 
 <MudNavMenu>
     <MudNavLink Href="/admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Tổng quan</MudNavLink>
-    
-    <MudNavGroup Title="Danh mục" Expanded="true" Icon="@Icons.Material.Filled.Inventory">
+
+    <MudNavGroup Title="Danh mục" Expanded="@_categoriesExpanded" Icon="@Icons.Material.Filled.Inventory" ExpandedChanged="@((bool expanded) => OnGroupExpandedChanged("categories", expanded))">
         <MudNavLink Href="/admin/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Loại sản phẩm</MudNavLink>
         <MudNavLink Href="/admin/brands" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BrandingWatermark">Thương hiệu</MudNavLink>
         <MudNavLink Href="/admin/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices">Sản phẩm</MudNavLink>
     </MudNavGroup>
-    
-    <MudNavGroup Title="Bán hàng" Icon="@Icons.Material.Filled.ShoppingCart">
+
+    <MudNavGroup Title="Bán hàng" Expanded="@_salesExpanded" Icon="@Icons.Material.Filled.ShoppingCart" ExpandedChanged="@((bool expanded) => OnGroupExpandedChanged("sales", expanded))">
         <MudNavLink Href="/admin/orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt">Đơn hàng</MudNavLink>
         <MudNavLink Href="/admin/returns" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AssignmentReturn">Hoàn hàng</MudNavLink>
         <MudNavLink Href="/admin/warranty-requests" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Security">Yêu cầu bảo hành</MudNavLink>
         <MudNavLink Href="/admin/reviews" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Star">Đánh giá</MudNavLink>
     </MudNavGroup>
-    
-    <MudNavGroup Title="Kho hàng" Icon="@Icons.Material.Filled.Warehouse" Expanded="true">
+
+    <MudNavGroup Title="Kho hàng" Expanded="@_warehouseExpanded" Icon="@Icons.Material.Filled.Warehouse" ExpandedChanged="@((bool expanded) => OnGroupExpandedChanged("warehouse", expanded))">
         <MudNavLink Href="/admin/warehouses" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Warehouse">Quản lý kho</MudNavLink>
         <MudNavLink Href="/admin/suppliers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Nhà cung cấp</MudNavLink>
         <MudNavLink Href="/admin/inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices">Sản phẩm trong kho</MudNavLink>
+        <MudNavLink Href="/admin/damaged-products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ReportProblem">Sản phẩm hỏng</MudNavLink>
     </MudNavGroup>
-    
-    <MudNavGroup Title="Khuyến mãi" Icon="@Icons.Material.Filled.LocalOffer">
+
+    <MudNavGroup Title="Khuyến mãi" Expanded="@_promotionsExpanded" Icon="@Icons.Material.Filled.LocalOffer" ExpandedChanged="@((bool expanded) => OnGroupExpandedChanged("promotions", expanded))">
         <MudNavLink Href="/admin/coupons" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CardGiftcard">Mã giảm giá</MudNavLink>
         <MudNavLink Href="/admin/promotions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Campaign">Chương trình KM</MudNavLink>
     </MudNavGroup>
-    
-    <MudNavGroup Title="Lắp đặt" Icon="@Icons.Material.Filled.Build">
+
+    <MudNavGroup Title="Lắp đặt" Expanded="@_installationExpanded" Icon="@Icons.Material.Filled.Build" ExpandedChanged="@((bool expanded) => OnGroupExpandedChanged("installation", expanded))">
         <MudNavLink Href="/admin/installations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.EventNote">Lịch lắp đặt</MudNavLink>
         <MudNavLink Href="/admin/technicians" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Engineering">Kỹ thuật viên</MudNavLink>
     </MudNavGroup>
-    
-    <MudNavGroup Title="Hỗ trợ khách hàng" Icon="@Icons.Material.Filled.SupportAgent">
+
+    <MudNavGroup Title="Hỗ trợ khách hàng" Expanded="@_supportExpanded" Icon="@Icons.Material.Filled.SupportAgent" ExpandedChanged="@((bool expanded) => OnGroupExpandedChanged("support", expanded))">
         <MudNavLink Href="/admin/chat" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.ChatBubble">Chat hỗ trợ</MudNavLink>
     </MudNavGroup>
-    
-    <MudNavGroup Title="Nội dung" Icon="@Icons.Material.Filled.Article">
+
+    <MudNavGroup Title="Nội dung" Expanded="@_contentExpanded" Icon="@Icons.Material.Filled.Article" ExpandedChanged="@((bool expanded) => OnGroupExpandedChanged("content", expanded))">
         <MudNavLink Href="/admin/banners" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Image">Banner</MudNavLink>
     </MudNavGroup>
-    
-    <MudNavGroup Title="Hệ thống" Icon="@Icons.Material.Filled.Settings">
+
+    <MudNavGroup Title="Hệ thống" Expanded="@_systemExpanded" Icon="@Icons.Material.Filled.Settings" ExpandedChanged="@((bool expanded) => OnGroupExpandedChanged("system", expanded))">
         <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Người dùng</MudNavLink>
     </MudNavGroup>
-    
+
     <MudDivider Class="my-2" />
-    
+
     <MudNavLink OnClick="Logout" Icon="@Icons.Material.Filled.Logout" Color="Color.Error">Đăng xuất</MudNavLink>
 </MudNavMenu>
 
 @code {
+    private bool _categoriesExpanded = true;
+    private bool _salesExpanded = false;
+    private bool _warehouseExpanded = true;
+    private bool _promotionsExpanded = false;
+    private bool _installationExpanded = false;
+    private bool _supportExpanded = false;
+    private bool _contentExpanded = false;
+    private bool _systemExpanded = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadExpansionStates();
+        }
+    }
+
+    private async Task LoadExpansionStates()
+    {
+        try
+        {
+            _categoriesExpanded = await GetBoolFromLocalStorage("adminNav_categoriesExpanded", true);
+            _salesExpanded = await GetBoolFromLocalStorage("adminNav_salesExpanded", false);
+            _warehouseExpanded = await GetBoolFromLocalStorage("adminNav_warehouseExpanded", true);
+            _promotionsExpanded = await GetBoolFromLocalStorage("adminNav_promotionsExpanded", false);
+            _installationExpanded = await GetBoolFromLocalStorage("adminNav_installationExpanded", false);
+            _supportExpanded = await GetBoolFromLocalStorage("adminNav_supportExpanded", false);
+            _contentExpanded = await GetBoolFromLocalStorage("adminNav_contentExpanded", false);
+            _systemExpanded = await GetBoolFromLocalStorage("adminNav_systemExpanded", false);
+            StateHasChanged();
+        }
+        catch
+        {
+            // Ignore errors loading from localStorage
+        }
+    }
+
+    private async Task<bool> GetBoolFromLocalStorage(string key, bool defaultValue)
+    {
+        try
+        {
+            var value = await JSRuntime.InvokeAsync<string>("localStorage.getItem", key);
+            return bool.TryParse(value, out var result) ? result : defaultValue;
+        }
+        catch
+        {
+            return defaultValue;
+        }
+    }
+
+    private async Task OnGroupExpandedChanged(string groupName, bool expanded)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", $"adminNav_{groupName}Expanded", expanded.ToString());
+        }
+        catch
+        {
+            // Ignore errors saving to localStorage
+        }
+    }
+
     private async Task Logout()
     {
         // Clear JWT token from localStorage and session

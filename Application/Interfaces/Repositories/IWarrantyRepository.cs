@@ -6,9 +6,9 @@ namespace Application.Interfaces.Repositories
     {
         Task<Warranty?> GetByIdAsync(int id);
         Task<Warranty?> GetByIdWithClaimsAsync(int id);
+        Task<Warranty?> GetByOrderItemIdAsync(int orderItemId);
         Task<List<Warranty>> GetAllAsync();
         Task<List<Warranty>> GetByProductIdAsync(int productId);
-        Task<List<Warranty>> GetByOrderItemIdAsync(int orderItemId);
         Task<List<Warranty>> GetActiveWarrantiesAsync();
         Task AddAsync(Warranty warranty);
         void Update(Warranty warranty);

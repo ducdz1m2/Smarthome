@@ -3,6 +3,7 @@ namespace Domain.Entities.Installation;
 using Domain.Abstractions;
 using Domain.Exceptions;
 using Domain.ValueObjects;
+using Domain.Entities.Identity;
 
 /// <summary>
 /// TechnicianProfile aggregate root - represents a technician's profile and capabilities.
@@ -10,7 +11,7 @@ using Domain.ValueObjects;
 public class TechnicianProfile : AggregateRoot
     {
         public int? UserId { get; private set; }
-        
+
         // Personal info
         public string FullName { get; private set; } = string.Empty;
         public PhoneNumber PhoneNumber { get; private set; } = null!;
@@ -18,6 +19,8 @@ public class TechnicianProfile : AggregateRoot
         public string? IdentityCard { get; private set; } // CCCD
         public Address? Address { get; private set; }
         public DateTime? DateOfBirth { get; private set; }
+
+        public virtual ApplicationUser? User { get; private set; }
 
         // Work info
         public string EmployeeCode { get; private set; } = string.Empty;

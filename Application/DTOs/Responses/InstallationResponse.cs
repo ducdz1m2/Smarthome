@@ -24,7 +24,7 @@ namespace Application.DTOs.Responses
         public string TechnicianPhone { get; set; } = string.Empty;
         
         // Thông tin lịch hẹn
-        public int SlotId { get; set; }
+        public int? SlotId { get; set; }
         public DateTime ScheduledDate { get; set; }
         public TimeSpan? StartTime { get; set; }
         public TimeSpan? EndTime { get; set; }
@@ -42,6 +42,7 @@ namespace Application.DTOs.Responses
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsUninstall { get; set; }
+        public bool IsWarranty { get; set; }
         public int CustomerRescheduleCount { get; set; }
         
         // Vật tư

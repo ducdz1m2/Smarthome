@@ -8,6 +8,7 @@ namespace Application.DTOs.Requests
         public DateTime ScheduledDate { get; set; }
         public bool IsUninstall { get; set; } = false;
         public bool IsWarranty { get; set; } = false;
+        public int? WarrantyRequestId { get; set; }
     }
 
     public class UpdateInstallationBookingRequest
@@ -29,6 +30,23 @@ namespace Application.DTOs.Requests
         public string CustomerSignature { get; set; } = string.Empty;
         public int CustomerRating { get; set; }
         public string? Notes { get; set; }
+        public List<MaterialUsageItem> MaterialUsages { get; set; } = new();
+        public List<DamagedProductItem> DamagedProducts { get; set; } = new();
+    }
+
+    public class DamagedProductItem
+    {
+        public int ProductId { get; set; }
+        public int? VariantId { get; set; }
+        public int Quantity { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public bool IsDamaged { get; set; } = true;
+    }
+
+    public class MaterialUsageItem
+    {
+        public int MaterialId { get; set; }
+        public int QuantityUsed { get; set; }
     }
 
     public class CancelInstallationRequest
@@ -55,6 +73,7 @@ namespace Application.DTOs.Requests
         public int ProductId { get; set; }
         public int? VariantId { get; set; }
         public int Quantity { get; set; }
+        public bool Selected { get; set; }
     }
 
     public class RecordMaterialUsageRequest

@@ -35,8 +35,8 @@ namespace Infrastructure.Repositories
 
         public async Task<Order?> GetByIdWithDetailsForUpdateAsync(int id)
         {
+            // Do not use AsNoTracking here - we need change tracking for updates
             return await _context.Orders
-                .AsNoTracking()
                 .Include(o => o.Items)
                 .Include(o => o.Shipments)
                 .FirstOrDefaultAsync(o => o.Id == id);
@@ -47,6 +47,13 @@ namespace Infrastructure.Repositories
             return await _context.Orders
                 .AsNoTracking()
                 .FirstOrDefaultAsync(o => o.OrderNumber == orderNumber);
+        }
+
+        public async Task<OrderItem?> GetOrderItemByIdAsync(int orderItemId)
+        {
+            return await _context.OrderItems
+                .AsNoTracking()
+                .FirstOrDefaultAsync(oi => oi.Id == orderItemId);
         }
 
         public async Task<List<Order>> GetAllAsync()

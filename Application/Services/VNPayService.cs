@@ -1,6 +1,7 @@
 using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using System.Security.Cryptography;
 using System.Text;
@@ -11,11 +12,13 @@ namespace Application.Services
     {
         private readonly IConfiguration _configuration;
         private readonly IOrderRepository _orderRepository;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public VNPayService(IConfiguration configuration, IOrderRepository orderRepository)
+        public VNPayService(IConfiguration configuration, IOrderRepository orderRepository, IHttpContextAccessor httpContextAccessor)
         {
             _configuration = configuration;
             _orderRepository = orderRepository;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<VNPayResponse> CreatePaymentUrlAsync(int orderId, decimal amount, string orderInfo)
@@ -28,12 +31,21 @@ namespace Application.Services
                 var baseUrl = vnpayConfig["BaseUrl"];
                 var returnUrl = vnpayConfig["ReturnUrl"];
 
-                if (string.IsNullOrEmpty(tmnCode) || string.IsNullOrEmpty(hashSecret))
+                if (string.IsNullOrEmpty(tmnCode) || string.IsNullOrEmpty(hashSecret) || string.IsNullOrEmpty(returnUrl))
                 {
                     return new VNPayResponse
                     {
                         Success = false,
-                        Message = "VNPay configuration is missing"
+                        Message = "Cấu hình VNPay chưa được thiết lập. Vui lòng liên hệ quản trị viên."
+                    };
+                }
+
+                if (tmnCode == "YOUR_TMN_CODE" || hashSecret == "YOUR_HASH_SECRET")
+                {
+                    return new VNPayResponse
+                    {
+                        Success = false,
+                        Message = "Cấu hình VNPay đang ở chế độ demo. Vui lòng cập nhật thông tin VNPay thực tế trong appsettings.json"
                     };
                 }
 
@@ -43,10 +55,11 @@ namespace Application.Services
                     return new VNPayResponse
                     {
                         Success = false,
-                        Message = "Order not found"
+                        Message = "Không tìm thấy đơn hàng"
                     };
                 }
 
+                // Use actual order ID instead of ticks for better tracking
                 var vnpayData = new Dictionary<string, string>
                 {
                     { "vnp_Version", "2.1.0" },
@@ -54,7 +67,7 @@ namespace Application.Services
                     { "vnp_TmnCode", tmnCode },
                     { "vnp_Amount", ((long)(amount * 100)).ToString() },
                     { "vnp_CurrCode", "VND" },
-                    { "vnp_TxnRef", DateTime.Now.Ticks.ToString() },
+                    { "vnp_TxnRef", orderId.ToString() },
                     { "vnp_OrderInfo", orderInfo },
                     { "vnp_OrderType", "billpayment" },
                     { "vnp_Locale", "vn" },
@@ -73,7 +86,7 @@ namespace Application.Services
                 {
                     Success = true,
                     PaymentUrl = paymentUrl,
-                    TransactionId = vnpayData["vnp_TxnRef"]
+                    TransactionId = orderId.ToString()
                 };
             }
             catch (Exception ex)
@@ -81,7 +94,7 @@ namespace Application.Services
                 return new VNPayResponse
                 {
                     Success = false,
-                    Message = ex.Message
+                    Message = $"Lỗi khi tạo URL thanh toán: {ex.Message}"
                 };
             }
         }
@@ -94,6 +107,11 @@ namespace Application.Services
                 var hashSecret = vnpayConfig["HashSecret"];
 
                 if (string.IsNullOrEmpty(hashSecret))
+                {
+                    return false;
+                }
+
+                if (!vnpayData.ContainsKey("vnp_SecureHash"))
                 {
                     return false;
                 }
@@ -111,8 +129,8 @@ namespace Application.Services
                     return false;
                 }
 
-                var responseCode = vnpayData["vnp_ResponseCode"];
-                var transactionStatus = vnpayData["vnp_TransactionStatus"];
+                var responseCode = vnpayData.GetValueOrDefault("vnp_ResponseCode");
+                var transactionStatus = vnpayData.GetValueOrDefault("vnp_TransactionStatus");
 
                 if (responseCode == "00" && transactionStatus == "00")
                 {
@@ -147,7 +165,34 @@ namespace Application.Services
 
         private string GetIpAddress()
         {
-            return "127.0.0.1";
+            try
+            {
+                var context = _httpContextAccessor?.HttpContext;
+                if (context == null)
+                {
+                    return "127.0.0.1";
+                }
+
+                // Try to get IP from forwarded headers (for proxy/load balancer scenarios)
+                var forwardedHeader = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+                if (!string.IsNullOrEmpty(forwardedHeader))
+                {
+                    return forwardedHeader.Split(',')[0].Trim();
+                }
+
+                // Try to get IP from RemoteIpAddress
+                var remoteIp = context.Connection.RemoteIpAddress;
+                if (remoteIp != null)
+                {
+                    return remoteIp.ToString();
+                }
+
+                return "127.0.0.1";
+            }
+            catch
+            {
+                return "127.0.0.1";
+            }
         }
     }
 }

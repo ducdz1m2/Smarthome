@@ -25,14 +25,14 @@
                       IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
     </ToolBarContent>
     <HeaderContent>
-        <MudTh Width="60px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.Id)">ID</MudTableSortLabel></MudTh>
-        <MudTh Width="150px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.UserName)">Tên đăng nhập</MudTableSortLabel></MudTh>
-        <MudTh Width="200px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.FullName)">Họ tên</MudTableSortLabel></MudTh>
-        <MudTh Width="200px">Email</MudTh>
-        <MudTh Width="100px">SĐT</MudTh>
-        <MudTh Width="150px">Vai trò</MudTh>
-        <MudTh Width="100px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
-        <MudTh Width="150px">Thao tác</MudTh>
+        <MudTh width="60px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh width="150px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.UserName)">Tên đăng nhập</MudTableSortLabel></MudTh>
+        <MudTh width="200px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.FullName)">Họ tên</MudTableSortLabel></MudTh>
+        <MudTh width="200px">Email</MudTh>
+        <MudTh width="100px">SĐT</MudTh>
+        <MudTh width="150px">Vai trò</MudTh>
+        <MudTh width="100px"><MudTableSortLabel T="UserResponse" SortBy="@(u => u.IsActive)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh width="150px">Thao tác</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
@@ -63,7 +63,7 @@
         </MudTd>
     </RowTemplate>
     <PagerContent>
-        <MudTablePager RowsPerPageString="Số dòng:" rowsperpageoptions="new[] { 5, 10, 25, 50 }"
+        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
                        InfoFormat="{first_item}-{last_item} / {all_items}" />
     </PagerContent>
 </MudTable>

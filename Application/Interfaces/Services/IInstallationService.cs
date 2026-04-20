@@ -14,6 +14,7 @@ namespace Application.Interfaces.Services
         Task<List<InstallationBookingListResponse>> GetByStatusAsync(string status);
         Task<int> CreateAsync(CreateInstallationBookingRequest request);
         Task UpdateAsync(int id, UpdateInstallationBookingRequest request);
+        Task StartWarrantyAsync(int id);
         Task AssignTechnicianAsync(int id, int technicianId, int slotId);
         Task StartPreparationAsync(int id);
         Task StartTravelAsync(int id);
@@ -37,5 +38,6 @@ namespace Application.Interfaces.Services
 
         // Uninstall booking management
         Task SetIsUninstallAsync(int bookingId, bool isUninstall);
+        Task UpdateIsWarrantyAsync(int bookingId, bool isWarranty);
     }
 }

@@ -37,12 +37,12 @@ public class ReturnOrder : AggregateRoot
             };
         }
 
-        public void AddItem(int orderItemId, int quantity, string itemReason)
+        public void AddItem(int orderItemId, int productId, int? variantId, int quantity, string itemReason, bool isDamaged = false, int? warehouseId = null)
         {
             if (Status != ReturnOrderStatus.Pending)
                 throw new BusinessRuleViolationException("ReturnOrderStatus", "Không thể thêm sản phẩm vào yêu cầu đã xử lý");
 
-            var item = ReturnOrderItem.Create(Id, orderItemId, quantity, itemReason);
+            var item = ReturnOrderItem.Create(Id, orderItemId, productId, variantId, quantity, itemReason, isDamaged, warehouseId);
             Items.Add(item);
         }
 
@@ -85,20 +85,45 @@ public class ReturnOrder : AggregateRoot
     {
         public int ReturnOrderId { get; private set; }
         public int OrderItemId { get; private set; }
+        public int ProductId { get; private set; }
+        public int? VariantId { get; private set; }
         public int Quantity { get; private set; }
         public string Reason { get; private set; } = string.Empty;
+        public bool IsDamaged { get; private set; } = false;
+        public bool ReturnedToInventory { get; private set; } = false;
+        public int? WarehouseId { get; private set; }
 
         private ReturnOrderItem() { }
 
-        public static ReturnOrderItem Create(int returnOrderId, int orderItemId, int quantity, string reason)
+        public static ReturnOrderItem Create(int returnOrderId, int orderItemId, int productId, int? variantId, int quantity, string reason, bool isDamaged = false, int? warehouseId = null)
         {
             return new ReturnOrderItem
             {
                 ReturnOrderId = returnOrderId,
                 OrderItemId = orderItemId,
+                ProductId = productId,
+                VariantId = variantId,
                 Quantity = quantity,
-                Reason = reason
+                Reason = reason,
+                IsDamaged = isDamaged,
+                WarehouseId = warehouseId,
+                ReturnedToInventory = false
             };
+        }
+
+        public void MarkAsReturnedToInventory()
+        {
+            ReturnedToInventory = true;
+        }
+
+        public void MarkAsDamaged()
+        {
+            IsDamaged = true;
+        }
+
+        public void SetWarehouseId(int warehouseId)
+        {
+            WarehouseId = warehouseId;
         }
     }
 

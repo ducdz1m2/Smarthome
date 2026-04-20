@@ -34,7 +34,13 @@ namespace Application.Services
         {
             var product = await _productRepository.GetByIdWithDetailsAsync(id);
             if (product == null) return null;
-            return MapToResponse(product);
+            
+            // Get actual stock from ProductWarehouse
+            var warehouseStocks = await _productWarehouseRepository.GetByProductAsync(id);
+            var totalQuantity = warehouseStocks.Sum(pw => pw.Quantity);
+            var totalReserved = warehouseStocks.Sum(pw => pw.ReservedQuantity);
+            
+            return MapToResponse(product, totalQuantity, totalReserved, warehouseStocks);
         }
 
         public async Task<ProductResponse?> GetBySkuAsync(string sku)
@@ -291,6 +297,11 @@ namespace Application.Services
 
         private ProductResponse MapToResponse(Product product)
         {
+            return MapToResponse(product, product.StockQuantity, product.FrozenStockQuantity, new List<ProductWarehouse>());
+        }
+
+        private ProductResponse MapToResponse(Product product, int totalQuantity, int totalReserved, List<ProductWarehouse> warehouseStocks)
+        {
             var activeVariants = product.Variants?.Where(v => v.IsActive).ToList() ?? new List<ProductVariant>();
             var minPrice = activeVariants.Any() ? activeVariants.Min(v => v.Price.Amount) : 0;
             var maxPrice = activeVariants.Any() ? activeVariants.Max(v => v.Price.Amount) : 0;
@@ -302,8 +313,8 @@ namespace Application.Services
                 Sku = product.Sku.Value,
                 MinPrice = minPrice,
                 MaxPrice = maxPrice,
-                StockQuantity = product.StockQuantity,
-                FrozenStockQuantity = product.FrozenStockQuantity,
+                StockQuantity = totalQuantity,
+                FrozenStockQuantity = totalReserved,
                 Description = product.Description,
                 Specs = product.GetSpecs(),
                 IsActive = product.IsActive,
@@ -314,14 +325,23 @@ namespace Application.Services
                 BrandName = product.Brand?.Name ?? "",
                 SupplierId = product.SupplierId,
                 SupplierName = product.Supplier?.Name,
-                Variants = product.Variants?.Select(v => new ProductVariantResponse
+                Variants = product.Variants?.Select(v =>
                 {
-                    Id = v.Id,
-                    Sku = v.Sku.Value,
-                    Price = v.Price.Amount,
-                    StockQuantity = v.StockQuantity,
-                    Attributes = v.GetAttributes(),
-                    IsActive = v.IsActive
+                    // Calculate stock for this variant from warehouse
+                    var variantStocks = warehouseStocks.Where(pw => pw.VariantId == v.Id).ToList();
+                    var variantQty = variantStocks.Sum(pw => pw.Quantity);
+                    var variantReserved = variantStocks.Sum(pw => pw.ReservedQuantity);
+                    
+                    return new ProductVariantResponse
+                    {
+                        Id = v.Id,
+                        Sku = v.Sku.Value,
+                        Price = v.Price.Amount,
+                        StockQuantity = variantQty,
+                        WarrantyPeriod = v.WarrantyPeriod,
+                        Attributes = v.GetAttributes(),
+                        IsActive = v.IsActive
+                    };
                 }).ToList() ?? new List<ProductVariantResponse>(),
                 Images = product.Images?.Select(i => new ProductImageResponse
                 {

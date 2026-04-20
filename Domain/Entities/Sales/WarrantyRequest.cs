@@ -10,7 +10,12 @@ using Domain.ValueObjects;
 /// </summary>
 public class WarrantyRequest : AggregateRoot
 {
-    public int OrderId { get; private set; }
+    public int? WarrantyId { get; private set; }
+    public int ProductId { get; private set; }
+    public int? VariantId { get; private set; }
+    public int OrderItemId { get; private set; } // Link to OrderItem instead of serial number
+    public int? InstallationBookingId { get; set; }
+    public int? AssignedTechnicianId { get; private set; }
     public WarrantyType WarrantyType { get; private set; }
     public string Description { get; private set; } = string.Empty;
     public WarrantyRequestStatus Status { get; private set; } = WarrantyRequestStatus.Pending;
@@ -19,31 +24,26 @@ public class WarrantyRequest : AggregateRoot
     public DateTime? CompletedAt { get; private set; }
     public string? TechnicianNotes { get; private set; }
 
+    public virtual Warranty? Warranty { get; private set; }
     public virtual ICollection<WarrantyRequestItem> Items { get; private set; } = new List<WarrantyRequestItem>();
 
     private WarrantyRequest() { }
 
-    public static WarrantyRequest Create(int orderId, WarrantyType warrantyType, string description)
+    public static WarrantyRequest Create(int? warrantyId, int productId, int? variantId, int orderItemId, WarrantyType warrantyType, string description)
     {
         if (string.IsNullOrWhiteSpace(description))
             throw new ValidationException(nameof(description), "Mô tả yêu cầu bảo hành không được trống");
 
         return new WarrantyRequest
         {
-            OrderId = orderId,
+            WarrantyId = warrantyId,
+            ProductId = productId,
+            VariantId = variantId,
+            OrderItemId = orderItemId,
             WarrantyType = warrantyType,
             Description = description.Trim(),
             Status = WarrantyRequestStatus.Pending
         };
-    }
-
-    public void AddItem(int orderItemId, int quantity, string itemDescription, bool isDamaged = false)
-    {
-        if (Status != WarrantyRequestStatus.Pending)
-            throw new BusinessRuleViolationException("WarrantyRequestStatus", "Không thể thêm sản phẩm vào yêu cầu đã xử lý");
-
-        var item = WarrantyRequestItem.Create(Id, orderItemId, quantity, itemDescription, isDamaged);
-        Items.Add(item);
     }
 
     public void Approve()
@@ -82,33 +82,14 @@ public class WarrantyRequest : AggregateRoot
         CompletedAt = DateTime.UtcNow;
         TechnicianNotes = technicianNotes;
     }
-}
 
-public class WarrantyRequestItem : Entity
-{
-    public int WarrantyRequestId { get; private set; }
-    public int OrderItemId { get; private set; }
-    public int Quantity { get; private set; }
-    public string Description { get; private set; } = string.Empty;
-    public bool IsDamaged { get; private set; } = false;
-    public bool ReturnedToInventory { get; private set; } = false;
-
-    private WarrantyRequestItem() { }
-
-    public static WarrantyRequestItem Create(int warrantyRequestId, int orderItemId, int quantity, string description, bool isDamaged = false)
+    public void LinkToInstallationBooking(int bookingId)
     {
-        return new WarrantyRequestItem
-        {
-            WarrantyRequestId = warrantyRequestId,
-            OrderItemId = orderItemId,
-            Quantity = quantity,
-            Description = description,
-            IsDamaged = isDamaged
-        };
+        InstallationBookingId = bookingId;
     }
 
-    public void MarkAsReturnedToInventory()
+    public void AssignTechnician(int technicianId)
     {
-        ReturnedToInventory = true;
+        AssignedTechnicianId = technicianId;
     }
 }

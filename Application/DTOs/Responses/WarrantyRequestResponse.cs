@@ -4,6 +4,12 @@ public class WarrantyRequestResponse
 {
     public int Id { get; set; }
     public int OrderId { get; set; }
+    public int? WarrantyId { get; set; }
+    public int ProductId { get; set; }
+    public int? VariantId { get; set; }
+    public int OrderItemId { get; set; }
+    public int? InstallationBookingId { get; set; }
+    public int? AssignedTechnicianId { get; set; }
     public string OrderNumber { get; set; } = string.Empty;
     public string WarrantyType { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -22,4 +28,6 @@ public class WarrantyRequestItemResponseDto
     public int OrderItemId { get; set; }
     public int Quantity { get; set; }
     public string Description { get; set; } = string.Empty;
+    public bool IsDamaged { get; set; }
+    public bool ReturnedToInventory { get; set; }
 }

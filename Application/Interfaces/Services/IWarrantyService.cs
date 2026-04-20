@@ -10,8 +10,9 @@ namespace Application.Interfaces.Services
         Task<WarrantyResponse?> GetByIdAsync(int id);
         Task<WarrantyResponse?> GetByIdWithClaimsAsync(int id);
         Task<List<WarrantyResponse>> GetByProductIdAsync(int productId);
+        Task<WarrantyResponse?> GetByOrderItemIdAsync(int orderItemId);
         Task<List<WarrantyResponse>> GetActiveWarrantiesAsync();
-        Task<int> CreateAsync(int orderItemId, int productId, int durationInMonths);
+        Task<int> CreateAsync(int productId, int? variantId, int orderItemId, int durationInMonths);
         Task ExtendWarrantyAsync(int id, int additionalMonths);
         Task UpdateStatusAsync(int id, string status);
         Task DeleteAsync(int id);

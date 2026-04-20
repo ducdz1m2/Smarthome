@@ -7,6 +7,7 @@
 @using Web.Services
 @inject IInstallationService InstallationService
 @inject InstallationApiService InstallationApiService
+@inject IWarrantyRequestService WarrantyRequestService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
@@ -132,75 +133,141 @@ else
                 }
                 else if (_booking.Status == "Confirmed")
                 {
-                    <MudAlert Severity="Severity.Success" Class="mb-3">
-                        Đã xác nhận lịch. Vui lòng chuẩn bị vật tư từ kho trước khi di chuyển.
-                    </MudAlert>
-                    @if (_booking.MaterialsPrepared)
+                    @if (_booking.IsWarranty)
                     {
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
-                                   OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                        <MudAlert Severity="Severity.Success" Class="mb-3">
+                            Đã xác nhận lịch bảo hành.
+                        </MudAlert>
+                        @if (_replacementProductsPrepared)
+                        {
+                            <MudAlert Severity="Severity.Info" Class="mb-3">
+                                Đã chuẩn bị sản phẩm thay thế xong. Sẵn sàng bắt đầu bảo hành!
+                            </MudAlert>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.BuildCircle"
+                                       OnClick="StartWarranty">Bắt đầu bảo hành</MudButton>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Warning" Class="mb-3">
+                                Vui lòng chuẩn bị sản phẩm thay thế trước khi bắt đầu bảo hành.
+                            </MudAlert>
+                            <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
+                                       OnClick="OpenPrepareReplacementDialog">Chuẩn bị sản phẩm thay thế</MudButton>
+                        }
                     }
                     else
                     {
-                        <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
-                                   OnClick="OpenPrepareMaterialsDialog">Chuẩn bị vật tư từ kho</MudButton>
+                        <MudAlert Severity="Severity.Success" Class="mb-3">
+                            Đã xác nhận lịch. Vui lòng chuẩn bị vật tư từ kho trước khi di chuyển.
+                        </MudAlert>
+                        @if (_booking.MaterialsPrepared)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
+                                       OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
+                                       OnClick="OpenPrepareMaterialsDialog">Chuẩn bị vật tư từ kho</MudButton>
+                        }
                     }
                 }
                 else if (_booking.Status == "Preparing")
                 {
-                    @if (_booking.MaterialsPrepared)
+                    @if (_booking.IsWarranty)
                     {
-                        <MudAlert Severity="Severity.Success" Class="mb-3">
-                            Đã chuẩn bị vật tư xong. Sẵn sàng di chuyển!
-                        </MudAlert>
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
-                                   OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                        @if (_replacementProductsPrepared)
+                        {
+                            <MudAlert Severity="Severity.Success" Class="mb-3">
+                                Đã chuẩn bị sản phẩm thay thế xong. Sẵn sàng di chuyển!
+                            </MudAlert>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
+                                       OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Warning" Class="mb-3">
+                                Vui lòng chuẩn bị sản phẩm thay thế trước khi di chuyển.
+                            </MudAlert>
+                            <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
+                                       OnClick="OpenPrepareReplacementDialog">Chuẩn bị sản phẩm thay thế</MudButton>
+                        }
                     }
                     else
                     {
-                        <MudAlert Severity="Severity.Warning" Class="mb-3">
-                            Vui lòng chuẩn bị vật tư từ kho trước khi di chuyển.
-                        </MudAlert>
-                        <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
-                                   OnClick="OpenPrepareMaterialsDialog">Chuẩn bị vật tư từ kho</MudButton>
-                    }
+                        @if (_booking.MaterialsPrepared)
+                        {
+                            <MudAlert Severity="Severity.Success" Class="mb-3">
+                                Đã chuẩn bị vật tư xong. Sẵn sàng di chuyển!
+                            </MudAlert>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
+                                       OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Warning" Class="mb-3">
+                                Vui lòng chuẩn bị vật tư từ kho trước khi di chuyển.
+                            </MudAlert>
+                            <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
+                                       OnClick="OpenPrepareMaterialsDialog">Chuẩn bị vật tư từ kho</MudButton>
+                        }
 
-                    @if (_booking.Materials?.Any() == true)
-                    {
-                        <MudCard Class="mt-4" Elevation="1">
-                            <MudCardHeader>
-                                <MudText Typo="Typo.subtitle1">Vật tư đã lấy từ kho</MudText>
-                            </MudCardHeader>
-                            <MudCardContent>
-                                <MudList T="InstallationMaterialResponse">
-                                    @foreach (var material in _booking.Materials)
-                                    {
-                                        <MudListItem T="InstallationMaterialResponse">
-                                            <div class="d-flex justify-space-between align-center">
-                                                <div>
-                                                    <MudText>@material.ProductName</MudText>
-                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                        SL: @material.QuantityTaken | Kho: @(material.WarehouseName ?? "N/A")
-                                                    </MudText>
+                        @if (_booking.Materials?.Any() == true)
+                        {
+                            <MudCard Class="mt-4" Elevation="1">
+                                <MudCardHeader>
+                                    <MudText Typo="Typo.subtitle1">Vật tư đã lấy từ kho</MudText>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <MudList T="InstallationMaterialResponse">
+                                        @foreach (var material in _booking.Materials)
+                                        {
+                                            <MudListItem T="InstallationMaterialResponse">
+                                                <div class="d-flex justify-space-between align-center">
+                                                    <div>
+                                                        <MudText>@material.ProductName</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            SL: @material.QuantityTaken | Kho: @(material.WarehouseName ?? "N/A")
+                                                        </MudText>
+                                                    </div>
+                                                    <MudChip Size="Size.Small" Color="Color.Info">Đã lấy</MudChip>
                                                 </div>
-                                                <MudChip Size="Size.Small" Color="Color.Info">Đã lấy</MudChip>
-                                            </div>
-                                        </MudListItem>
-                                    }
-                                </MudList>
-                            </MudCardContent>
-                        </MudCard>
+                                            </MudListItem>
+                                        }
+                                    </MudList>
+                                </MudCardContent>
+                            </MudCard>
+                        }
                     }
                 }
                 else if (_booking.Status == "OnTheWay")
                 {
-                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Build"
-                               OnClick="StartInstallation">Bắt đầu lắp đặt</MudButton>
+                    @if (_booking.IsWarranty)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.BuildCircle"
+                                   OnClick="StartWarranty">Bắt đầu bảo hành</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Build"
+                                   OnClick="StartInstallation">Bắt đầu lắp đặt</MudButton>
+                    }
                 }
                 else if (_booking.Status == "Installing")
                 {
-                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Done"
-                               OnClick="OpenCompleteDialog">Hoàn thành</MudButton>
+                    @if (_booking.IsWarranty)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mb-3">
+                            Đang thực hiện bảo hành. Hoàn thành khi xong.
+                            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Done"
+                                       OnClick="OpenCompleteDialog">Hoàn thành bảo hành</MudButton>
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Done"
+                                   OnClick="OpenCompleteDialog">Hoàn thành</MudButton>
+                    }
                 }
                 else if (_booking.Status == "Completed")
                 {
@@ -253,17 +320,87 @@ else
 @if (_showCompleteDialog)
 {
     <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
-        <MudPaper Class="pa-4" Style="max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
-            <MudText Typo="Typo.h6" Class="mb-4">Hoàn thành lắp đặt</MudText>
+        <MudPaper Class="pa-4" Style="max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <MudText Typo="Typo.h6" Class="mb-4">@(_booking?.IsWarranty == true ? "Hoàn thành bảo hành" : "Hoàn thành lắp đặt")</MudText>
             <div>
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Ảnh hoàn thành *</MudText>
-                <InputFile OnChange="HandlePhotoUpload" accept="image/*" class="mb-2" />
-                @if (!string.IsNullOrEmpty(_completionPhoto))
-                {
-                    <img src="@_completionPhoto" style="max-width: 100%; max-height: 200px; margin-top: 10px;" class="border rounded" />
-                    <MudButton OnClick="ClearPhoto" Variant="Variant.Outlined" Size="Size.Small" Class="mt-2">Xóa ảnh</MudButton>
-                }
+                <MudCard Elevation="0" Outlined="true" Class="mb-3">
+                    <MudCardContent Class="pa-4">
+                        @if (!string.IsNullOrEmpty(_completionPhoto))
+                        {
+                            <div class="d-flex flex-column align-center">
+                                <img src="@_completionPhoto" style="max-width: 100%; max-height: 300px;" class="border rounded mb-3" />
+                                <MudButton OnClick="ClearPhoto" Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete">
+                                    Xóa ảnh
+                                </MudButton>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="d-flex align-center justify-center pa-4">
+                                <InputFile OnChange="HandlePhotoUpload" accept="image/*" class="custom-file-input" />
+                            </div>
+                        }
+                    </MudCardContent>
+                </MudCard>
             </div>
+
+            @if (_booking?.IsWarranty == true)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mb-2 mt-3">Thay thế</MudText>
+                <MudCard Elevation="0" Outlined="true" Class="mb-3">
+                    <MudCardContent>
+                        @if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
+                        {
+                            @foreach (var replacement in _selectedReplacementProducts.Where(rp => rp.Selected))
+                            {
+                                var productInfo = _booking?.Products?.FirstOrDefault(p => p.ProductId == replacement.ProductId);
+                                <div class="d-flex align-center justify-space-between p-2" style="border: 1px solid #ddd; border-radius: 4px;">
+                                    <div>
+                                        <MudText Typo="Typo.body1" Class="fw-bold">@(productInfo?.ProductName ?? $"Sản phẩm #{replacement.ProductId}")</MudText>
+                                        @if (productInfo?.VariantName != null)
+                                        {
+                                            <MudText Typo="Typo.caption">@productInfo.VariantName</MudText>
+                                        }
+                                        <MudText Typo="Typo.caption">SL: 1</MudText>
+                                    </div>
+                                    <div class="d-flex align-center gap-2">
+                                        <MudCheckBox T="bool" Checked="@GetReplacementUsed(replacement.ProductId, replacement.VariantId)"
+                                                    CheckedChanged="(bool value) => SetReplacementUsed(replacement.ProductId, replacement.VariantId, value)"
+                                                    Label="Đã thay thế (sản phẩm cũ hư hỏng)" Color="Color.Primary" />
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Chưa chuẩn bị sản phẩm thay thế</MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            }
+            else
+            {
+                @if (_booking?.Materials?.Any() == true)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mb-2 mt-3">Số lượng vật tư đã dùng</MudText>
+                    <MudCard Elevation="0" Outlined="true" Class="mb-3">
+                        <MudCardContent>
+                            @foreach (var material in _booking.Materials)
+                            {
+                                <div class="d-flex align-center justify-space-between p-2" style="border: 1px solid #ddd; border-radius: 4px;">
+                                    <div>
+                                        <MudText Typo="Typo.body1" Class="fw-bold">@material.ProductName</MudText>
+                                        <MudText Typo="Typo.caption">Đã lấy: @material.QuantityTaken</MudText>
+                                    </div>
+                                    <MudNumericField T="int" @bind-Value="@_materialQuantitiesUsed[material.Id]" Label="Đã dùng" Variant="Variant.Outlined" Dense="true" Min="0" Max="@material.QuantityTaken" Style="width: 100px;" />
+                                </div>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                }
+            }
+
             <MudForm @ref="_completeForm" @bind-IsValid="_isCompleteFormValid">
                 <MudTextField @bind-Value="_completionNotes" Label="Ghi chú"
                               Variant="Variant.Outlined" Lines="2" Class="mt-3" />
@@ -355,6 +492,86 @@ else
     </div>
 }
 
+<!-- Prepare Replacement Products Dialog for Warranty Bookings -->
+@if (_showPrepareReplacementDialog)
+{
+    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center;">
+        <MudPaper Class="pa-4" Style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <MudText Typo="Typo.h6" Class="mb-4">Chuẩn bị sản phẩm thay thế cho bảo hành</MudText>
+            @if (_loadingWarehouses)
+            {
+                <MudProgressLinear Indeterminate="true" Class="my-4" />
+            }
+            else if (_replacementWarehouses?.Any() != true)
+            {
+                <MudAlert Severity="Severity.Warning">Không có kho nào có sẵn sản phẩm thay thế.</MudAlert>
+            }
+            else
+            {
+                <MudForm @ref="_replacementForm" @bind-IsValid="_isReplacementFormValid">
+                    <MudSelect T="int" @bind-Value="_replacementWarehouseId" Label="Chọn kho *" Required="true"
+                               RequiredError="Vui lòng chọn kho" Variant="Variant.Outlined" Class="mb-4">
+                        @foreach (var warehouse in _replacementWarehouses)
+                        {
+                            <MudSelectItem T="int" Value="@warehouse.WarehouseId">
+                                @warehouse.WarehouseName (@warehouse.WarehouseCode) - @warehouse.AvailableProducts.Count sản phẩm
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    @if (_replacementWarehouseId > 0)
+                    {
+                        var selectedWarehouse = _replacementWarehouses.FirstOrDefault(w => w.WarehouseId == _replacementWarehouseId);
+                        @if (selectedWarehouse != null)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Chọn sản phẩm thay thế:</MudText>
+                            <MudTable Items="selectedWarehouse.AvailableProducts" Dense="true" Hover="true">
+                                <HeaderContent>
+                                    <MudTh>Chọn</MudTh>
+                                    <MudTh>Sản phẩm</MudTh>
+                                    <MudTh>SKU</MudTh>
+                                    <MudTh>SL tồn</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd>
+                                        <MudCheckBox T="bool" Value="@IsReplacementSelected(context.ProductId, context.VariantId)"
+                                                    ValueChanged="(bool value) => ToggleReplacementSelection(context.ProductId, context.VariantId, value)"
+                                                    Color="Color.Primary" />
+                                    </MudTd>
+                                    <MudTd>
+                                        <MudText>@context.ProductName</MudText>
+                                        @if (context.VariantName != null)
+                                        {
+                                            <MudText Typo="Typo.caption" Class="d-block">@context.VariantName</MudText>
+                                        }
+                                    </MudTd>
+                                    <MudTd>
+                                        <MudText Typo="Typo.caption">@context.Sku</MudText>
+                                    </MudTd>
+                                    <MudTd>
+                                        <MudText Color="Color.Success">@context.AvailableStock</MudText>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+
+                            <MudAlert Severity="Severity.Info" Class="mt-3">
+                                <MudText Typo="Typo.body2">
+                                    <b>Ghi chú:</b> Chọn sản phẩm thay thế mang theo để thực hiện bảo hành. Số lượng mặc định là 1 cho mỗi sản phẩm được chọn.
+                                </MudText>
+                            </MudAlert>
+                        }
+                    }
+                </MudForm>
+            }
+            <div class="d-flex justify-end mt-4">
+                <MudButton OnClick="() => _showPrepareReplacementDialog = false" Variant="Variant.Outlined" Class="mr-2">Hủy</MudButton>
+                <MudButton Color="Color.Success" OnClick="ConfirmPrepareReplacement"
+                           Disabled="!_isReplacementFormValid || _replacementWarehouseId == 0 || _loadingWarehouses">Xác nhận</MudButton>
+            </div>
+        </MudPaper>
+    </div>
+}
+
 @code {
     [Parameter]
     public int Id { get; set; }
@@ -385,6 +602,14 @@ else
     private bool _isCompleteFormValid = false;
     private string _completionPhoto = "";
     private string _completionNotes = "";
+    private Dictionary<int, int> _materialQuantitiesUsed = new();
+    private Dictionary<int, DamagedProductItem> _damagedProducts = new();
+    private int _newDamagedProductId = 0;
+    private int _newDamagedQuantity = 1;
+    private string _newDamagedReason = "";
+    private string _warrantyDamageReason = "";
+    private Dictionary<string, bool> _replacementUsed = new();
+    private HashSet<string> _selectedReplacementKeys = new();
 
     // Prepare Materials Dialog fields
     private bool _showPrepareMaterialsDialog = false;
@@ -394,6 +619,16 @@ else
     private int _selectedWarehouseId = 0;
     private List<WarehouseStockForTechnicianResponse> _availableWarehouses = new();
     private List<MaterialPreparationItem> _selectedMaterials = new();
+    private string _warrantyRequestStatus = "";
+
+    // Prepare Replacement Products Dialog fields for warranty bookings
+    private bool _showPrepareReplacementDialog = false;
+    private MudForm _replacementForm = null!;
+    private bool _isReplacementFormValid = false;
+    private int _replacementWarehouseId = 0;
+    private List<WarehouseStockForTechnicianResponse> _replacementWarehouses = new();
+    private List<MaterialPreparationItem> _selectedReplacementProducts = new();
+    private bool _replacementProductsPrepared = false;
 
     private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
     private readonly DialogOptions _dialogOptionsLarge = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
@@ -407,8 +642,28 @@ else
     {
         try
         {
-            _loading = true;
-            _booking = await InstallationService.GetByIdAsync(Id);
+            _booking = await InstallationApiService.GetByIdAsync(Id);
+
+            // Load warranty request status if this is a warranty booking
+            if (_booking?.IsWarranty == true)
+            {
+                var allRequests = await WarrantyRequestService.GetAllAsync();
+                var warrantyRequest = allRequests.FirstOrDefault(r => r.InstallationBookingId == Id);
+                _warrantyRequestStatus = warrantyRequest?.Status.ToString() ?? "";
+
+                // Load replacement products prepared state from booking materials
+                _replacementProductsPrepared = _booking.MaterialsPrepared;
+                if (_booking.Materials?.Any() == true)
+                {
+                    _selectedReplacementProducts = _booking.Materials.Select(m => new MaterialPreparationItem
+                    {
+                        ProductId = m.ProductId,
+                        VariantId = m.VariantId,
+                        Quantity = m.QuantityTaken,
+                        Selected = true
+                    }).ToList();
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -417,6 +672,28 @@ else
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task LoadWarrantyRequestStatus(int orderId)
+    {
+        try
+        {
+            // Product-based warranty: find warranty request linked to this installation booking
+            var allRequests = await WarrantyRequestService.GetAllAsync();
+            var warrantyRequest = allRequests.FirstOrDefault(r => r.InstallationBookingId == Id);
+            if (warrantyRequest != null)
+            {
+                _warrantyRequestStatus = warrantyRequest.Status;
+            }
+            else
+            {
+                _warrantyRequestStatus = "";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LoadWarrantyRequestStatus] Error: {ex.Message}");
         }
     }
 
@@ -431,7 +708,7 @@ else
         try
         {
             var technicianId = await GetCurrentTechnicianId();
-            await InstallationService.AcceptBookingAsync(Id, technicianId);
+            await InstallationApiService.AcceptBookingAsync(Id, technicianId);
             Snackbar.Add("Đã tiếp nhận lịch lắp đặt", Severity.Success);
             await LoadBooking();
         }
@@ -453,7 +730,7 @@ else
         {
             var technicianId = await GetCurrentTechnicianId();
             var request = new RejectBookingRequest { Reason = _rejectReason };
-            await InstallationService.RejectBookingAsync(Id, technicianId, request);
+            await InstallationApiService.RejectBookingAsync(Id, technicianId, request);
             _showRejectDialog = false;
             Snackbar.Add("Đã từ chối lịch lắp đặt", Severity.Info);
             await LoadBooking();
@@ -468,12 +745,15 @@ else
     {
         try
         {
-            await InstallationService.StartTravelAsync(Id);
+            Console.WriteLine($"[StartTravel] Before start travel - Booking ID: {Id}, Status: {_booking?.Status}, MaterialsPrepared: {_booking?.MaterialsPrepared}");
+            await InstallationApiService.StartTravelAsync(Id);
             Snackbar.Add("Đã bắt đầu di chuyển", Severity.Success);
             await LoadBooking();
+            Console.WriteLine($"[StartTravel] After start travel - Booking ID: {Id}, Status: {_booking?.Status}");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[StartTravel] Error: {ex.Message}");
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }
@@ -482,7 +762,7 @@ else
     {
         try
         {
-            await InstallationService.StartInstallationAsync(Id);
+            await InstallationApiService.StartInstallationAsync(Id);
             Snackbar.Add("Đã bắt đầu lắp đặt", Severity.Success);
             await LoadBooking();
         }
@@ -494,9 +774,20 @@ else
 
     private void OpenCompleteDialog()
     {
-        Console.WriteLine($"[OpenCompleteDialog] Opening complete dialog for booking {_booking?.Id}, current status: {_booking?.Status}");
+        Console.WriteLine($"[OpenCompleteDialog] Opening complete dialog for booking {_booking?.Id}, current status: {_booking?.Status}, IsWarranty: {_booking?.IsWarranty}");
         _completionPhoto = "";
         _completionNotes = "";
+        _materialQuantitiesUsed = new Dictionary<int, int>();
+
+        // Initialize material quantities with default values (all used by default)
+        if (_booking?.Materials?.Any() == true)
+        {
+            foreach (var material in _booking.Materials)
+            {
+                _materialQuantitiesUsed[material.Id] = material.QuantityTaken;
+            }
+        }
+
         _showCompleteDialog = true;
         Console.WriteLine($"[OpenCompleteDialog] Dialog visibility set to: {_showCompleteDialog}");
     }
@@ -557,13 +848,32 @@ else
 
             Console.WriteLine($"[ConfirmComplete] Photo length: {_completionPhoto.Length}, Notes: {_completionNotes}");
 
+            // Build material usage list
+            var materialUsages = new List<MaterialUsageItem>();
+            if (_booking?.Materials?.Any() == true)
+            {
+                foreach (var material in _booking.Materials)
+                {
+                    if (_materialQuantitiesUsed.ContainsKey(material.Id))
+                    {
+                        materialUsages.Add(new MaterialUsageItem
+                        {
+                            MaterialId = material.Id,
+                            QuantityUsed = _materialQuantitiesUsed[material.Id]
+                        });
+                    }
+                }
+            }
+
             var request = new CompleteInstallationRequest
             {
                 CustomerSignature = _completionPhoto,
                 CustomerRating = 0,
-                Notes = _completionNotes
+                Notes = _completionNotes,
+                MaterialUsages = materialUsages,
+                DamagedProducts = _damagedProducts.Values.ToList()
             };
-            await InstallationService.CompleteAsync(Id, request);
+            await InstallationApiService.CompleteAsync(Id, request);
             _showCompleteDialog = false;
             Snackbar.Add("Đã hoàn thành lắp đặt", Severity.Success);
             await LoadBooking();
@@ -571,6 +881,310 @@ else
         catch (Exception ex)
         {
             Console.WriteLine($"[ConfirmComplete] Error: {ex.Message}");
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartWarranty()
+    {
+        try
+        {
+            await InstallationService.StartWarrantyAsync(Id);
+            Snackbar.Add("Đã bắt đầu bảo hành", Severity.Success);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CompleteWarranty()
+    {
+        try
+        {
+            var allRequests = await WarrantyRequestService.GetAllAsync();
+            var warrantyRequest = allRequests.FirstOrDefault(r => r.InstallationBookingId == Id);
+            if (warrantyRequest == null)
+            {
+                Snackbar.Add("Không tìm thấy yêu cầu bảo hành cho booking này", Severity.Error);
+                return;
+            }
+
+            // Create damaged product entry for warranty product ONLY if replacement was used
+            var damagedProducts = new List<DamagedProductItem>();
+            bool replacementWasUsed = false;
+
+            if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
+            {
+                foreach (var replacement in _selectedReplacementProducts.Where(rp => rp.Selected))
+                {
+                    var key = $"{replacement.ProductId}_{replacement.VariantId ?? 0}";
+                    if (_replacementUsed.ContainsKey(key) && _replacementUsed[key])
+                    {
+                        replacementWasUsed = true;
+                        // Mark warranty product as damaged since replacement was used
+                        if (_booking?.Products?.Any() == true)
+                        {
+                            foreach (var product in _booking.Products)
+                            {
+                                damagedProducts.Add(new DamagedProductItem
+                                {
+                                    ProductId = product.ProductId,
+                                    VariantId = product.VariantId,
+                                    Quantity = product.Quantity,
+                                    Reason = "Sản phẩm hư hỏng, đã thay thế",
+                                    IsDamaged = true
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Handle replacement products - if marked as used, they stay with customer
+            // If not marked as used, they are returned to warehouse (not included in MaterialUsages)
+            var materialUsages = new List<MaterialUsageItem>();
+            if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
+            {
+                foreach (var replacement in _selectedReplacementProducts.Where(rp => rp.Selected))
+                {
+                    var key = $"{replacement.ProductId}_{replacement.VariantId ?? 0}";
+                    if (_replacementUsed.ContainsKey(key) && _replacementUsed[key])
+                    {
+                        // Replacement was used - mark it as material usage
+                        materialUsages.Add(new MaterialUsageItem
+                        {
+                            MaterialId = replacement.ProductId,
+                            QuantityUsed = 1
+                        });
+                    }
+                    // If not used, it will be returned to warehouse automatically
+                }
+            }
+
+            // Include warranty damage reason in completion notes
+            string notes = replacementWasUsed ? "Đã hoàn thành bảo hành (đã thay thế)" : "Đã hoàn thành bảo hành (đã sửa chữa)";
+            if (!string.IsNullOrEmpty(_warrantyDamageReason))
+            {
+                notes += $". Lý do: {_warrantyDamageReason}";
+            }
+
+            await WarrantyRequestService.CompleteAsync(warrantyRequest.Id, notes);
+
+            // Also complete the installation booking to mark it as completed
+            await InstallationApiService.CompleteAsync(Id, new CompleteInstallationRequest
+            {
+                CustomerSignature = "Bảo hành hoàn thành",
+                CustomerRating = 0,
+                Notes = notes,
+                MaterialUsages = materialUsages,
+                DamagedProducts = damagedProducts
+            });
+
+            Snackbar.Add("Đã hoàn thành bảo hành", Severity.Success);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private bool GetReplacementUsed(int productId, int? variantId)
+    {
+        var key = $"{productId}_{variantId ?? 0}";
+        if (!_replacementUsed.ContainsKey(key))
+        {
+            _replacementUsed[key] = false; // Default to not used
+        }
+        return _replacementUsed[key];
+    }
+
+    private void SetReplacementUsed(int productId, int? variantId, bool value)
+    {
+        var key = $"{productId}_{variantId ?? 0}";
+        _replacementUsed[key] = value;
+    }
+
+    private bool GetReplacementItemSelected(int productId, int? variantId)
+    {
+        var existing = _selectedReplacementProducts.FirstOrDefault(m => m.ProductId == productId && m.VariantId == variantId);
+        if (existing == null)
+        {
+            existing = new MaterialPreparationItem
+            {
+                ProductId = productId,
+                VariantId = variantId,
+                Quantity = 0,
+                Selected = false
+            };
+            _selectedReplacementProducts.Add(existing);
+        }
+        return existing.Selected;
+    }
+
+    private void SetReplacementItemSelected(int productId, int? variantId, bool value)
+    {
+        var existing = _selectedReplacementProducts.FirstOrDefault(m => m.ProductId == productId && m.VariantId == variantId);
+        if (existing == null)
+        {
+            existing = new MaterialPreparationItem
+            {
+                ProductId = productId,
+                VariantId = variantId,
+                Quantity = 0,
+                Selected = value
+            };
+            _selectedReplacementProducts.Add(existing);
+        }
+        else
+        {
+            existing.Selected = value;
+        }
+    }
+
+    private void AddDamagedProduct()
+    {
+        if (_newDamagedProductId <= 0)
+        {
+            Snackbar.Add("Vui lòng nhập ID sản phẩm", Severity.Warning);
+            return;
+        }
+
+        if (_newDamagedQuantity <= 0)
+        {
+            Snackbar.Add("Vui lòng nhập số lượng hỏng", Severity.Warning);
+            return;
+        }
+
+        _damagedProducts[_newDamagedProductId] = new DamagedProductItem
+        {
+            ProductId = _newDamagedProductId,
+            VariantId = null,
+            Quantity = _newDamagedQuantity,
+            Reason = _newDamagedReason,
+            IsDamaged = true
+        };
+
+        Snackbar.Add("Đã thêm sản phẩm hỏng", Severity.Success);
+
+        // Reset fields
+        _newDamagedProductId = 0;
+        _newDamagedQuantity = 1;
+        _newDamagedReason = "";
+    }
+
+    private void RemoveDamagedProduct(int productId)
+    {
+        _damagedProducts.Remove(productId);
+        Snackbar.Add("Đã xóa sản phẩm hỏng", Severity.Success);
+    }
+
+    private async Task OpenPrepareReplacementDialog()
+    {
+        try
+        {
+            _loadingWarehouses = true;
+            _replacementWarehouseId = 0;
+            _selectedReplacementProducts.Clear();
+            _selectedReplacementKeys.Clear();
+
+            // Load warehouses with available products for warranty replacement
+            if (_booking?.Products?.Any() == true)
+            {
+                var productIds = _booking.Products.Select(p => p.ProductId).ToList();
+                _replacementWarehouses = await InstallationApiService.GetWarehousesForProductsAsync(productIds);
+            }
+
+            _showPrepareReplacementDialog = true;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingWarehouses = false;
+        }
+    }
+
+    private MaterialPreparationItem GetReplacementItem(int productId, int? variantId)
+    {
+        var existing = _selectedReplacementProducts.FirstOrDefault(m => m.ProductId == productId && m.VariantId == variantId);
+        if (existing == null)
+        {
+            existing = new MaterialPreparationItem
+            {
+                ProductId = productId,
+                VariantId = variantId,
+                Quantity = 0,
+                Selected = false
+            };
+            _selectedReplacementProducts.Add(existing);
+        }
+        return existing;
+    }
+
+    private bool IsReplacementSelected(int productId, int? variantId)
+    {
+        var key = $"{productId}_{variantId ?? 0}";
+        return _selectedReplacementKeys.Contains(key);
+    }
+
+    private void ToggleReplacementSelection(int productId, int? variantId, bool isSelected)
+    {
+        var key = $"{productId}_{variantId ?? 0}";
+        if (isSelected)
+        {
+            _selectedReplacementKeys.Add(key);
+        }
+        else
+        {
+            _selectedReplacementKeys.Remove(key);
+        }
+    }
+
+    private async Task ConfirmPrepareReplacement()
+    {
+        try
+        {
+            var items = _selectedReplacementKeys.Select(key =>
+            {
+                var parts = key.Split('_');
+                var productId = int.Parse(parts[0]);
+                var variantId = parts.Length > 1 && int.TryParse(parts[1], out var vid) && vid != 0 ? (int?)vid : null;
+                return new MaterialPreparationItem
+                {
+                    ProductId = productId,
+                    VariantId = variantId,
+                    Quantity = 1 // Default to 1 for warranty replacements
+                };
+            }).ToList();
+
+            if (!items.Any())
+            {
+                Snackbar.Add("Vui lòng chọn ít nhất một sản phẩm thay thế", Severity.Warning);
+                return;
+            }
+
+            // Update _selectedReplacementProducts for later use in completion dialog
+            _selectedReplacementProducts = items;
+
+            var request = new PrepareMaterialsRequest
+            {
+                WarehouseId = _replacementWarehouseId,
+                Items = items
+            };
+
+            await InstallationApiService.PrepareMaterialsAsync(Id, request);
+            _showPrepareReplacementDialog = false;
+            _replacementProductsPrepared = true;
+            Snackbar.Add("Đã chuẩn bị sản phẩm thay thế thành công", Severity.Success);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }
@@ -656,6 +1270,8 @@ else
     {
         try
         {
+            Console.WriteLine($"[ConfirmPrepareMaterials] Before prepare - Booking ID: {Id}, Status: {_booking?.Status}, MaterialsPrepared: {_booking?.MaterialsPrepared}");
+
             // Filter only materials with quantity > 0
             var materialsToPrepare = _selectedMaterials
                 .Where(m => m.Quantity > 0)
@@ -676,11 +1292,42 @@ else
             await InstallationApiService.PrepareMaterialsAsync(Id, request);
             _showPrepareMaterialsDialog = false;
             Snackbar.Add("Đã chuẩn bị vật tư từ kho thành công", Severity.Success);
+            
+            Console.WriteLine($"[ConfirmPrepareMaterials] After prepare - calling LoadBooking()");
             await LoadBooking();
+            
+            Console.WriteLine($"[ConfirmPrepareMaterials] After LoadBooking - Booking ID: {Id}, Status: {_booking?.Status}, MaterialsPrepared: {_booking?.MaterialsPrepared}");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[ConfirmPrepareMaterials] Error: {ex.Message}");
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }
 }
+
+<style>
+    .custom-file-input {
+        width: 100%;
+        padding: 12px;
+        border: 2px dashed #ccc;
+        border-radius: 8px;
+        cursor: pointer;
+        text-align: center;
+        transition: border-color 0.3s;
+    }
+
+    .custom-file-input:hover {
+        border-color: var(--mud-palette-primary);
+    }
+
+    .custom-file-input::file-selector-button {
+        background-color: var(--mud-palette-primary);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        margin-right: 12px;
+    }
+</style>

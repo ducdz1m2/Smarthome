@@ -179,7 +179,7 @@
                 {
                     OrderId = _booking.OrderId,
                     TechnicianId = _booking.TechnicianId ?? 0,
-                    SlotId = _booking.SlotId,
+                    SlotId = _booking.SlotId ?? 0,
                     ScheduledDate = _booking.ScheduledDate
                 };
                 _scheduledDate = _booking.ScheduledDate;

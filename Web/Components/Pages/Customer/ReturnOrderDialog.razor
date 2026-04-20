@@ -2,47 +2,80 @@
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @inject IReturnOrderService ReturnOrderService
+@inject IOrderService OrderService
 @inject ISnackbar Snackbar
 
 <MudDialog>
     <DialogContent>
         <MudText Typo="Typo.h6" Class="mb-4">Yêu cầu hoàn hàng - Đơn #@OrderNumber</MudText>
         
-        <MudForm @ref="_form" @bind-IsValid="_isValid">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Chọn sản phẩm hoàn trả:</MudText>
-            
-            @foreach (var item in Items)
-            {
-                <MudCard Class="mb-2" Elevation="0" Outlined="true">
-                    <MudCardContent>
-                        <div class="d-flex align-center justify-space-between">
-                            <div>
-                                <MudText Typo="Typo.body1" Class="fw-bold">@item.ProductName</MudText>
-                                <MudText Typo="Typo.caption">SKU: @item.Sku</MudText>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="my-4" />
+        }
+        else
+        {
+            <MudForm @ref="_form" @bind-IsValid="_isValid">
+                <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
+                    <MudText Typo="Typo.body2">Vui lòng chọn số lượng sản phẩm cần hoàn trả. Nếu sản phẩm bị hư hỏng, vui lòng đánh dấu bên dưới.</MudText>
+                </MudAlert>
+                
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Chọn sản phẩm hoàn trả:</MudText>
+                
+                @foreach (var item in Items)
+                {
+                    <MudCard Class="mb-3" Elevation="0" Outlined="true">
+                        <MudCardContent>
+                            <div class="d-flex align-center justify-space-between mb-2">
+                                <div>
+                                    <MudText Typo="Typo.body1" Class="fw-bold">@item.ProductName</MudText>
+                                    <MudText Typo="Typo.caption">SKU: @item.Sku</MudText>
+                                </div>
+                                <div class="d-flex align-center gap-3">
+                                    <MudNumericField T="int" Value="_returnQuantities[item.Id]" 
+                                                     Label="SL hoàn" Min="0" Max="@item.Quantity"
+                                                     Style="width: 100px;" 
+                                                     ValueChanged="(v) => OnQuantityChanged(item.Id, v)" />
+                                    <MudText Typo="Typo.caption">/ @item.Quantity</MudText>
+                                </div>
                             </div>
-                            <div class="d-flex align-center gap-3">
-                                <MudNumericField T="int" @bind-Value="_returnQuantities[item.Id]" 
-                                                 Label="SL hoàn" Min="0" Max="@item.Quantity"
-                                                 Style="width: 100px;" />
-                                <MudText Typo="Typo.caption">/ @item.Quantity</MudText>
-                            </div>
-                        </div>
-                    </MudCardContent>
-                </MudCard>
-            }
-            
-            <MudTextField @bind-Value="_reason" Label="Lý do hoàn hàng *" 
-                          Required="true" RequiredError="Vui lòng nhập lý do"
-                          Lines="3" Class="mt-4" />
-            
-            <MudTextField @bind-Value="_bankInfo" Label="Thông tin tài khoản hoàn tiền (nếu có)"
-                          HelperText="Số tài khoản - Tên ngân hàng - Tên chủ TK"
-                          Class="mt-2" />
-        </MudForm>
+                            
+                            @if (_returnQuantities[item.Id] > 0)
+                            {
+                                <MudDivider Class="my-2" />
+                                <div class="d-flex align-center gap-4 mt-2">
+                                    <MudCheckBox T="bool" 
+                                                 Value="_isDamaged[item.Id]" 
+                                                 ValueChanged="(v) => _isDamaged[item.Id] = v"
+                                                 Label="Sản phẩm bị hư hỏng"
+                                                 Color="Color.Error"
+                                                 Dense="true" />
+                                </div>
+                                
+                                @if (_isDamaged[item.Id])
+                                {
+                                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                                        <MudText Typo="Typo.caption">Sản phẩm hư hỏng sẽ không được cộng vào kho bán</MudText>
+                                    </MudAlert>
+                                }
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                }
+                
+                <MudTextField @bind-Value="_reason" Label="Lý do hoàn hàng *" 
+                              Required="true" RequiredError="Vui lòng nhập lý do"
+                              Lines="3" Class="mt-4" />
+                
+                <MudTextField @bind-Value="_bankInfo" Label="Thông tin tài khoản hoàn tiền (nếu có)"
+                              HelperText="Số tài khoản - Tên ngân hàng - Tên chủ TK"
+                              Class="mt-2" />
+            </MudForm>
+        }
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Hủy</MudButton>
-        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid || !HasSelectedItems()">
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid || _loading || !HasSelectedItems()">
             Gửi yêu cầu
         </MudButton>
     </DialogActions>
@@ -69,17 +102,50 @@
 
     private MudForm _form = null!;
     private bool _isValid;
+    private bool _loading = true;
     private string _reason = "";
     private string _bankInfo = "";
     private Dictionary<int, int> _returnQuantities = new();
+    private Dictionary<int, int> _itemWarehouses = new(); // Kho từ phân bổ đơn hàng
+    private Dictionary<int, bool> _isDamaged = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        // Load warehouse allocations from order
+        try
+        {
+            var allocations = await OrderService.GetWarehouseAllocationsAsync(OrderId);
+            
+            // Map order item to its allocated warehouse
+            foreach (var item in Items)
+            {
+                var itemAllocation = allocations.FirstOrDefault(a => a.OrderItemId == item.Id);
+                if (itemAllocation != null)
+                {
+                    _itemWarehouses[item.Id] = itemAllocation.WarehouseId;
+                }
+            }
+        }
+        catch
+        {
+            // Silently handle - warehouse selection will be done by admin later
+        }
+        finally
+        {
+            _loading = false;
+        }
+
         // Initialize return quantities to 0
         foreach (var item in Items)
         {
             _returnQuantities[item.Id] = 0;
+            _isDamaged[item.Id] = false;
         }
+    }
+
+    private void OnQuantityChanged(int itemId, int quantity)
+    {
+        _returnQuantities[itemId] = quantity;
     }
 
     private bool HasSelectedItems()
@@ -96,16 +162,29 @@
 
         try
         {
-            // Create return items
-            var returnItems = _returnQuantities
-                .Where(x => x.Value > 0)
-                .Select(x => new CreateReturnOrderItemRequest
+            // Create return items with full info
+            var returnItems = new List<CreateReturnOrderItemRequest>();
+            
+            foreach (var item in Items)
+            {
+                var qty = _returnQuantities[item.Id];
+                if (qty > 0)
                 {
-                    OrderItemId = x.Key,
-                    Quantity = x.Value,
-                    Reason = _reason
-                })
-                .ToList();
+                    // Use warehouse from order allocation, or null if not found (admin will assign later)
+                    var warehouseId = _itemWarehouses.ContainsKey(item.Id) ? _itemWarehouses[item.Id] : (int?)null;
+                    
+                    returnItems.Add(new CreateReturnOrderItemRequest
+                    {
+                        OrderItemId = item.Id,
+                        ProductId = item.ProductId,
+                        VariantId = item.VariantId,
+                        Quantity = qty,
+                        Reason = _reason,
+                        IsDamaged = _isDamaged[item.Id],
+                        WarehouseId = warehouseId
+                    });
+                }
+            }
 
             var request = new CreateReturnOrderRequest
             {
@@ -115,6 +194,7 @@
             };
 
             await ReturnOrderService.CreateAsync(request);
+            Snackbar.Add("Yêu cầu hoàn hàng đã được gửi", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)

@@ -1,0 +1,381 @@
+@page "/customer/order-statistics"
+@layout Web.Components.Layout.AccountLayout
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Enums
+@using Web.Helpers
+@using Web.Services
+@using MudBlazor
+
+@inject IOrderService OrderService
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h5" Class="mb-4">Thống kê đơn hàng</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else if (!_orders.Any())
+{
+    <MudPaper Elevation="0" Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+        <MudText Typo="Typo.h6" Class="mb-2">Không có dữ liệu thống kê</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+            Bạn chưa có đơn hàng nào để hiển thị thống kê.
+        </MudText>
+        <MudButton Href="/products" Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.ShoppingCart">
+            Mua sắm ngay
+        </MudButton>
+    </MudPaper>
+}
+else
+{
+    <!-- Summary Cards -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="3" Class="stat-card">
+                <MudCardContent>
+                    <div class="d-flex align-center mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.ShoppingBag" Size="Size.Large" Color="Color.Primary" Class="mr-2"/>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Tổng đơn hàng</MudText>
+                    </div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_orders.Count</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="3" Class="stat-card">
+                <MudCardContent>
+                    <div class="d-flex align-center mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Large" Color="Color.Success" Class="mr-2"/>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Tổng chi tiêu</MudText>
+                    </div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@FormatPrice(_totalSpent)</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="3" Class="stat-card">
+                <MudCardContent>
+                    <div class="d-flex align-center mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Info" Class="mr-2"/>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Đơn hoàn thành</MudText>
+                    </div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_completedCount</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="3" Class="stat-card">
+                <MudCardContent>
+                    <div class="d-flex align-center mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Size="Size.Large" Color="Color.Warning" Class="mr-2"/>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Đang giao</MudText>
+                    </div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_inTransitCount</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Charts Row 1 -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" md="8">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Xu hướng chi tiêu (6 tháng gần nhất)</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudChart T="double" ChartType="ChartType.Line"
+                              ChartSeries="@GetSpendingSeries()"
+                              xaxislabels="@GetMonthLabels()"
+                              ChartOptions="@(_chartOptions)"
+                              Width="100%" Height="300px" />
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" md="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Phân bố trạng thái</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Class="d-flex justify-center">
+                    <MudChart T="double" ChartType="ChartType.Pie"
+                              inputdata="@GetStatusData()"
+                              inputlabels="@GetStatusLabels()"
+                              Width="300px" Height="300px" />
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Charts Row 2 -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Phương thức thanh toán</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Class="d-flex justify-center">
+                    <MudChart T="double" ChartType="ChartType.Donut"
+                              inputdata="@GetPaymentMethodData()"
+                              inputlabels="@GetPaymentMethodLabels()"
+                              Width="300px" Height="300px" />
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Sản phẩm mua nhiều nhất</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudChart T="double" ChartType="ChartType.Bar"
+                              ChartSeries="@GetProductSeries()"
+                              xaxislabels="@GetProductLabels()"
+                              ChartOptions="@(_chartOptions)"
+                              Width="100%" Height="300px" />
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Recent Orders -->
+    <MudCard Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Đơn hàng gần đây</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudTable Items="_recentOrders" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Mã đơn</MudTh>
+                    <MudTh>Ngày đặt</MudTh>
+                    <MudTh>Tổng tiền</MudTh>
+                    <MudTh>Trạng thái</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.OrderNumber</MudTd>
+                    <MudTd>@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+                    <MudTd>@FormatPrice(context.TotalAmount)</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Color="@StatusHelper.GetOrderStatusColor(context.Status)" Size="Size.Small">
+                            @StatusHelper.GetOrderStatusText(context.Status)
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton Href="/orders" Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                Xem tất cả đơn hàng
+            </MudButton>
+        </MudCardActions>
+    </MudCard>
+}
+
+<style>
+    .stat-card {
+        transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12) !important;
+    }
+</style>
+
+@code {
+    private List<OrderResponse> _orders = new();
+    private List<OrderResponse> _recentOrders = new();
+    private bool _isLoading = true;
+    private int? _currentUserId;
+    private decimal _totalSpent = 0;
+    private int _completedCount = 0;
+    private int _inTransitCount = 0;
+    private readonly ChartOptions _chartOptions = new() { ShowLegend = true };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadCurrentUserId();
+            await LoadOrderStatistics();
+        }
+    }
+
+    private async Task LoadCurrentUserId()
+    {
+        var userIdStr = await AuthService.GetUserIdAsync();
+        if (int.TryParse(userIdStr, out var userId))
+        {
+            _currentUserId = userId;
+        }
+    }
+
+    private async Task LoadOrderStatistics()
+    {
+        if (!_currentUserId.HasValue)
+        {
+            Snackbar.Add("Không tìm thấy thông tin người dùng", Severity.Error);
+            return;
+        }
+
+        _isLoading = true;
+        try
+        {
+            _orders = await OrderService.GetByUserIdAsync(_currentUserId.Value);
+            _orders = _orders.OrderByDescending(o => o.CreatedAt).ToList();
+            
+            // Calculate statistics
+            _totalSpent = _orders.Where(o => o.Status != "Cancelled" && o.Status != "Refunded").Sum(o => o.TotalAmount);
+            _completedCount = _orders.Count(o => o.Status == "Completed");
+            _inTransitCount = _orders.Count(o => o.Status == "Shipping" || o.Status == "AwaitingPickup");
+            
+            // Get recent orders (last 5)
+            _recentOrders = _orders.Take(5).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải thống kê: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private List<ChartSeries<double>> GetSpendingSeries()
+    {
+        var last6Months = Enumerable.Range(0, 6)
+            .Select(i => DateTime.Today.AddMonths(-i))
+            .Reverse()
+            .ToList();
+
+        var spendingByMonth = last6Months.Select(date =>
+        {
+            return _orders.Where(o =>
+                o.Status != "Cancelled" && o.Status != "Refunded" &&
+                o.CreatedAt.Year == date.Year && o.CreatedAt.Month == date.Month)
+            .Sum(o => (double)o.TotalAmount);
+        }).ToList();
+
+        return new List<ChartSeries<double>>
+        {
+            new ChartSeries<double>
+            {
+                Name = "Chi tiêu",
+                Data = spendingByMonth.ToArray()
+            }
+        };
+    }
+
+    private string[] GetMonthLabels()
+    {
+        return Enumerable.Range(0, 6)
+            .Select(i => DateTime.Today.AddMonths(-i).ToString("MM/yyyy"))
+            .Reverse()
+            .ToArray();
+    }
+
+    private double[] GetStatusData()
+    {
+        var statusGroups = _orders.GroupBy(o => o.Status).ToDictionary(g => g.Key, g => g.Count());
+        var statuses = new[] { "Pending", "Confirmed", "Shipping", "Completed", "Cancelled" };
+        
+        return statuses.Select(s => statusGroups.ContainsKey(s) ? (double)statusGroups[s] : 0).ToArray();
+    }
+
+    private string[] GetStatusLabels()
+    {
+        return new[] { "Chờ xử lý", "Đã xác nhận", "Đang giao", "Hoàn thành", "Đã hủy" };
+    }
+
+    private double[] GetPaymentMethodData()
+    {
+        var paymentGroups = _orders.GroupBy(o => o.PaymentMethod ?? "Unknown").ToDictionary(g => g.Key, g => g.Count());
+        var methods = new[] { "COD", "VNPAY" };
+        
+        return methods.Select(m => paymentGroups.ContainsKey(m) ? (double)paymentGroups[m] : 0).ToArray();
+    }
+
+    private string[] GetPaymentMethodLabels()
+    {
+        return new[] { "COD", "VNPAY" };
+    }
+
+    private List<ChartSeries<double>> GetProductSeries()
+    {
+        var productGroups = new Dictionary<string, int>();
+        foreach (var order in _orders)
+        {
+            foreach (var item in order.Items)
+            {
+                var productName = item.ProductName ?? "Khác";
+                if (productGroups.ContainsKey(productName))
+                {
+                    productGroups[productName] += item.Quantity;
+                }
+                else
+                {
+                    productGroups[productName] = item.Quantity;
+                }
+            }
+        }
+
+        var top5Products = productGroups.OrderByDescending(kvp => kvp.Value).Take(5).ToList();
+
+        return new List<ChartSeries<double>>
+        {
+            new ChartSeries<double>
+            {
+                Name = "Số lượng",
+                Data = top5Products.Select(kvp => (double)kvp.Value).ToArray()
+            }
+        };
+    }
+
+    private string[] GetProductLabels()
+    {
+        var productGroups = new Dictionary<string, int>();
+        foreach (var order in _orders)
+        {
+            foreach (var item in order.Items)
+            {
+                var productName = item.ProductName ?? "Khác";
+                if (productGroups.ContainsKey(productName))
+                {
+                    productGroups[productName] += item.Quantity;
+                }
+                else
+                {
+                    productGroups[productName] = item.Quantity;
+                }
+            }
+        }
+
+        return productGroups.OrderByDescending(kvp => kvp.Value).Take(5).Select(kvp => kvp.Key).ToArray();
+    }
+
+    private string FormatPrice(decimal price)
+    {
+        return $"{price:N0} ₫";
+    }
+}

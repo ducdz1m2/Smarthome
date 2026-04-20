@@ -22,7 +22,15 @@
     {
         public int Id { get; set; }
         public int OrderItemId { get; set; }
+        public int ProductId { get; set; }
+        public int? VariantId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public string VariantName { get; set; } = string.Empty;
         public int Quantity { get; set; }
         public string Reason { get; set; } = string.Empty;
+        public bool IsDamaged { get; set; }
+        public bool ReturnedToInventory { get; set; }
+        public int? WarehouseId { get; set; }
+        public string WarehouseName { get; set; } = string.Empty;
     }
 }

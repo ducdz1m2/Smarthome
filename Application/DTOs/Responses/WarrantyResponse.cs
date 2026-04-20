@@ -6,7 +6,6 @@ namespace Application.DTOs.Responses
         public int OrderItemId { get; set; }
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
-        public string SerialNumber { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public string Status { get; set; } = string.Empty;

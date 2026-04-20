@@ -99,31 +99,40 @@ public class ChatService : IChatService
 
     public async Task<int> CreateSupportChatAsync(int customerId, int? orderId = null, int? installationId = null, int? warrantyClaimId = null)
     {
-        var room = ChatRoom.CreateSupportRoom(customerId, orderId, installationId, warrantyClaimId);
-        await _chatRoomRepository.AddAsync(room);
-        await _chatRoomRepository.SaveChangesAsync();
+        // Validate customerId
+        if (customerId <= 0)
+        {
+            throw new DomainException("ID khách hàng không hợp lệ");
+        }
 
-        Console.WriteLine($"Created support chat room {room.Id} for customer {customerId}");
-
-        // Assign admin to support chat room (using admin ID = 1 as default)
-        // In production, this should get the first available admin or assign based on routing logic
         try
         {
-            await AssignAdminAsync(room.Id, 1);
-            Console.WriteLine($"Assigned admin ID 1 to chat room {room.Id}");
+            var room = ChatRoom.CreateSupportRoom(customerId, orderId, installationId, warrantyClaimId);
+            await _chatRoomRepository.AddAsync(room);
+            await _chatRoomRepository.SaveChangesAsync();
+
+            Console.WriteLine($"Created support chat room {room.Id} for customer {customerId}");
+
+            // Don't auto-assign admin to avoid FK constraint errors
+            // Admins can join the chat room manually when needed
+
+            return room.Id;
         }
         catch (Exception ex)
         {
-            // Log but don't fail if admin assignment fails
-            Console.WriteLine($"Failed to assign admin to support chat room: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            Console.WriteLine($"[ChatService] Failed to create support chat room for customer {customerId}: {ex.Message}");
+            throw new DomainException("Không thể tạo phòng chat hỗ trợ. Vui lòng thử lại sau.");
         }
-
-        return room.Id;
     }
 
     public async Task<int> CreateInstallationChatAsync(int customerId, int technicianId, int installationId)
     {
+        // Validate IDs before creating chat room
+        if (customerId <= 0)
+        {
+            throw new DomainException("ID khách hàng không hợp lệ");
+        }
+
         // Check if chat room already exists for this installation
         var existingRoom = await _chatRoomRepository.GetByInstallationIdAsync(installationId);
         if (existingRoom != null)
@@ -139,16 +148,23 @@ public class ChatService : IChatService
 
         Console.WriteLine($"Created installation chat room {room.Id} for installation {installationId}");
 
-        // Assign technician to the chat room
-        try
+        // Assign technician to the chat room only if technicianId is valid
+        if (technicianId > 0)
         {
-            await AssignTechnicianAsync(room.Id, technicianId);
-            Console.WriteLine($"Assigned technician ID {technicianId} to chat room {room.Id}");
+            try
+            {
+                await AssignTechnicianAsync(room.Id, technicianId);
+                Console.WriteLine($"Assigned technician ID {technicianId} to chat room {room.Id}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to assign technician to installation chat room: {ex.Message}");
+                // Don't fail the entire operation if technician assignment fails
+            }
         }
-        catch (Exception ex)
+        else
         {
-            Console.WriteLine($"Failed to assign technician to installation chat room: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            Console.WriteLine($"Skipping technician assignment - invalid technicianId: {technicianId}");
         }
 
         return room.Id;
@@ -274,13 +290,40 @@ public class ChatService : IChatService
 
     public async Task AssignTechnicianAsync(int chatRoomId, int technicianId)
     {
+        // Validate technicianId
+        if (technicianId <= 0)
+        {
+            Console.WriteLine($"[ChatService] Invalid technicianId: {technicianId}. Skipping assignment.");
+            return;
+        }
+
         var room = await _chatRoomRepository.GetByIdWithParticipantsAsync(chatRoomId);
         if (room == null)
-            throw new DomainException("Không tìm thấy chat room");
+        {
+            Console.WriteLine($"[ChatService] Chat room {chatRoomId} not found.");
+            return;
+        }
 
-        room.AssignTechnician(technicianId);
-        _chatRoomRepository.Update(room);
-        await _chatRoomRepository.SaveChangesAsync();
+        // Check if technician is already a participant
+        if (room.Participants.Any(p => p.UserId == technicianId && p.UserType == UserType.Technician))
+        {
+            Console.WriteLine($"[ChatService] Technician {technicianId} is already a participant in room {chatRoomId}.");
+            return;
+        }
+
+        try
+        {
+            room.AssignTechnician(technicianId);
+            _chatRoomRepository.Update(room);
+            await _chatRoomRepository.SaveChangesAsync();
+            Console.WriteLine($"[ChatService] Successfully assigned technician {technicianId} to room {chatRoomId}.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ChatService] Failed to assign technician {technicianId} to room {chatRoomId}: {ex.Message}");
+            // Log but don't throw - this is likely a FK constraint error
+            // The chat room is still usable without the technician
+        }
     }
 
     public async Task AssignAdminAsync(int chatRoomId, int adminId)
@@ -288,6 +331,13 @@ public class ChatService : IChatService
         var room = await _chatRoomRepository.GetByIdWithParticipantsAsync(chatRoomId);
         if (room == null)
             throw new DomainException("Không tìm thấy chat room");
+
+        // Check if admin already exists as participant
+        if (room.Participants.Any(p => p.UserId == adminId && p.UserType == Domain.Enums.UserType.Admin))
+        {
+            Console.WriteLine($"Admin ID {adminId} is already a participant in chat room {chatRoomId}");
+            return;
+        }
 
         room.AssignAdmin(adminId);
         _chatRoomRepository.Update(room);

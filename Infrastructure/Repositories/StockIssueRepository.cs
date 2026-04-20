@@ -54,15 +54,7 @@ public class StockIssueRepository : IStockIssueRepository
         // Query StockIssue and manually load details since we removed navigation properties
         var stockIssue = await _context.StockIssues
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
-        
-        if (stockIssue != null)
-        {
-            var details = await _context.StockIssueDetails
-                .Where(d => d.StockIssueId == id)
-                .ToListAsync(cancellationToken);
-            // Details can be loaded separately if needed
-        }
-        
+
         return stockIssue;
     }
 

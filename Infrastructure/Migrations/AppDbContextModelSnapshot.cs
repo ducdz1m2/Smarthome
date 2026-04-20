@@ -955,7 +955,7 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("ScheduledDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("SlotId")
+                    b.Property<int?>("SlotId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("StartedAt")
@@ -982,8 +982,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("ScheduledDate");
 
-                    b.HasIndex("SlotId")
-                        .IsUnique();
+                    b.HasIndex("SlotId");
 
                     b.HasIndex("TechnicianId");
 
@@ -2220,6 +2219,69 @@ namespace Infrastructure.Migrations
                     b.ToTable("PaymentTransactions", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.Sales.ProductRating", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OrderItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("RatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("VariantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("OrderItemId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("ProductId", "VariantId", "OrderItemId", "CustomerId")
+                        .IsUnique()
+                        .HasFilter("[VariantId] IS NOT NULL");
+
+                    b.ToTable("ProductRatings", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.Sales.ReturnOrder", b =>
                 {
                     b.Property<int>("Id")
@@ -2291,7 +2353,13 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsDamaged")
+                        .HasColumnType("bit");
+
                     b.Property<int>("OrderItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
                         .HasColumnType("int");
 
                     b.Property<int>("Quantity")
@@ -2304,11 +2372,20 @@ namespace Infrastructure.Migrations
                     b.Property<int>("ReturnOrderId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("ReturnedToInventory")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("VariantId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("WarehouseId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -2325,6 +2402,11 @@ namespace Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("ClaimsCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -2332,8 +2414,14 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("DurationMonths")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<int?>("InstalledByTechnicianId")
+                        .HasColumnType("int");
 
                     b.Property<int>("OrderItemId")
                         .HasColumnType("int");
@@ -2353,14 +2441,20 @@ namespace Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("VariantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EndDate");
 
-                    b.HasIndex("OrderItemId")
-                        .IsUnique();
+                    b.HasIndex("OrderItemId");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("ProductId", "VariantId", "OrderItemId")
+                        .IsUnique()
+                        .HasFilter("[VariantId] IS NOT NULL");
 
                     b.ToTable("Warranties", (string)null);
                 });
@@ -2388,6 +2482,12 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<int>("OrderItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Resolution")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -2404,14 +2504,26 @@ namespace Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("VariantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("WarrantyId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("WarrantyRequestId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OrderItemId");
+
+                    b.HasIndex("ProductId");
+
                     b.HasIndex("TechnicianId");
 
                     b.HasIndex("WarrantyId");
+
+                    b.HasIndex("WarrantyRequestId");
 
                     b.ToTable("WarrantyClaims", (string)null);
                 });
@@ -2426,6 +2538,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTime?>("ApprovedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<int?>("AssignedTechnicianId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");
@@ -2442,7 +2557,13 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<int>("OrderId")
+                    b.Property<int?>("InstallationBookingId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OrderItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("StartedAt")
@@ -2461,14 +2582,26 @@ namespace Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("VariantId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("WarrantyId")
+                        .HasColumnType("int");
+
                     b.Property<int>("WarrantyType")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex("InstallationBookingId");
+
+                    b.HasIndex("OrderItemId");
+
+                    b.HasIndex("ProductId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("WarrantyId");
 
                     b.ToTable("WarrantyRequests", (string)null);
                 });
@@ -2949,8 +3082,7 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Entities.Installation.InstallationSlot", "Slot")
                         .WithMany()
                         .HasForeignKey("SlotId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Domain.Entities.Installation.TechnicianProfile", "Technician")
                         .WithMany()
@@ -3000,6 +3132,10 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Entities.Installation.TechnicianProfile", b =>
                 {
+                    b.HasOne("Domain.Entities.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId");
+
                     b.OwnsOne("Domain.ValueObjects.Address", "Address", b1 =>
                         {
                             b1.Property<int>("TechnicianProfileId")
@@ -3037,6 +3173,8 @@ namespace Infrastructure.Migrations
                         });
 
                     b.Navigation("Address");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Domain.Entities.Installation.TechnicianRating", b =>
@@ -3335,13 +3473,25 @@ namespace Infrastructure.Migrations
                     b.Navigation("Warranty");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Sales.WarrantyRequest", b =>
+                {
+                    b.HasOne("Domain.Entities.Sales.Warranty", "Warranty")
+                        .WithMany()
+                        .HasForeignKey("WarrantyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Warranty");
+                });
+
             modelBuilder.Entity("Domain.Entities.Sales.WarrantyRequestItem", b =>
                 {
-                    b.HasOne("Domain.Entities.Sales.WarrantyRequest", null)
+                    b.HasOne("Domain.Entities.Sales.WarrantyRequest", "WarrantyRequest")
                         .WithMany("Items")
                         .HasForeignKey("WarrantyRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("WarrantyRequest");
                 });
 
             modelBuilder.Entity("Domain.Entities.Shipping.ShippingRate", b =>

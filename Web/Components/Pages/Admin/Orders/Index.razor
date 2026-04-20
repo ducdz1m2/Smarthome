@@ -54,6 +54,10 @@
             {
                 <MudChip T="string" Color="Color.Warning" Size="Size.Small">Tháo dỡ</MudChip>
             }
+            @if (context.HasWarrantyRequest)
+            {
+                <MudChip T="string" Color="Color.Info" Size="Size.Small">Bảo hành</MudChip>
+            }
         </MudTd>
         <MudTd DataLabel="Mã đơn">
             <MudText Typo="Typo.body2" Style="font-weight: 500;">@context.OrderNumber</MudText>

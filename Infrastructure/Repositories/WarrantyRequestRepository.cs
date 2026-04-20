@@ -20,15 +20,19 @@ public class WarrantyRequestRepository : IWarrantyRequestRepository
 
     public async Task<WarrantyRequest?> GetByIdWithItemsAsync(int id)
         => await _context.WarrantyRequests
+            .Include(r => r.Warranty)
             .Include(r => r.Items)
             .FirstOrDefaultAsync(r => r.Id == id);
 
     public async Task<List<WarrantyRequest>> GetAllAsync()
-        => await _context.WarrantyRequests.ToListAsync();
+        => await _context.WarrantyRequests
+            .Include(r => r.Items)
+            .ToListAsync();
 
     public async Task<List<WarrantyRequest>> GetByOrderIdAsync(int orderId)
         => await _context.WarrantyRequests
-            .Where(r => r.OrderId == orderId)
+            .Include(r => r.Items)
+            .Where(r => r.WarrantyId == orderId) // Note: This is actually WarrantyId now, not OrderId
             .ToListAsync();
 
     public async Task<List<WarrantyRequest>> GetByStatusAsync(WarrantyRequestStatus status)
@@ -38,7 +42,7 @@ public class WarrantyRequestRepository : IWarrantyRequestRepository
 
     public async Task<bool> ExistsPendingWarrantyForOrderAsync(int orderId)
         => await _context.WarrantyRequests
-            .AnyAsync(r => r.OrderId == orderId && r.Status == WarrantyRequestStatus.Pending);
+            .AnyAsync(r => r.WarrantyId == orderId && r.Status == WarrantyRequestStatus.Pending);
 
     public async Task AddAsync(WarrantyRequest warrantyRequest)
         => await _context.WarrantyRequests.AddAsync(warrantyRequest);

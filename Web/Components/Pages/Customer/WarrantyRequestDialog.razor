@@ -6,122 +6,67 @@
 
 <MudDialog>
     <DialogContent>
-        <MudText Typo="Typo.h6" Class="mb-4">Yêu cầu bảo hành - Đơn #@OrderNumber</MudText>
-        
+        <MudText Typo="Typo.h6" Class="mb-4">Yêu cầu bảo hành sản phẩm</MudText>
+
         <MudForm @ref="_form" @bind-IsValid="_isValid">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Loại bảo hành:</MudText>
-            <MudSelect T="Domain.Enums.WarrantyType" @bind-Value="_warrantyType" Label="Chọn loại bảo hành *" Required="true" RequiredError="Vui lòng chọn loại bảo hành">
-                <MudSelectItem T="Domain.Enums.WarrantyType" Value="@Domain.Enums.WarrantyType.Repair">Sửa chữa</MudSelectItem>
-                <MudSelectItem T="Domain.Enums.WarrantyType" Value="@Domain.Enums.WarrantyType.Replace">Thay thế</MudSelectItem>
-                <MudSelectItem T="Domain.Enums.WarrantyType" Value="@Domain.Enums.WarrantyType.Refund">Hoàn tiền</MudSelectItem>
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Thông tin sản phẩm:</MudText>
+
+            <MudSelect T="int?" @bind-Value="_selectedOrderItemId" Label="Sản phẩm" Required="true" RequiredError="Vui lòng chọn sản phẩm">
+                @foreach (var item in Items)
+                {
+                    <MudSelectItem T="int?" Value="@item.Id">@item.ProductName (@item.Id)</MudSelectItem>
+                }
             </MudSelect>
-            
-            <MudText Typo="Typo.subtitle1" Class="mb-2 mt-4">Chọn sản phẩm bảo hành:</MudText>
-            
-            @foreach (var item in Items)
-            {
-                <MudCard Class="mb-2" Elevation="0" Outlined="true">
-                    <MudCardContent>
-                        <div class="d-flex align-center justify-space-between mb-2">
-                            <div>
-                                <MudText Typo="Typo.body1" Class="fw-bold">@item.ProductName</MudText>
-                                <MudText Typo="Typo.caption">SKU: @item.Sku</MudText>
-                            </div>
-                            <div class="d-flex align-center gap-3">
-                                <MudNumericField T="int" @bind-Value="_warrantyQuantities[item.Id]"
-                                                 Label="SL bảo hành" Min="0" Max="@item.Quantity"
-                                                 Style="width: 120px;" />
-                                <MudText Typo="Typo.caption">/ @item.Quantity</MudText>
-                            </div>
-                        </div>
-                        <MudCheckBox T="bool" @bind-Checked="_isDamaged[item.Id]"
-                                   Label="Sản phẩm bị hư hỏng (không trả lại kho)"
-                                   Color="Color.Warning" />
-                    </MudCardContent>
-                </MudCard>
-            }
-            
-            <MudTextField @bind-Value="_description" Label="Mô tả vấn đề *" 
+
+            <MudTextField @bind-Value="_issue" Label="Mô tả vấn đề *"
                           Required="true" RequiredError="Vui lòng nhập mô tả"
-                          Lines="3" Class="mt-4" />
+                          Lines="3" Class="mt-3" />
         </MudForm>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Hủy</MudButton>
-        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid || !HasSelectedItems()">
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
             Gửi yêu cầu
         </MudButton>
     </DialogActions>
 </MudDialog>
-
-<style>
-    .fw-bold {
-        font-weight: 600;
-    }
-</style>
 
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = null!;
 
     [Parameter]
-    public int OrderId { get; set; }
-
-    [Parameter]
-    public string OrderNumber { get; set; } = "";
-
-    [Parameter]
     public List<OrderItemResponse> Items { get; set; } = new();
 
     private MudForm _form = null!;
     private bool _isValid;
-    private Domain.Enums.WarrantyType _warrantyType = Domain.Enums.WarrantyType.Repair;
-    private string _description = "";
-    private Dictionary<int, int> _warrantyQuantities = new();
-    private Dictionary<int, bool> _isDamaged = new();
-
-    protected override void OnInitialized()
-    {
-        // Initialize warranty quantities to 0
-        foreach (var item in Items)
-        {
-            _warrantyQuantities[item.Id] = 0;
-            _isDamaged[item.Id] = false;
-        }
-    }
-
-    private bool HasSelectedItems()
-    {
-        return _warrantyQuantities.Values.Any(q => q > 0);
-    }
+    private int? _selectedOrderItemId;
+    private string _issue = "";
 
     private void Cancel() => MudDialog.Cancel();
 
     private async Task Submit()
     {
         await _form.ValidateAsync();
-        if (!_isValid || !HasSelectedItems()) return;
+        if (!_isValid) return;
 
         try
         {
-            // Create warranty items
-            var warrantyItems = _warrantyQuantities
-                .Where(x => x.Value > 0)
-                .Select(x => new WarrantyRequestItemDto
-                {
-                    OrderItemId = x.Key,
-                    Quantity = x.Value,
-                    Description = _description,
-                    IsDamaged = _isDamaged[x.Key]
-                })
-                .ToList();
+            // Get selected order item
+            var selectedItem = Items.FirstOrDefault(i => i.Id == _selectedOrderItemId);
+            if (selectedItem == null)
+            {
+                Snackbar.Add("Vui lòng chọn sản phẩm", Severity.Error);
+                return;
+            }
 
             var request = new CreateWarrantyRequestRequest
             {
-                OrderId = OrderId,
-                WarrantyType = _warrantyType,
-                Description = _description,
-                Items = warrantyItems
+                ProductId = selectedItem.ProductId,
+                VariantId = selectedItem.VariantId,
+                OrderItemId = selectedItem.Id,
+                Description = "",
+                Issue = _issue
             };
 
             await WarrantyRequestService.CreateAsync(request);

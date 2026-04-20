@@ -28,6 +28,8 @@ namespace Application.Services
         private readonly IWarehouseService _warehouseService;
         private readonly IProductVariantRepository _productVariantRepository;
         private readonly ICurrentUserService _currentUserService;
+        private readonly IWarrantyRepository _warrantyRepository;
+        private readonly IWarrantyRequestRepository _warrantyRequestRepository;
 
         public OrderService(
             IOrderRepository orderRepository,
@@ -42,7 +44,9 @@ namespace Application.Services
             IOrderWarehouseAllocationRepository orderWarehouseAllocationRepository,
             IWarehouseService warehouseService,
             IProductVariantRepository productVariantRepository,
-            ICurrentUserService currentUserService)
+            ICurrentUserService currentUserService,
+            IWarrantyRepository warrantyRepository,
+            IWarrantyRequestRepository warrantyRequestRepository)
         {
             _orderRepository = orderRepository;
             _productRepository = productRepository;
@@ -57,6 +61,8 @@ namespace Application.Services
             _warehouseService = warehouseService;
             _productVariantRepository = productVariantRepository;
             _currentUserService = currentUserService;
+            _warrantyRepository = warrantyRepository;
+            _warrantyRequestRepository = warrantyRequestRepository;
         }
 
         public async Task<List<OrderResponse>> GetAllAsync()
@@ -148,10 +154,10 @@ namespace Application.Services
                     var variants = await _productVariantRepository.GetByProductIdAsync(item.ProductId);
                     if (!variants.Any())
                         throw new DomainException($"Product {item.ProductId} has no variants");
-                    price = variants.Min(v => v.Price);
+                    price = variants.Min(v => v.Price)!;
                 }
 
-                order.AddItem(item.ProductId, item.VariantId, item.Quantity, price, item.RequiresInstallation);
+                order.AddItem(item.ProductId, item.VariantId, item.Quantity, price!, item.RequiresInstallation);
 
                 // Calculate total for regular items (non-installation)
                 if (!item.RequiresInstallation)
@@ -501,10 +507,13 @@ namespace Application.Services
                 // Only shipping items
                 else if (hasShipItems)
                 {
-                    var order = await _orderRepository.GetByIdAsync(id);
+                    // Use GetByIdWithDetailsForUpdateAsync to load Items for StartShippingFlow check
+                    var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
                     if (order == null)
                         throw new DomainException("Không tìm thấy đơn hàng");
 
+                    // Only change status to AwaitingPickup, don't dispatch stock yet
+                    // Stock will be dispatched when StartShippingAsync is called (admin clicks "Start Shipping")
                     order.StartShippingFlow();
                     await _orderRepository.SaveChangesAsync();
                     
@@ -565,9 +574,32 @@ namespace Application.Services
 
         public async Task StartShippingAsync(int id)
         {
-            var order = await _orderRepository.GetByIdAsync(id);
+            // Use GetByIdWithDetailsForUpdateAsync to ensure change tracking is enabled
+            var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
+
+            // Dispatch stock from warehouses for shipping items
+            foreach (var orderItem in order.Items.Where(i => !i.RequiresInstallation))
+            {
+                var allocations = await _orderWarehouseAllocationRepository.GetByOrderItemIdAsync(orderItem.Id);
+                foreach (var allocation in allocations)
+                {
+                    var productWarehouse = await _productWarehouseRepository.GetByProductVariantAndWarehouseAsync(
+                        orderItem.ProductId,
+                        orderItem.VariantId,
+                        allocation.WarehouseId
+                    );
+
+                    if (productWarehouse != null)
+                    {
+                        // Release reserved quantity first, then dispatch actual quantity
+                        productWarehouse.Release(allocation.AllocatedQuantity);
+                        productWarehouse.Dispatch(allocation.AllocatedQuantity);
+                        _productWarehouseRepository.Update(productWarehouse);
+                    }
+                }
+            }
 
             order.StartShipping();
             await _orderRepository.SaveChangesAsync();
@@ -586,13 +618,36 @@ namespace Application.Services
 
         public async Task CancelAsync(int id, string reason)
         {
-            var order = await _orderRepository.GetByIdAsync(id);
+            // Use GetByIdWithDetailsForUpdateAsync to ensure change tracking is enabled
+            var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
+            // Release reserved stock if order hasn't been shipped yet
+            if (order.Status.ToString() != "Shipping" && order.Status.ToString() != "Delivered" && order.Status.ToString() != "Completed")
+            {
+                foreach (var orderItem in order.Items.Where(i => !i.RequiresInstallation))
+                {
+                    var allocations = await _orderWarehouseAllocationRepository.GetByOrderItemIdAsync(orderItem.Id);
+                    foreach (var allocation in allocations)
+                    {
+                        var productWarehouse = await _productWarehouseRepository.GetByProductVariantAndWarehouseAsync(
+                            orderItem.ProductId,
+                            orderItem.VariantId,
+                            allocation.WarehouseId
+                        );
+
+                        if (productWarehouse != null)
+                        {
+                            productWarehouse.Release(allocation.AllocatedQuantity);
+                            _productWarehouseRepository.Update(productWarehouse);
+                        }
+                    }
+                }
+            }
+
             var userId = _currentUserService.UserId ?? 0;
             order.Cancel(reason, userId);
-            _orderRepository.Update(order);
             await _orderRepository.SaveChangesAsync();
         }
 
@@ -605,6 +660,34 @@ namespace Application.Services
             // Complete method doesn't need userId
             order.Complete();
             await _orderRepository.SaveChangesAsync();
+
+            // Create warranties for products that require installation
+            foreach (var orderItem in order.Items)
+            {
+                if (orderItem.RequiresInstallation)
+                {
+                    try
+                    {
+                        var existingWarranty = await _warrantyRepository.GetByOrderItemIdAsync(orderItem.Id);
+                        if (existingWarranty == null)
+                        {
+                            var warranty = Warranty.Create(
+                                orderItem.ProductId,
+                                orderItem.VariantId,
+                                orderItem.Id,
+                                12 // 12 months warranty
+                            );
+                            await _warrantyRepository.AddAsync(warranty);
+                            await _warrantyRepository.SaveChangesAsync();
+                            Console.WriteLine($"[CompleteAsync] Created warranty for product {orderItem.ProductId} with order item {orderItem.Id}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[CompleteAsync] Error creating warranty: {ex.Message}");
+                    }
+                }
+            }
         }
 
         public async Task DeleteAsync(int id)
@@ -687,6 +770,18 @@ namespace Application.Services
                 // Ignore errors checking for uninstall booking
             }
 
+            // Check if order has active warranty request
+            bool hasWarrantyRequest = false;
+            try
+            {
+                var warrantyRequests = await _warrantyRequestRepository.GetByOrderIdAsync(order.Id);
+                hasWarrantyRequest = warrantyRequests.Any(wr => wr.Status == Domain.Enums.WarrantyRequestStatus.Approved || wr.Status == Domain.Enums.WarrantyRequestStatus.InProgress);
+            }
+            catch
+            {
+                // Ignore errors checking for warranty requests
+            }
+
             return new OrderResponse
             {
                 Id = order.Id,
@@ -705,6 +800,7 @@ namespace Application.Services
                 CancelReason = order.CancelReason,
                 CreatedAt = order.CreatedAt,
                 HasUninstallBooking = hasUninstallBooking,
+                HasWarrantyRequest = hasWarrantyRequest,
                 Items = order.Items.Select(i =>
                 {
                     productsDict.TryGetValue(i.ProductId, out var product);
@@ -726,7 +822,9 @@ namespace Application.Services
                         Quantity = i.Quantity,
                         UnitPrice = i.UnitPrice.Amount,
                         TotalPrice = i.GetSubtotal(),
-                        RequiresInstallation = i.RequiresInstallation
+                        RequiresInstallation = i.RequiresInstallation,
+                        WarrantyPeriod = variant?.WarrantyPeriod ?? 12,
+                        OrderDate = order.CreatedAt
                     };
                 }).ToList(),
                 Shipments = order.Shipments.Select(s => new OrderShipmentResponse

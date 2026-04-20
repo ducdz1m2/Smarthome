@@ -112,22 +112,11 @@ builder.Services.AddScoped<SpeechRecognitionService>();
 builder.Services.AddScoped<RecommendationService>();
 builder.Services.AddScoped<RecommendationApiService>();
 
-// Register Installation API service
-builder.Services.AddScoped<InstallationApiService>();
-
-// Add HttpClient for API calls with JWT token handler
-builder.Services.AddHttpClient();
+// Add HttpClient for API calls
 builder.Services.AddScoped<JwtTokenHandler>();
-builder.Services.AddScoped(sp =>
+builder.Services.AddHttpClient<InstallationApiService>(client =>
 {
-    var navigationManager = sp.GetRequiredService<NavigationManager>();
-    var tokenHandler = sp.GetRequiredService<JwtTokenHandler>();
-    var handler = new JwtTokenMessageHandler(tokenHandler)
-    {
-        InnerHandler = new HttpClientHandler()
-    };
-    var httpClient = new HttpClient(handler) { BaseAddress = new Uri(navigationManager.BaseUri) };
-    return httpClient;
+    client.BaseAddress = new Uri("https://localhost:7298");
 });
 
 // Add authentication state provider

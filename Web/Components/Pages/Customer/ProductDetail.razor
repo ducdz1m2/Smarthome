@@ -324,6 +324,10 @@ else
                             <MudText Typo="Typo.h6" Class="fw-bold mb-1">Giao hàng</MudText>
                             <MudText Typo="Typo.body2" Color="Color.Secondary">
                                 Giao hàng toàn quốc, miễn phí cho đơn từ 500.000₫
+                                @if (_product.RequiresInstallation)
+                                {
+                                    <text> - Miễn phí lắp đặt cho sản phẩm này</text>
+                                }
                             </MudText>
                         </div>
                     </MudItem>
@@ -332,7 +336,7 @@ else
                             <MudIcon Icon="@Icons.Material.Filled.Replay" Size="Size.Large" Color="Color.Primary" Class="mb-2"/>
                             <MudText Typo="Typo.h6" Class="fw-bold mb-1">Đổi trả</MudText>
                             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                Đổi trả trong 7 ngày nếu sản phẩm lỗi
+                                Đổi trả trong 1 tháng đầu kể từ ngày đặt hàng
                             </MudText>
                         </div>
                     </MudItem>
@@ -340,9 +344,28 @@ else
                         <div class="policy-item">
                             <MudIcon Icon="@Icons.Material.Filled.Verified" Size="Size.Large" Color="Color.Primary" Class="mb-2"/>
                             <MudText Typo="Typo.h6" Class="fw-bold mb-1">Bảo hành</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                Bảo hành chính hãng 12 tháng
-                            </MudText>
+                            @if (_product.Variants.Any())
+                            {
+                                var warrantyPeriods = _product.Variants.Select(v => v.WarrantyPeriod).Distinct().OrderBy(p => p).ToList();
+                                if (warrantyPeriods.Count == 1)
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Bảo hành @warrantyPeriods[0] tháng
+                                    </MudText>
+                                }
+                                else if (warrantyPeriods.Count > 1)
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Bảo hành từ @warrantyPeriods.First() đến @warrantyPeriods.Last() tháng (tùy phân loại)
+                                    </MudText>
+                                }
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    Bảo hành theo quy định nhà sản xuất
+                                </MudText>
+                            }
                         </div>
                     </MudItem>
                 </MudGrid>

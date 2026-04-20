@@ -1,6 +1,8 @@
 using Application.DTOs.Requests;
 using Application.DTOs.Responses;
+using Microsoft.AspNetCore.Components;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 
 namespace Web.Services
 {
@@ -10,10 +12,36 @@ namespace Web.Services
     public class InstallationApiService
     {
         private readonly HttpClient _httpClient;
+        private readonly JwtTokenHandler _tokenHandler;
+        private readonly NavigationManager _navigationManager;
 
-        public InstallationApiService(HttpClient httpClient)
+        public InstallationApiService(HttpClient httpClient, JwtTokenHandler tokenHandler, NavigationManager navigationManager)
         {
             _httpClient = httpClient;
+            _tokenHandler = tokenHandler;
+            _navigationManager = navigationManager;
+            
+            // Ensure BaseAddress is set
+            if (_httpClient.BaseAddress == null)
+            {
+                _httpClient.BaseAddress = new Uri(_navigationManager.BaseUri);
+            }
+        }
+
+        private async Task AddAuthTokenAsync()
+        {
+            try
+            {
+                var token = await _tokenHandler.GetTokenAsync();
+                if (!string.IsNullOrEmpty(token))
+                {
+                    _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                }
+            }
+            catch
+            {
+                // Ignore token errors - will get 401 if auth is required
+            }
         }
 
         /// <summary>
@@ -21,6 +49,7 @@ namespace Web.Services
         /// </summary>
         public async Task<List<WarehouseStockForTechnicianResponse>> GetWarehousesForProductsAsync(List<int> productIds)
         {
+            await AddAuthTokenAsync();
             var queryString = string.Join("&", productIds.Select(id => $"productIds={id}"));
             var response = await _httpClient.GetAsync($"api/installation/warehouses/for-products?{queryString}");
             response.EnsureSuccessStatusCode();
@@ -32,6 +61,7 @@ namespace Web.Services
         /// </summary>
         public async Task<List<ProductStockForTechnician>> GetProductStockAsync(int productId)
         {
+            await AddAuthTokenAsync();
             var response = await _httpClient.GetAsync($"api/installation/stock/{productId}");
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<List<ProductStockForTechnician>>() ?? new();
@@ -42,6 +72,7 @@ namespace Web.Services
         /// </summary>
         public async Task PrepareMaterialsAsync(int bookingId, PrepareMaterialsRequest request)
         {
+            await AddAuthTokenAsync();
             var response = await _httpClient.PostAsJsonAsync($"api/installation/{bookingId}/prepare-materials", request);
             response.EnsureSuccessStatusCode();
         }
@@ -51,6 +82,7 @@ namespace Web.Services
         /// </summary>
         public async Task ReturnMaterialsAsync(int bookingId, List<MaterialReturnInfo> returns)
         {
+            await AddAuthTokenAsync();
             var response = await _httpClient.PostAsJsonAsync($"api/installation/{bookingId}/return-materials", returns);
             response.EnsureSuccessStatusCode();
         }
@@ -60,6 +92,7 @@ namespace Web.Services
         /// </summary>
         public async Task AddMaterialAsync(int bookingId, AddInstallationMaterialRequest request)
         {
+            await AddAuthTokenAsync();
             var response = await _httpClient.PostAsJsonAsync($"api/installation/{bookingId}/materials", request);
             response.EnsureSuccessStatusCode();
         }
@@ -69,6 +102,7 @@ namespace Web.Services
         /// </summary>
         public async Task AcceptBookingAsync(int bookingId, int technicianId)
         {
+            await AddAuthTokenAsync();
             var response = await _httpClient.PostAsync($"api/installation/{bookingId}/accept?technicianId={technicianId}", null);
             response.EnsureSuccessStatusCode();
         }
@@ -78,6 +112,7 @@ namespace Web.Services
         /// </summary>
         public async Task RejectBookingAsync(int bookingId, int technicianId, RejectBookingRequest request)
         {
+            await AddAuthTokenAsync();
             var response = await _httpClient.PostAsJsonAsync($"api/installation/{bookingId}/reject?technicianId={technicianId}", request);
             response.EnsureSuccessStatusCode();
         }
@@ -87,6 +122,7 @@ namespace Web.Services
         /// </summary>
         public async Task StartTravelAsync(int bookingId)
         {
+            await AddAuthTokenAsync();
             var response = await _httpClient.PostAsync($"api/installation/{bookingId}/start-travel", null);
             response.EnsureSuccessStatusCode();
         }
@@ -96,6 +132,7 @@ namespace Web.Services
         /// </summary>
         public async Task StartInstallationAsync(int bookingId)
         {
+            await AddAuthTokenAsync();
             var response = await _httpClient.PostAsync($"api/installation/{bookingId}/start-installation", null);
             response.EnsureSuccessStatusCode();
         }
@@ -105,6 +142,7 @@ namespace Web.Services
         /// </summary>
         public async Task CompleteAsync(int bookingId, CompleteInstallationRequest request)
         {
+            await AddAuthTokenAsync();
             var response = await _httpClient.PostAsJsonAsync($"api/installation/{bookingId}/complete", request);
             response.EnsureSuccessStatusCode();
         }
@@ -114,6 +152,7 @@ namespace Web.Services
         /// </summary>
         public async Task<InstallationBookingResponse?> GetByIdAsync(int id)
         {
+            await AddAuthTokenAsync();
             var response = await _httpClient.GetAsync($"api/installation/{id}");
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 return null;

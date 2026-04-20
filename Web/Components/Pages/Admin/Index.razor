@@ -553,6 +553,41 @@ else if (_statistics != null)
             </MudGrid>
         </MudCardContent>
     </MudCard>
+
+    <!-- Additional Charts Row -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Xu hướng doanh thu (12 tháng)</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudChart T="double" ChartType="ChartType.Line"
+                              ChartSeries="@GetRevenueTrendSeries()"
+                              xaxislabels="@GetMonthLabels()"
+                              ChartOptions="@(_chartOptions)"
+                              Width="100%" Height="300px" />
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Phân bố đơn hàng theo thành phố</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Class="d-flex justify-center">
+                    <MudChart T="double" ChartType="ChartType.Pie"
+                              inputdata="@GetCityData()"
+                              inputlabels="@GetCityLabels()"
+                              Width="300px" Height="300px" />
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
 }
 else if (_loadError)
 {
@@ -668,5 +703,31 @@ else if (_loadError)
     private string[] GetCategoryLabels()
     {
         return _statistics?.Charts?.CategoryDistribution?.Select(x => x.Label).ToArray() ?? Array.Empty<string>();
+    }
+
+    private List<ChartSeries<double>> GetRevenueTrendSeries()
+    {
+        if (_statistics?.Charts?.RevenueChart == null) return new List<ChartSeries<double>>();
+
+        return new List<ChartSeries<double>>
+        {
+            new ChartSeries<double>
+            {
+                Name = "Doanh thu",
+                Data = _statistics.Charts.RevenueChart.Select(x => (double)x.Value).ToArray()
+            }
+        };
+    }
+
+    private double[] GetCityData()
+    {
+        // Mock data for city distribution - in real app, this would come from statistics service
+        return new double[] { 35, 25, 20, 12, 8 };
+    }
+
+    private string[] GetCityLabels()
+    {
+        // Mock data for city labels - in real app, this would come from statistics service
+        return new string[] { "Hà Nội", "TP.HCM", "Đà Nẵng", "Hải Phòng", "Khác" };
     }
 }

@@ -29,6 +29,7 @@ namespace Application
             services.AddScoped<IInventoryService, InventoryService>();
 
             // VNPay
+            services.AddHttpContextAccessor();
             services.AddScoped<IVNPayService, VNPayService>();
 
             // Installation services

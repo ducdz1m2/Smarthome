@@ -17,9 +17,9 @@
     Thêm sản phẩm
 </MudButton>
 
-<MudTable Items="_products" Dense="true" Hover="true" Loading="_loading" 
+<MudTable Items="_products" Dense="true" Hover="true" Loading="_loading"
           LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
-          Filter="@FilterProducts">
+          Filter="@FilterProducts" SortMode="SortMode.Single" AllowUnsorted="false">
     <ToolBarContent>
         <MudText Typo="Typo.h6">Danh sách sản phẩm</MudText>
         <MudSpacer />

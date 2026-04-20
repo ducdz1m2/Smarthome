@@ -2,9 +2,7 @@ namespace Domain.Enums;
 
 public enum WarrantyType
 {
-    Repair = 0,
-    Replace = 1,
-    Refund = 2
+    Repair = 0
 }
 
 public enum WarrantyRequestStatus

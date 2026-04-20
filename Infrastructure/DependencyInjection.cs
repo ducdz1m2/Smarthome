@@ -15,14 +15,14 @@ namespace Infrastructure
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
-            // Cấu hình DbContext for Blazor Server (scoped per request)
+            // Cấu hình DbContext for Blazor Server (transient to avoid concurrency issues)
             // Enable sensitive data logging and detailed errors for debugging
             services.AddDbContext<AppDbContext>(options =>
             {
                 options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
                 options.EnableSensitiveDataLogging();
                 options.EnableDetailedErrors();
-            });
+            }, ServiceLifetime.Transient);
 
             // Đăng ký Domain Event Dispatcher
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
@@ -61,6 +61,7 @@ namespace Infrastructure
             services.AddScoped<Application.Interfaces.Repositories.ITechnicianProfileRepository, TechnicianProfileRepository>();
             services.AddScoped<Application.Interfaces.Repositories.IInstallationSlotRepository, InstallationSlotRepository>();
             services.AddScoped<Application.Interfaces.Repositories.ITechnicianRatingRepository, TechnicianRatingRepository>();
+            services.AddScoped<Domain.Repositories.IInstallationMaterialRepository, InstallationMaterialRepository>();
 
             // Warranty repositories
             services.AddScoped<Application.Interfaces.Repositories.IWarrantyRepository, WarrantyRepository>();

@@ -8,6 +8,7 @@
 @inject IOrderService OrderService
 @inject ISnackbar Snackbar
 @inject IWarehouseService WarehouseService
+@inject IInventoryService InventoryService
 
 <MudDialog>
     <DialogContent>
@@ -156,10 +157,14 @@
                                                     @foreach (var allocation in _warehouseAllocations[context.Id])
                                                     {
                                                         var warehouse = _warehouses.FirstOrDefault(w => w.Id == allocation.WarehouseId);
+                                                        var currentStock = _availableStockByWarehouse.ContainsKey(context.Id) && 
+                                                                           _availableStockByWarehouse[context.Id].ContainsKey(allocation.WarehouseId)
+                                                                           ? _availableStockByWarehouse[context.Id][allocation.WarehouseId]
+                                                                           : 0;
                                                         if (warehouse != null)
                                                         {
                                                             <div class="mb-2">
-                                                                <MudText>@warehouse.Name: <strong>@allocation.Quantity</strong> / @context.Quantity</MudText>
+                                                                <MudText>@warehouse.Name: <strong>@currentStock</strong> <MudText Typo="Typo.caption" Color="Color.Secondary">(đã phân bổ @allocation.Quantity)</MudText></MudText>
                                                             </div>
                                                         }
                                                     }
@@ -342,6 +347,32 @@
             // Initialize warehouse allocations dictionary and load available warehouses
             if (_order != null)
             {
+                // Load warehouses once before the loop
+                List<WarehouseResponse> allWarehouses;
+                try
+                {
+                    allWarehouses = await WarehouseService.GetAllAsync();
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Lỗi khi tải danh sách kho: {ex.Message}", Severity.Warning);
+                    allWarehouses = new List<WarehouseResponse>();
+                }
+
+                // Load warehouse allocations once if order is not Pending
+                List<WarehouseAllocationResponse> allocations = new();
+                if (_order.Status != "Pending")
+                {
+                    try
+                    {
+                        allocations = await OrderService.GetWarehouseAllocationsAsync(OrderId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Snackbar.Add($"Lỗi khi tải phân bổ kho: {ex.Message}", Severity.Warning);
+                    }
+                }
+
                 foreach (var item in _order.Items)
                 {
                     if (!_warehouseAllocations.ContainsKey(item.Id))
@@ -354,25 +385,61 @@
                         _checkboxStates[item.Id] = new Dictionary<int, bool>();
                     }
 
-                    // Load available warehouses for this product variant
-                    var allWarehouses = await WarehouseService.GetAllAsync();
-
                     if (!_availableStockByWarehouse.ContainsKey(item.Id))
                     {
                         _availableStockByWarehouse[item.Id] = new Dictionary<int, int>();
                     }
 
-                    // Initialize all warehouses with 0 stock
+                    // Load actual stock from inventory service
+                    if (item.ProductId > 0)
+                    {
+                        try
+                        {
+                            var inventory = await InventoryService.GetProductInventoryByIdAsync(item.ProductId);
+                            if (inventory != null)
+                            {
+                                // If variant is specified, get stock from variant
+                                if (item.VariantId.HasValue && item.VariantId.Value > 0)
+                                {
+                                    var variantInventory = inventory.Variants?.FirstOrDefault(v => v.VariantId == item.VariantId.Value);
+                                    if (variantInventory?.WarehouseStocks != null)
+                                    {
+                                        foreach (var warehouseStock in variantInventory.WarehouseStocks)
+                                        {
+                                            _availableStockByWarehouse[item.Id][warehouseStock.WarehouseId] = warehouseStock.Quantity;
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    // Get stock from product level
+                                    foreach (var warehouseStock in inventory.WarehouseStocks)
+                                    {
+                                        _availableStockByWarehouse[item.Id][warehouseStock.WarehouseId] = warehouseStock.Quantity;
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Silently continue - stock info is for display only
+                            Console.WriteLine($"Error loading inventory for product {item.ProductId}: {ex.Message}");
+                        }
+                    }
+                    
+                    // Initialize checkbox states for all warehouses
                     foreach (var warehouse in allWarehouses)
                     {
-                        _availableStockByWarehouse[item.Id][warehouse.Id] = 0;
+                        if (!_availableStockByWarehouse[item.Id].ContainsKey(warehouse.Id))
+                        {
+                            _availableStockByWarehouse[item.Id][warehouse.Id] = 0;
+                        }
                         _checkboxStates[item.Id][warehouse.Id] = false;
                     }
 
                     // If order is not Pending, load existing warehouse allocations for display
                     if (_order.Status != "Pending" && !item.RequiresInstallation)
                     {
-                        var allocations = await OrderService.GetWarehouseAllocationsAsync(OrderId);
                         var itemAllocations = allocations.Where(a => a.OrderItemId == item.Id).ToList();
                         
                         // Remove duplicates by warehouse ID

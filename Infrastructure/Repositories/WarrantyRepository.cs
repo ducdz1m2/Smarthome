@@ -26,11 +26,18 @@ namespace Infrastructure.Repositories
                 .FirstOrDefaultAsync(w => w.Id == id);
         }
 
+        public async Task<Warranty?> GetByOrderItemIdAsync(int orderItemId)
+        {
+            return await _context.Warranties
+                .AsNoTracking()
+                .FirstOrDefaultAsync(w => w.OrderItemId == orderItemId);
+        }
+
         public async Task<List<Warranty>> GetAllAsync()
         {
             return await _context.Warranties
                 .AsNoTracking()
-                .OrderByDescending(w => w.CreatedAt)
+                .OrderByDescending(w => w.StartDate)
                 .ToListAsync();
         }
 
@@ -39,16 +46,7 @@ namespace Infrastructure.Repositories
             return await _context.Warranties
                 .AsNoTracking()
                 .Where(w => w.ProductId == productId)
-                .OrderByDescending(w => w.CreatedAt)
-                .ToListAsync();
-        }
-
-        public async Task<List<Warranty>> GetByOrderItemIdAsync(int orderItemId)
-        {
-            return await _context.Warranties
-                .AsNoTracking()
-                .Where(w => w.OrderItemId == orderItemId)
-                .OrderByDescending(w => w.CreatedAt)
+                .OrderByDescending(w => w.StartDate)
                 .ToListAsync();
         }
 
@@ -79,7 +77,8 @@ namespace Infrastructure.Repositories
 
         public async Task<bool> ExistsAsync(int orderItemId)
         {
-            return await _context.Warranties.AnyAsync(w => w.OrderItemId == orderItemId);
+            return await _context.Warranties
+                .AnyAsync(w => w.OrderItemId == orderItemId);
         }
 
         public async Task<int> CountAsync()

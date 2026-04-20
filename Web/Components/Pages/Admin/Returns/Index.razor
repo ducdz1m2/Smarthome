@@ -6,6 +6,7 @@
 @layout AdminLayout
 @inject IReturnOrderService ReturnOrderService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudText Typo="Typo.h4" Class="mb-4">Quản lý hoàn hàng</MudText>
 
@@ -110,6 +111,11 @@
                     <MudTd>@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
                     <MudTd>
                         <div class="d-flex gap-1">
+                            <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                         Color="Color.Primary"
+                                         Size="Size.Small"
+                                         OnClick="() => OpenDetail(context.Id)"
+                                         Title="Xem chi tiết" />
                             @if (context.Status == "Pending")
                             {
                                 <MudIconButton Icon="@Icons.Material.Filled.Check"
@@ -209,6 +215,28 @@
         catch (Exception ex)
         {
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenDetail(int id)
+    {
+        var parameters = new DialogParameters<ReturnOrderDetailDialog>();
+        parameters.Add(x => x.ReturnOrderId, id);
+
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ReturnOrderDetailDialog>("Chi tiết hoàn hàng", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadAll();
+            StateHasChanged();
         }
     }
 }

@@ -23,19 +23,21 @@
                       IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
     </ToolBarContent>
     <HeaderContent>
-        <MudTh Width="60px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Id)">ID</MudTableSortLabel></MudTh>
-        <MudTh Width="120px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.OrderNumber)">Mã đơn</MudTableSortLabel></MudTh>
-        <MudTh Width="100px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.WarrantyType)">Loại</MudTableSortLabel></MudTh>
-        <MudTh Width="200px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Description)">Mô tả</MudTableSortLabel></MudTh>
-        <MudTh Width="100px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Status)">Trạng thái</MudTableSortLabel></MudTh>
-        <MudTh Width="150px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.CreatedAt)">Ngày tạo</MudTableSortLabel></MudTh>
-        <MudTh Width="100px">Thao tác</MudTh>
+        <MudTh width="60px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh width="100px">Order Item</MudTh>
+        <MudTh width="200px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Description)">Mô tả</MudTableSortLabel></MudTh>
+        <MudTh width="120px">Kỹ thuật viên</MudTh>
+        <MudTh width="100px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Status)">Trạng thái</MudTableSortLabel></MudTh>
+        <MudTh width="150px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.CreatedAt)">Ngày tạo</MudTableSortLabel></MudTh>
+        <MudTh width="100px">Thao tác</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
-        <MudTd DataLabel="Mã đơn">@context.OrderNumber</MudTd>
-        <MudTd DataLabel="Loại">@context.WarrantyType</MudTd>
+        <MudTd DataLabel="Order Item">#@context.OrderItemId</MudTd>
         <MudTd DataLabel="Mô tả">@context.Description</MudTd>
+        <MudTd DataLabel="Kỹ thuật viên">
+            @(context.AssignedTechnicianId.HasValue ? $"KTV #{context.AssignedTechnicianId}" : "Chưa gán")
+        </MudTd>
         <MudTd DataLabel="Trạng thái">
             <MudChip T="string" Color="@StatusHelper.GetWarrantyStatusColor(context.Status)" Size="Size.Small">@StatusHelper.GetWarrantyStatusText(context.Status)</MudChip>
         </MudTd>
@@ -64,7 +66,7 @@
         </MudTd>
     </RowTemplate>
     <PagerContent>
-        <MudTablePager RowsPerPageString="Số dòng:" RowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 5, 10, 25, 50 }"
                        InfoFormat="{first_item}-{last_item} / {all_items}" />
     </PagerContent>
 </MudTable>

@@ -23,10 +23,10 @@ namespace Infrastructure.Repositories
         public async Task<InstallationBooking?> GetByIdWithDetailsAsync(int id)
         {
             return await _context.InstallationBookings
-                .AsNoTracking()
                 .Include(b => b.Order)
                     .ThenInclude(o => o.Items)
                 .Include(b => b.Technician)
+                    .ThenInclude(t => t.User)
                 .Include(b => b.Slot)
                 .Include(b => b.Materials)
                     .ThenInclude(m => m.Warehouse)
@@ -55,6 +55,7 @@ namespace Infrastructure.Repositories
                 .Where(b => b.OrderId == orderId)
                 .Include(b => b.Order)
                 .Include(b => b.Technician)
+                    .ThenInclude(t => t.User)
                 .Include(b => b.Slot)
                 .Include(b => b.Materials)
                     .ThenInclude(m => m.Warehouse)
@@ -156,11 +157,15 @@ namespace Infrastructure.Repositories
         public void Update(InstallationBooking booking)
         {
             var existing = _context.InstallationBookings.Local.FirstOrDefault(e => e.Id == booking.Id);
-            if (existing != null)
+            if (existing != null && existing != booking)
             {
                 _context.Entry(existing).State = EntityState.Detached;
             }
-            _context.InstallationBookings.Update(booking);
+            if (_context.Entry(booking).State == EntityState.Detached)
+            {
+                _context.InstallationBookings.Attach(booking);
+            }
+            _context.Entry(booking).State = EntityState.Modified;
         }
 
         public void Delete(InstallationBooking booking)

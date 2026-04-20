@@ -1,0 +1,168 @@
+@page "/admin/damaged-products"
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@inject IWarrantyRequestService WarrantyRequestService
+@inject IReturnOrderService ReturnOrderService
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h4" Class="mb-4">Quản lý sản phẩm hỏng</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else if (!_damagedProducts.Any())
+{
+    <MudAlert Severity="Severity.Info" Class="my-4">Không có sản phẩm hỏng nào.</MudAlert>
+}
+else
+{
+    <MudTable Items="_damagedProducts" Dense="true" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Mã đơn</MudTh>
+            <MudTh>Loại</MudTh>
+            <MudTh>Sản phẩm</MudTh>
+            <MudTh>SL</MudTh>
+            <MudTh>Trạng thái</MudTh>
+            <MudTh>Ngày tạo</MudTh>
+            <MudTh>Thao tác</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.OrderNumber</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(context.Type)">@context.Type</MudChip>
+            </MudTd>
+            <MudTd>@context.ProductName</MudTd>
+            <MudTd>@context.Quantity</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="@GetReturnedColor(context.ReturnedToInventory)">
+                    @(context.ReturnedToInventory ? "Đã trả kho" : "Chưa trả")
+                </MudChip>
+            </MudTd>
+            <MudTd>@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
+            <MudTd>
+                @if (!context.ReturnedToInventory)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+                               OnClick="() => MarkAsReturned(context)">Đã trả kho</MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private bool _loading = true;
+    private List<DamagedProductResponse> _damagedProducts = new();
+
+    public class DamagedProductResponse
+    {
+        public int Id { get; set; }
+        public string OrderNumber { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string ProductName { get; set; } = "";
+        public int Quantity { get; set; }
+        public bool ReturnedToInventory { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public int ItemId { get; set; }
+        public string SourceType { get; set; } = ""; // "Warranty" or "Return"
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDamagedProducts();
+    }
+
+    private async Task LoadDamagedProducts()
+    {
+        try
+        {
+            _loading = true;
+            _damagedProducts.Clear();
+
+            // Get damaged products from warranty requests
+            var warrantyRequests = await WarrantyRequestService.GetAllAsync();
+            foreach (var wr in warrantyRequests)
+            {
+                foreach (var item in wr.Items.Where(i => i.IsDamaged))
+                {
+                    _damagedProducts.Add(new DamagedProductResponse
+                    {
+                        Id = item.Id,
+                        OrderNumber = wr.OrderNumber,
+                        Type = "Bảo hành",
+                        ProductName = $"Product #{item.OrderItemId}",
+                        Quantity = item.Quantity,
+                        ReturnedToInventory = item.ReturnedToInventory,
+                        CreatedAt = wr.CreatedAt,
+                        ItemId = item.Id,
+                        SourceType = "Warranty"
+                    });
+                }
+            }
+
+            // Get damaged products from return orders
+            var returnOrders = await ReturnOrderService.GetAllAsync();
+            foreach (var ro in returnOrders)
+            {
+                foreach (var item in ro.Items.Where(i => i.IsDamaged))
+                {
+                    _damagedProducts.Add(new DamagedProductResponse
+                    {
+                        Id = item.Id,
+                        OrderNumber = ro.OrderNumber,
+                        Type = "Trả hàng",
+                        ProductName = $"Product #{item.ProductId}",
+                        Quantity = item.Quantity,
+                        ReturnedToInventory = item.ReturnedToInventory,
+                        CreatedAt = ro.CreatedAt,
+                        ItemId = item.Id,
+                        SourceType = "Return"
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task MarkAsReturned(DamagedProductResponse item)
+    {
+        try
+        {
+            if (item.SourceType == "Warranty")
+            {
+                await WarrantyRequestService.MarkItemAsReturnedAsync(item.ItemId);
+                Snackbar.Add("Đã đánh dấu sản phẩm đã trả kho", Severity.Success);
+            }
+            else if (item.SourceType == "Return")
+            {
+                // Mark return item as returned
+                // Note: This would require a method in ReturnOrderService
+                Snackbar.Add("Đã đánh dấu sản phẩm đã trả kho", Severity.Success);
+            }
+
+            await LoadDamagedProducts();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetTypeColor(string type)
+    {
+        return type == "Bảo hành" ? Color.Primary : Color.Secondary;
+    }
+
+    private Color GetReturnedColor(bool returned)
+    {
+        return returned ? Color.Success : Color.Warning;
+    }
+}

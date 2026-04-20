@@ -15,17 +15,23 @@ public class ReturnOrderService : IReturnOrderService
     private readonly IOrderRepository _orderRepository;
     private readonly IInstallationService _installationService;
     private readonly IInstallationSlotService _slotService;
+    private readonly IProductWarehouseRepository _productWarehouseRepository;
+    private readonly IWarehouseRepository _warehouseRepository;
 
     public ReturnOrderService(
         IReturnOrderRepository returnOrderRepository,
         IOrderRepository orderRepository,
         IInstallationService installationService,
-        IInstallationSlotService slotService)
+        IInstallationSlotService slotService,
+        IProductWarehouseRepository productWarehouseRepository,
+        IWarehouseRepository warehouseRepository)
     {
         _returnOrderRepository = returnOrderRepository;
         _orderRepository = orderRepository;
         _installationService = installationService;
         _slotService = slotService;
+        _productWarehouseRepository = productWarehouseRepository;
+        _warehouseRepository = warehouseRepository;
     }
 
     public async Task<List<ReturnOrderResponse>> GetAllAsync()
@@ -63,14 +69,10 @@ public class ReturnOrderService : IReturnOrderService
         if (order == null)
             throw new DomainException("Không tìm thấy đơn hàng");
 
-        // Check if order is within 1 month for return eligibility
-        var lastShipment = order.Shipments.OrderByDescending(s => s.DeliveredAt).FirstOrDefault();
-        if (lastShipment?.DeliveredAt == null)
-            throw new DomainException("Không thể xác nhận ngày giao hàng để xử lý yêu cầu hoàn trả");
-
-        var daysSinceDelivery = (DateTime.UtcNow - lastShipment.DeliveredAt.Value).TotalDays;
-        if (daysSinceDelivery > 30)
-            throw new DomainException("Chỉ có thể hoàn trả trong vòng 30 ngày kể từ ngày giao hàng");
+        // Check if order is within 1 month for return eligibility (from order date)
+        var daysSinceOrder = (DateTime.UtcNow - order.CreatedAt).TotalDays;
+        if (daysSinceOrder > 30)
+            throw new DomainException("Chỉ có thể hoàn trả trong vòng 1 tháng đầu kể từ ngày đặt hàng");
 
         // Check if there's already a pending return for this order
         if (await _returnOrderRepository.ExistsPendingReturnForOrderAsync(request.OrderId))
@@ -88,7 +90,14 @@ public class ReturnOrderService : IReturnOrderService
         // Add items
         foreach (var item in request.Items)
         {
-            returnOrder.AddItem(item.OrderItemId, item.Quantity, item.Reason);
+            returnOrder.AddItem(
+                item.OrderItemId,
+                item.ProductId,
+                item.VariantId,
+                item.Quantity,
+                item.Reason,
+                item.IsDamaged,
+                item.WarehouseId);
         }
 
         await _returnOrderRepository.AddAsync(returnOrder);
@@ -207,9 +216,35 @@ public class ReturnOrderService : IReturnOrderService
 
     public async Task CompleteAsync(int id)
     {
-        var returnOrder = await _returnOrderRepository.GetByIdAsync(id);
+        var returnOrder = await _returnOrderRepository.GetByIdWithItemsAsync(id);
         if (returnOrder == null)
             throw new DomainException("Không tìm thấy yêu cầu trả hàng");
+
+        // Cập nhật kho cho các sản phẩm không bị hư hỏng
+        foreach (var item in returnOrder.Items.Where(i => !i.IsDamaged && !i.ReturnedToInventory))
+        {
+            if (item.WarehouseId.HasValue)
+            {
+                var productWarehouse = await _productWarehouseRepository
+                    .GetByProductVariantAndWarehouseAsync(item.ProductId, item.VariantId, item.WarehouseId.Value);
+
+                if (productWarehouse != null)
+                {
+                    // Cộng hàng vào kho
+                    productWarehouse.Receive(item.Quantity);
+                    _productWarehouseRepository.Update(productWarehouse);
+                    item.MarkAsReturnedToInventory();
+                }
+                else
+                {
+                    // Nếu chưa có trong kho này, tạo mới
+                    productWarehouse = Domain.Entities.Inventory.ProductWarehouse.Create(
+                        item.ProductId, item.VariantId, item.WarehouseId.Value, item.Quantity);
+                    await _productWarehouseRepository.AddAsync(productWarehouse);
+                    item.MarkAsReturnedToInventory();
+                }
+            }
+        }
 
         returnOrder.Complete();
         _returnOrderRepository.Update(returnOrder);
@@ -258,25 +293,24 @@ public class ReturnOrderService : IReturnOrderService
             {
                 Id = i.Id,
                 OrderItemId = i.OrderItemId,
+                ProductId = i.ProductId,
+                VariantId = i.VariantId,
                 Quantity = i.Quantity,
-                Reason = i.Reason
+                Reason = i.Reason,
+                IsDamaged = i.IsDamaged,
+                ReturnedToInventory = i.ReturnedToInventory,
+                WarehouseId = i.WarehouseId
             }).ToList()
         };
     }
 
     private static ReturnType DetermineReturnType(Order order)
     {
-        // Get the latest shipment delivery date
-        var lastShipment = order.Shipments.OrderByDescending(s => s.DeliveredAt).FirstOrDefault();
-        if (lastShipment?.DeliveredAt == null)
-        {
-            // If no delivery info, default to Refund
-            return ReturnType.Refund;
-        }
+        // Calculate from order date instead of delivery date
+        var daysSinceOrder = (DateTime.UtcNow - order.CreatedAt).TotalDays;
 
-        // Simple logic: if order was delivered within 30 days, refund
+        // Simple logic: if order was placed within 30 days, refund
         // Otherwise it's an exchange (simplified logic)
-        var daysSinceDelivery = (DateTime.UtcNow - lastShipment.DeliveredAt.Value).TotalDays;
-        return daysSinceDelivery <= 30 ? ReturnType.Refund : ReturnType.Exchange;
+        return daysSinceOrder <= 30 ? ReturnType.Refund : ReturnType.Exchange;
     }
 }

@@ -43,8 +43,10 @@ namespace Infrastructure.Data
         public DbSet<CartItem> CartItems => Set<CartItem>();
         public DbSet<Warranty> Warranties => Set<Warranty>();
         public DbSet<WarrantyClaim> WarrantyClaims => Set<WarrantyClaim>();
-        public DbSet<ReturnOrder> ReturnOrders => Set<ReturnOrder>();
         public DbSet<WarrantyRequest> WarrantyRequests => Set<WarrantyRequest>();
+        public DbSet<WarrantyRequestItem> WarrantyRequestItems => Set<WarrantyRequestItem>();
+        public DbSet<ProductRating> ProductRatings => Set<ProductRating>();
+        public DbSet<ReturnOrder> ReturnOrders => Set<ReturnOrder>();
         public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
         // Installation

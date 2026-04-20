@@ -12,7 +12,7 @@ public class InstallationBooking : AggregateRoot
 {
         public int OrderId { get; private set; }
         public int TechnicianId { get; private set; }
-        public int SlotId { get; private set; }
+        public int? SlotId { get; private set; }
         public InstallationStatus Status { get; private set; } = InstallationStatus.Pending;
         public DateTime ScheduledDate { get; private set; }
         public TimeSpan EstimatedDuration { get; private set; } = TimeSpan.FromHours(2);
@@ -56,6 +56,29 @@ public class InstallationBooking : AggregateRoot
             return booking;
         }
 
+        public static InstallationBooking CreateWarranty(int orderId, int technicianId, int? warrantyRequestId = null)
+        {
+            if (orderId <= 0)
+                throw new ValidationException(nameof(orderId), "OrderId không hợp lệ");
+
+            if (technicianId <= 0)
+                throw new ValidationException(nameof(technicianId), "TechnicianId không hợp lệ");
+
+            var booking = new InstallationBooking
+            {
+                OrderId = orderId,
+                TechnicianId = technicianId,
+                SlotId = null, // Will be scheduled later
+                ScheduledDate = DateTime.UtcNow.AddDays(1), // Default to tomorrow
+                Status = InstallationStatus.Assigned,
+                MaterialsPrepared = false,
+                IsWarranty = true
+            };
+
+            booking.AddDomainEvent(new InstallationBookingCreatedEvent(booking.Id, orderId, technicianId, booking.ScheduledDate));
+            return booking;
+        }
+
         public void AssignTechnician(int technicianId, int slotId)
         {
             TechnicianId = technicianId;
@@ -74,8 +97,13 @@ public class InstallationBooking : AggregateRoot
 
         public void StartTravel()
         {
-            if (Status != InstallationStatus.Preparing)
+            // Uninstall bookings can skip the Preparing status
+            if (!IsUninstall && Status != InstallationStatus.Preparing)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể di chuyển sau khi chuẩn bị xong");
+
+            // Uninstall bookings can go from Confirmed directly to OnTheWay
+            if (IsUninstall && Status != InstallationStatus.Confirmed && Status != InstallationStatus.Preparing)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể di chuyển từ trạng thái đã xác nhận hoặc đang chuẩn bị");
 
             Status = InstallationStatus.OnTheWay;
             OnTheWayAt = DateTime.UtcNow;
@@ -83,11 +111,29 @@ public class InstallationBooking : AggregateRoot
 
         public void StartInstallation()
         {
+            // Warranty bookings should not use this method
+            if (IsWarranty)
+                throw new BusinessRuleViolationException("BookingType", "Đơn bảo hành không thể dùng phương thức này. Vui lòng dùng StartWarranty.");
+
             if (Status != InstallationStatus.OnTheWay)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể lắp sau khi đã đến nơi");
 
             Status = InstallationStatus.Installing;
             StartedAt = DateTime.UtcNow;
+        }
+
+        public void StartWarranty()
+        {
+            Console.WriteLine($"[InstallationBooking.StartWarranty] ID: {Id}, Status: {Status}, IsWarranty: {IsWarranty}");
+            if (!IsWarranty)
+                throw new BusinessRuleViolationException("BookingType", "Chỉ có thể dùng phương thức này cho đơn bảo hành.");
+
+            if (Status != InstallationStatus.Assigned && Status != InstallationStatus.Confirmed && Status != InstallationStatus.OnTheWay)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể bắt đầu bảo hành ở trạng thái đã phân công, đã xác nhận hoặc đang di chuyển");
+
+            Status = InstallationStatus.Installing; // Use Installing status for warranty as well
+            StartedAt = DateTime.UtcNow;
+            Console.WriteLine($"[InstallationBooking.StartWarranty] After - Status: {Status}");
         }
 
         public void Complete(string customerSignature, int customerRating, int customerId = 0, string? notes = null)
@@ -154,6 +200,16 @@ public class InstallationBooking : AggregateRoot
 
         public void Accept()
         {
+            // For warranty bookings, change to Confirmed status to show proper UI state
+            if (IsWarranty)
+            {
+                if (Status != InstallationStatus.Assigned)
+                    throw new BusinessRuleViolationException("BookingStatus", "Đơn bảo hành chỉ có thể tiếp nhận ở trạng thái đã phân công");
+                Status = InstallationStatus.Confirmed;
+                AddDomainEvent(new InstallationBookingConfirmedEvent(Id, DateTime.UtcNow));
+                return;
+            }
+
             if (Status != InstallationStatus.Assigned && Status != InstallationStatus.Rescheduled)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể tiếp nhận lịch ở trạng thái đã phân công hoặc đã đổi lịch");
 

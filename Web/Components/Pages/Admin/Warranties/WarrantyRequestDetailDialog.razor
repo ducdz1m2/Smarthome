@@ -12,7 +12,6 @@
             <MudPaper Class="pa-3 mb-3" Elevation="2">
                 <div class="d-flex flex-column gap-2">
                     <div><strong>Mã đơn:</strong> @WarrantyRequest.OrderNumber</div>
-                    <div><strong>Loại bảo hành:</strong> @WarrantyRequest.WarrantyType</div>
                     <div><strong>Mô tả:</strong> @WarrantyRequest.Description</div>
                     <div><strong>Trạng thái:</strong>
                         <MudChip T="string" Color="@StatusHelper.GetWarrantyStatusColor(WarrantyRequest.Status)" Size="Size.Small">@StatusHelper.GetWarrantyStatusText(WarrantyRequest.Status)</MudChip>

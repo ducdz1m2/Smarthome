@@ -89,7 +89,7 @@ public class OrderItem : Entity
             IsReserved = false;
         }
 
-        public Money GetSubtotalMoney() => UnitPrice.Multiply(Quantity);
+    public Money GetSubtotalMoney() => UnitPrice.Multiply(Quantity);
 
         public decimal GetSubtotal() => GetSubtotalMoney().Amount;
 

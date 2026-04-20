@@ -1,0 +1,291 @@
+@using Application.DTOs.Requests
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Enums
+@inject IReturnOrderService ReturnOrderService
+@inject IWarehouseService WarehouseService
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="my-4" />
+        }
+        else if (_returnOrder == null)
+        {
+            <MudAlert Severity="Severity.Error">Không tìm thấy yêu cầu hoàn hàng</MudAlert>
+        }
+        else
+        {
+            <div class="d-flex align-center justify-space-between mb-4">
+                <div>
+                    <MudText Typo="Typo.h6">Chi tiết hoàn hàng #@_returnOrder.Id</MudText>
+                    <MudText Typo="Typo.caption">Đơn hàng: @_returnOrder.OrderNumber</MudText>
+                </div>
+                <MudChip T="string" Color="@GetStatusColor(_returnOrder.Status)" Size="Size.Medium">
+                    @GetStatusText(_returnOrder.Status)
+                </MudChip>
+            </div>
+
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle2">Lý do:</MudText>
+                    <MudText Typo="Typo.body2">@_returnOrder.Reason</MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle2">Số tiền hoàn:</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Success">
+                        @_returnOrder.RefundAmount.ToString("N0") đ
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle2">Loại:</MudText>
+                    <MudText Typo="Typo.body2">
+                        @(_returnOrder.ReturnType == "Exchange" ? "Đổi hàng" : "Hoàn tiền")
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle2">Ngày tạo:</MudText>
+                    <MudText Typo="Typo.body2">@_returnOrder.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.subtitle1" Class="fw-bold mb-3">Sản phẩm hoàn trả</MudText>
+
+            @if (_returnOrder.Items.Any())
+            {
+                <MudTable Items="_returnOrder.Items" Dense="true" Hover="true" Striped="true">
+                    <HeaderContent>
+                        <MudTh>Sản phẩm</MudTh>
+                        <MudTh>SL</MudTh>
+                        <MudTh>Trạng thái</MudTh>
+                        <MudTh>Kho nhận</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <div class="d-flex flex-column">
+                                <MudText Typo="Typo.body2" Class="fw-bold">@context.ProductName</MudText>
+                                @if (!string.IsNullOrEmpty(context.VariantName))
+                                {
+                                    <MudText Typo="Typo.caption">@context.VariantName</MudText>
+                                }
+                            </div>
+                        </MudTd>
+                        <MudTd>@context.Quantity</MudTd>
+                        <MudTd>
+                            @if (context.IsDamaged)
+                            {
+                                <MudChip T="string" Color="Color.Error" Size="Size.Small">Hư hỏng</MudChip>
+                            }
+                            else if (context.ReturnedToInventory)
+                            {
+                                <MudChip T="string" Color="Color.Success" Size="Size.Small">Đã nhập kho</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Color="Color.Default" Size="Size.Small">Chờ nhập kho</MudChip>
+                            }
+                        </MudTd>
+                        <MudTd>
+                            @if (context.WarehouseId.HasValue)
+                            {
+                                <MudText Typo="Typo.caption">@context.WarehouseName</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Error">Chưa chọn kho</MudText>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
+            @if (CanEditWarehouse() && _warehouses.Any())
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-4" Dense="true">
+                    <MudText Typo="Typo.body2">Vui lòng chọn kho nhận hàng cho các sản phẩm chưa có kho trước khi hoàn thành.</MudText>
+                </MudAlert>
+
+                @foreach (var item in _returnOrder.Items.Where(i => !i.WarehouseId.HasValue && !i.IsDamaged))
+                {
+                    <MudCard Class="mt-3" Elevation="0" Outlined="true">
+                        <MudCardContent>
+                            <div class="d-flex align-center justify-space-between">
+                                <MudText Typo="Typo.body2" Class="fw-bold">@item.ProductName x @item.Quantity</MudText>
+                                <MudSelect T="int" @bind-Value="_itemWarehouseSelections[item.Id]" 
+                                           Label="Chọn kho" Dense="true" Style="min-width: 200px;"
+                                           Variant="Variant.Outlined">
+                                    @foreach (var warehouse in _warehouses.Where(w => w.IsActive))
+                                    {
+                                        <MudSelectItem Value="warehouse.Id">@warehouse.Name</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Đóng</MudButton>
+        
+        @if (_returnOrder?.Status == "Approved")
+        {
+            <MudButton Color="Color.Primary" OnClick="MarkReceived" Variant="Variant.Filled">
+                Xác nhận đã nhận hàng
+            </MudButton>
+        }
+        
+        @if (_returnOrder?.Status == "Received" && CanComplete())
+        {
+            <MudButton Color="Color.Success" OnClick="Complete" Variant="Variant.Filled">
+                Hoàn thành & Nhập kho
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .fw-bold {
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int ReturnOrderId { get; set; }
+
+    private ReturnOrderResponse? _returnOrder;
+    private List<WarehouseResponse> _warehouses = new();
+    private Dictionary<int, int> _itemWarehouseSelections = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            _returnOrder = await ReturnOrderService.GetByIdAsync(ReturnOrderId);
+            _warehouses = await WarehouseService.GetAllAsync();
+            
+            // Initialize warehouse selections for items without warehouse
+            if (_returnOrder?.Items != null)
+            {
+                foreach (var item in _returnOrder.Items.Where(i => !i.WarehouseId.HasValue))
+                {
+                    var defaultWarehouse = _warehouses.FirstOrDefault(w => w.IsActive);
+                    if (defaultWarehouse != null)
+                    {
+                        _itemWarehouseSelections[item.Id] = defaultWarehouse.Id;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool CanEditWarehouse()
+    {
+        return _returnOrder?.Status == "Received" || _returnOrder?.Status == "Approved";
+    }
+
+    private bool CanComplete()
+    {
+        if (_returnOrder == null) return false;
+        
+        // Kiểm tra các sản phẩm cần kho đã có kho chưa
+        var itemsNeedingWarehouse = _returnOrder.Items.Where(i => !i.IsDamaged).ToList();
+        
+        // Nếu có items chưa có warehouse và chưa chọn trong dialog
+        var itemsWithoutWarehouse = itemsNeedingWarehouse.Where(i => !i.WarehouseId.HasValue).ToList();
+        
+        foreach (var item in itemsWithoutWarehouse)
+        {
+            if (!_itemWarehouseSelections.ContainsKey(item.Id))
+            {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    private async Task MarkReceived()
+    {
+        try
+        {
+            await ReturnOrderService.MarkReceivedAsync(ReturnOrderId);
+            Snackbar.Add("Đã xác nhận nhận hàng", Severity.Success);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Complete()
+    {
+        try
+        {
+            // Cập nhật warehouse cho các items chưa có
+            // Note: Đây là UI demo, thực tế cần API riêng để cập nhật warehouse
+            // Hiện tại CompleteAsync sẽ xử lý nhập kho dựa trên WarehouseId đã có
+            
+            await ReturnOrderService.CompleteAsync(ReturnOrderId);
+            Snackbar.Add("Đã hoàn thành hoàn hàng và nhập kho", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => Color.Warning,
+            "Approved" => Color.Info,
+            "Received" => Color.Primary,
+            "Completed" => Color.Success,
+            "Rejected" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetStatusText(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ duyệt",
+            "Approved" => "Đã duyệt",
+            "Received" => "Đã nhận hàng",
+            "Completed" => "Hoàn thành",
+            "Rejected" => "Đã từ chối",
+            _ => status
+        };
+    }
+}

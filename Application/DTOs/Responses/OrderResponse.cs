@@ -12,7 +12,8 @@ namespace Application.DTOs.Responses
         public decimal SubTotal { get; set; }
         public decimal DiscountAmount { get; set; }
         public decimal ShippingFee { get; set; }
-        public string Status { get; set; } = string.Empty; 
+        public string Status { get; set; } = string.Empty;
+        public bool HasWarrantyRequest { get; set; } 
         public string PaymentMethod { get; set; } = string.Empty;
         public string ShippingMethod { get; set; } = string.Empty;
         public string? CancelReason { get; set; }
@@ -35,6 +36,8 @@ namespace Application.DTOs.Responses
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }
         public bool RequiresInstallation { get; set; }
+        public int? WarrantyPeriod { get; set; }
+        public DateTime OrderDate { get; set; }
     }
 
     public class OrderShipmentResponse

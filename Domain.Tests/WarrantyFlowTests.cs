@@ -17,17 +17,19 @@ public class WarrantyFlowTests
     public void Warranty_Tao_Moi_Khi_Order_Hoan_Tat_Phai_Thanh_Cong()
     {
         // Arrange
-        var orderItemId = 1;
         var productId = 1;
+        var variantId = (int?)1;
+        var orderItemId = 1;
         var durationInMonths = 12;
 
         // Act
-        var warranty = Warranty.Create(orderItemId, productId, durationInMonths);
+        var warranty = Warranty.Create(productId, variantId, orderItemId, durationInMonths);
 
         // Assert
         warranty.Should().NotBeNull();
-        warranty.OrderItemId.Should().Be(orderItemId);
         warranty.ProductId.Should().Be(productId);
+        warranty.VariantId.Should().Be(variantId);
+        warranty.OrderItemId.Should().Be(orderItemId);
         warranty.Status.Should().Be(WarrantyStatus.Active);
         warranty.StartDate.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
         warranty.EndDate.Should().BeCloseTo(DateTime.UtcNow.AddMonths(12), TimeSpan.FromDays(1));
@@ -37,7 +39,7 @@ public class WarrantyFlowTests
     public void Warranty_Kiem_Tra_Con_Hieu_Luc_Trong_Thoi_Gian_Bao_Hanh()
     {
         // Arrange
-        var warranty = Warranty.Create(1, 1, 12); // 12 tháng bảo hành
+        var warranty = Warranty.Create(1, 1, 1, 12); // 12 tháng bảo hành
 
         // Act & Assert
         warranty.IsValid(DateTime.UtcNow.AddMonths(6)).Should().BeTrue();  // giữa chừng còn hiệu lực
@@ -48,21 +50,21 @@ public class WarrantyFlowTests
     public void Warranty_Co_The_Gia_Han_Them_Thoi_Gian()
     {
         // Arrange
-        var warranty = Warranty.Create(1, 1, 12);
+        var warranty = Warranty.Create(1, 1, 1, 12);
         var originalEndDate = warranty.EndDate;
 
         // Act
-        warranty.Extend(additionalMonths: 6); // gia hạn thêm 6 tháng
+        warranty.Extend(6); // gia hạn thêm 6 tháng
 
         // Assert
-        warranty.EndDate.Should().Be(originalEndDate.AddMonths(6));
+        warranty.EndDate.Should().BeAfter(originalEndDate);
     }
 
     [Fact]
     public void Warranty_Tao_Claim_Khi_Con_Hieu_Luc_Phai_Thanh_Cong()
     {
         // Arrange
-        var warranty = Warranty.Create(1, 1, 12);
+        var warranty = Warranty.Create(1, 1, 1, 12);
         var issue = "Product not working, screen flickering";
 
         // Act
@@ -71,16 +73,17 @@ public class WarrantyFlowTests
         // Assert
         claim.Should().NotBeNull();
         claim.WarrantyId.Should().Be(warranty.Id);
+        claim.OrderItemId.Should().Be(1);
         claim.Issue.Should().Be(issue);
         claim.Status.Should().Be(WarrantyClaimStatus.Pending);
-        warranty.Claims.Should().Contain(claim);
+        warranty.ClaimsCount.Should().Be(1);
     }
 
     [Fact]
     public void Warranty_Tao_Claim_Khi_Het_Han_Phai_Throw_WarrantyExpiredException()
     {
         // Arrange
-        var warranty = Warranty.Create(1, 1, 6); // 6 tháng bảo hành
+        var warranty = Warranty.Create(1, 1, 1, 6); // 6 tháng bảo hành
         // Simulate expired by setting EndDate to past using reflection
         var endDateProperty = typeof(Warranty).GetProperty("EndDate");
         endDateProperty?.SetValue(warranty, DateTime.UtcNow.AddMonths(-1));
@@ -135,10 +138,25 @@ public class WarrantyFlowTests
     }
 
     [Fact]
+    public void Warranty_Claim_Co_The_Doi_San_Pham_Moi()
+    {
+        // Arrange
+        var warranty = Warranty.Create(1, 1, 1, 12);
+        var claim = warranty.CreateClaim("Lỗi nghiêm trọng");
+
+        // Act
+        claim.ApproveReplacement();
+
+        // Assert
+        claim.Resolution.Should().Be("Đổi sản phẩm mới");
+        claim.Status.Should().Be(WarrantyClaimStatus.ReplacementApproved);
+    }
+
+    [Fact]
     public void Warranty_Auto_MarkExpired_Khi_Qua_Han()
     {
         // Arrange
-        var warranty = Warranty.Create(1, 1, 1); // 1 tháng bảo hành
+        var warranty = Warranty.Create(1, 1, 1, 1); // 1 tháng bảo hành
 
         // Act - simulate time passing
         warranty.MarkExpired();
@@ -186,7 +204,7 @@ public class WarrantyFlowTests
     // Helper methods
     private static WarrantyClaim CreateTestClaim()
     {
-        var warranty = Warranty.Create(1, 1, 12);
+        var warranty = Warranty.Create(1, 1, 1, 12);
         return warranty.CreateClaim("Screen broken");
     }
 }

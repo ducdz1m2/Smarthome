@@ -169,30 +169,34 @@
                 <!-- Installation Scheduling -->
                 @if (_requiresInstallation)
                 {
-                    <MudCard Elevation="2" Class="mt-4">
+                    <MudCard Elevation="2" Class="mt-4 installation-card">
                         <MudCardHeader>
                             <CardHeaderContent>
                                 <MudText Typo="Typo.h6">Lịch lắp đặt</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Error">* Bắt buộc</MudText>
                             </CardHeaderContent>
                         </MudCardHeader>
                         <MudCardContent>
                             <MudGrid>
                                 <MudItem xs="12" md="6">
-                                    <MudDatePicker Label="Ngày lắp đặt" 
+                                    <MudDatePicker Label="Ngày lắp đặt *"
                                                    @bind-Date="_request.InstallationDate"
                                                    @bind-Date:after="OnInstallationDateChanged"
                                                    Required="true"
-                                                   RequiredError="Chọn ngày lắp đặt"
+                                                   RequiredError="Vui lòng chọn ngày lắp đặt"
                                                    Variant="Variant.Outlined"
                                                    MinDate="@DateTime.Today"
-                                                   MaxDate="@DateTime.Today.AddDays(30)" />
+                                                   MaxDate="@DateTime.Today.AddDays(30)"
+                                                   DisableUnderlined="true" />
                                 </MudItem>
                                 <MudItem xs="12" md="6">
-                                    <MudSelect T="int?" Label="Khung giờ" 
+                                    <MudSelect T="int?" Label="Khung giờ *"
                                                @bind-Value="_request.InstallationSlotId"
+                                               @bind-Value:after="OnInstallationSlotChanged"
                                                Required="true"
-                                               RequiredError="Chọn khung giờ"
-                                               Variant="Variant.Outlined">
+                                               RequiredError="Vui lòng chọn khung giờ lắp đặt"
+                                               Variant="Variant.Outlined"
+                                               DisableUnderlined="true">
                                         @if (!_installationSlots.Any())
                                         {
                                             <MudSelectItem T="int?" Value="@null">
@@ -211,6 +215,12 @@
                                     </MudSelect>
                                 </MudItem>
                             </MudGrid>
+                            @if (!_isInstallationValid)
+                            {
+                                <MudAlert Severity="Severity.Error" Class="mt-3" Dense="true">
+                                    Vui lòng chọn ngày và khung giờ lắp đặt trước khi đặt hàng
+                                </MudAlert>
+                            }
                         </MudCardContent>
                     </MudCard>
                 }
@@ -270,13 +280,13 @@
                         </div>
                     </MudCardContent>
                     <MudCardActions Class="flex-column">
-                        <MudButton Variant="Variant.Filled" 
+                        <MudButton Variant="Variant.Filled"
                                    Color="Color.Primary"
                                    FullWidth="true"
                                    Size="Size.Large"
                                    StartIcon="@Icons.Material.Filled.ShoppingBag"
                                    OnClick="PlaceOrder"
-                                   Disabled="!_isValid || _isPlacingOrder">
+                                   Disabled="@(!_isValid || _isPlacingOrder || (_requiresInstallation && !_isInstallationValid))">
                             @if (_isPlacingOrder)
                             {
                                 <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Class="mr-2" />
@@ -317,6 +327,7 @@
     private bool _isLoading = true;
     private bool _isPlacingOrder = false;
     private string _paymentMethod = "COD";
+    private bool _isInstallationValid = true;
 
     private List<CartItem> _cartItems = new();
     private List<UserAddressResponse> _userAddresses = new();
@@ -363,6 +374,7 @@
         await LoadUserAddressesAsync();
         await LoadInstallationSlotsAsync();
         await CalculateShippingFeeAsync();
+        ValidateInstallation();
     }
 
     private async Task LoadInstallationSlotsAsync()
@@ -422,7 +434,19 @@
     {
         _request.InstallationSlotId = null; // Reset slot selection when date changes
         await LoadInstallationSlotsAsync();
+        ValidateInstallation();
         StateHasChanged();
+    }
+
+    private void ValidateInstallation()
+    {
+        if (!_requiresInstallation)
+        {
+            _isInstallationValid = true;
+            return;
+        }
+
+        _isInstallationValid = _request.InstallationDate.HasValue && _request.InstallationSlotId.HasValue;
     }
 
     private async Task OnDistrictChanged()
@@ -431,8 +455,15 @@
         {
             _request.InstallationSlotId = null; // Reset slot selection when district changes
             await LoadInstallationSlotsAsync();
+            ValidateInstallation();
             StateHasChanged();
         }
+    }
+
+    private void OnInstallationSlotChanged()
+    {
+        ValidateInstallation();
+        StateHasChanged();
     }
 
     private async Task LoadUserAddressesAsync()
