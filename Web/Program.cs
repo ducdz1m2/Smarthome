@@ -16,6 +16,8 @@ using System.Text;
 using Domain.Events;
 using Application.Interfaces.Repositories;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,11 +32,28 @@ builder.Services.AddMudServices();
 
 // Add session support for JWT token storage
 builder.Services.AddDistributedMemoryCache();
+builder.Services.AddMemoryCache(); // Add in-memory cache for static data
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromDays(7);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+});
+
+// Add response compression
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<GzipCompressionProvider>();
+    options.Providers.Add<BrotliCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+{
+    options.Level = System.IO.Compression.CompressionLevel.Fastest;
+});
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = System.IO.Compression.CompressionLevel.Fastest;
 });
 
 // Add controllers for API endpoints
@@ -107,10 +126,6 @@ builder.Services.AddScoped<IDomainEventHandler<BulkNotificationCreatedEvent>, We
 // Register Speech services
 builder.Services.AddScoped<SpeechService>();
 builder.Services.AddScoped<SpeechRecognitionService>();
-
-// Register Recommendation service
-builder.Services.AddScoped<RecommendationService>();
-builder.Services.AddScoped<RecommendationApiService>();
 
 // Add HttpClient for API calls
 builder.Services.AddScoped<JwtTokenHandler>();

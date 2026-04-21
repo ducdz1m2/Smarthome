@@ -1,0 +1,9 @@
+@using MudBlazor
+
+<MudGrid Class="mb-4">
+    @ChildContent
+</MudGrid>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

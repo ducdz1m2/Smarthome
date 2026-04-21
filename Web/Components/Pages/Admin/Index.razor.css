@@ -1,0 +1,101 @@
+/* Admin Dashboard Styles */
+
+/* Admin Header */
+.admin-header {
+    margin-bottom: 1.5rem;
+}
+
+/* Stat Cards with Green Theme Gradients */
+.stat-card {
+    border-radius: 16px !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(46, 125, 50, 0.25) !important;
+}
+
+.gradient-purple {
+    background: linear-gradient(135deg, var(--green-primary) 0%, var(--green-primary-dark) 100%) !important;
+    color: white !important;
+}
+
+.gradient-pink {
+    background: linear-gradient(135deg, var(--green-secondary) 0%, var(--green-accent) 100%) !important;
+    color: white !important;
+}
+
+.gradient-blue {
+    background: linear-gradient(135deg, var(--green-primary-light) 0%, var(--green-secondary) 100%) !important;
+    color: white !important;
+}
+
+.gradient-green {
+    background: linear-gradient(135deg, var(--green-accent) 0%, var(--green-primary-light) 100%) !important;
+    color: white !important;
+}
+
+.stat-icon {
+    opacity: 0.9;
+}
+
+/* Mini Stat Cards */
+.mini-stat-card {
+    border-radius: 12px !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    background-color: white !important;
+    border: 1px solid var(--green-surface) !important;
+}
+
+.mini-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(46, 125, 50, 0.15) !important;
+    border-color: var(--green-primary) !important;
+}
+
+/* Chart Cards */
+.chart-card {
+    border-radius: 16px !important;
+    transition: box-shadow 0.2s ease;
+    border: 1px solid var(--green-surface) !important;
+}
+
+.chart-card:hover {
+    box-shadow: 0 6px 20px rgba(46, 125, 50, 0.15) !important;
+}
+
+/* Stats List Cards */
+.stats-card {
+    border-radius: 16px !important;
+    transition: box-shadow 0.2s ease;
+    border: 1px solid var(--green-surface) !important;
+}
+
+.stats-card:hover {
+    box-shadow: 0 6px 20px rgba(46, 125, 50, 0.15) !important;
+}
+
+/* Promo Cards */
+.promo-card {
+    border-radius: 12px !important;
+    background-color: var(--green-surface) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.promo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(46, 125, 50, 0.15) !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .stat-card {
+        margin-bottom: 1rem;
+    }
+
+    .mini-stat-card {
+        margin-bottom: 0.5rem;
+    }
+}

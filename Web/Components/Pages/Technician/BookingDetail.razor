@@ -347,6 +347,14 @@ else
 
             @if (_booking?.IsWarranty == true)
             {
+                <MudText Typo="Typo.subtitle2" Class="mb-2 mt-3">Sản phẩm hỏng</MudText>
+                <MudCard Elevation="0" Outlined="true" Class="mb-3">
+                    <MudCardContent>
+                        <MudCheckBox T="bool" @bind-Checked="_warrantyProductDamaged" Label="Sản phẩm bảo hành bị hỏng" Color="Color.Error" />
+                        <MudTextField @bind-Value="_warrantyDamageReason" Label="Lý do hỏng" Variant="Variant.Outlined" Lines="2" Class="mt-2" />
+                    </MudCardContent>
+                </MudCard>
+
                 <MudText Typo="Typo.subtitle2" Class="mb-2 mt-3">Thay thế</MudText>
                 <MudCard Elevation="0" Outlined="true" Class="mb-3">
                     <MudCardContent>
@@ -608,6 +616,7 @@ else
     private int _newDamagedQuantity = 1;
     private string _newDamagedReason = "";
     private string _warrantyDamageReason = "";
+    private bool _warrantyProductDamaged = false;
     private Dictionary<string, bool> _replacementUsed = new();
     private HashSet<string> _selectedReplacementKeys = new();
 
@@ -778,6 +787,8 @@ else
         _completionPhoto = "";
         _completionNotes = "";
         _materialQuantitiesUsed = new Dictionary<int, int>();
+        _warrantyProductDamaged = false;
+        _warrantyDamageReason = "";
 
         // Initialize material quantities with default values (all used by default)
         if (_booking?.Materials?.Any() == true)
@@ -911,19 +922,37 @@ else
                 return;
             }
 
-            // Create damaged product entry for warranty product ONLY if replacement was used
+            // Create damaged product entry for warranty product
             var damagedProducts = new List<DamagedProductItem>();
             bool replacementWasUsed = false;
 
-            if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
+            // Mark warranty product as damaged if user checked the checkbox OR replacement was used
+            if (_warrantyProductDamaged)
             {
+                if (_booking?.Products?.Any() == true)
+                {
+                    foreach (var product in _booking.Products)
+                    {
+                        damagedProducts.Add(new DamagedProductItem
+                        {
+                            ProductId = product.ProductId,
+                            VariantId = product.VariantId,
+                            Quantity = product.Quantity,
+                            Reason = string.IsNullOrEmpty(_warrantyDamageReason) ? "Sản phẩm hư hỏng" : _warrantyDamageReason,
+                            IsDamaged = true
+                        });
+                    }
+                }
+            }
+            else if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
+            {
+                // Old logic: mark as damaged only if replacement was used
                 foreach (var replacement in _selectedReplacementProducts.Where(rp => rp.Selected))
                 {
                     var key = $"{replacement.ProductId}_{replacement.VariantId ?? 0}";
                     if (_replacementUsed.ContainsKey(key) && _replacementUsed[key])
                     {
                         replacementWasUsed = true;
-                        // Mark warranty product as damaged since replacement was used
                         if (_booking?.Products?.Any() == true)
                         {
                             foreach (var product in _booking.Products)

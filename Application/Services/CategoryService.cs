@@ -5,22 +5,35 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Catalog;
 using Domain.Exceptions;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Application.Services
 {
     public class CategoryService : ICategoryService
     {
         private readonly ICategoryRepository _categoryRepository;
+        private readonly IMemoryCache _cache;
+        private const string CategoriesCacheKey = "AllCategories";
+        private readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(30);
 
-        public CategoryService(ICategoryRepository categoryRepository)
+        public CategoryService(ICategoryRepository categoryRepository, IMemoryCache cache)
         {
             _categoryRepository = categoryRepository;
+            _cache = cache;
         }
 
         public async Task<List<CategoryResponse>> GetAllAsync()
         {
+            if (_cache.TryGetValue(CategoriesCacheKey, out List<CategoryResponse>? cachedCategories))
+            {
+                return cachedCategories ?? new List<CategoryResponse>();
+            }
+
             var categories = await _categoryRepository.GetAllAsync();
-            return categories.Select(MapToResponse).ToList();
+            var result = categories.Select(MapToResponse).ToList();
+            
+            _cache.Set(CategoriesCacheKey, result, _cacheDuration);
+            return result;
         }
 
         public async Task<CategoryResponse?> GetByIdAsync(int id)
@@ -51,6 +64,8 @@ namespace Application.Services
 
             await _categoryRepository.AddAsync(category);
             await _categoryRepository.SaveChangesAsync();
+            
+            _cache.Remove(CategoriesCacheKey);
             return category.Id;
         }
 
@@ -72,6 +87,8 @@ namespace Application.Services
 
             _categoryRepository.Update(category);
             await _categoryRepository.SaveChangesAsync();
+            
+            _cache.Remove(CategoriesCacheKey);
         }
 
         public async Task DeleteAsync(int id)
@@ -88,6 +105,8 @@ namespace Application.Services
 
             _categoryRepository.Delete(category);
             await _categoryRepository.SaveChangesAsync();
+            
+            _cache.Remove(CategoriesCacheKey);
         }
 
         public async Task<bool> ActivateAsync(int id)
@@ -98,6 +117,8 @@ namespace Application.Services
             category.Activate();
             _categoryRepository.Update(category);
             await _categoryRepository.SaveChangesAsync();
+            
+            _cache.Remove(CategoriesCacheKey);
             return true;
         }
 
@@ -109,6 +130,8 @@ namespace Application.Services
             category.Deactivate();
             _categoryRepository.Update(category);
             await _categoryRepository.SaveChangesAsync();
+            
+            _cache.Remove(CategoriesCacheKey);
             return true;
         }
 

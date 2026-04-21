@@ -47,7 +47,8 @@ public class Order : AggregateRoot
         string receiverName,
         string receiverPhone,
         Address shippingAddress,
-        decimal shippingFee = 0)
+        decimal shippingFee = 0,
+        DateTime? createdAt = null)
     {
         if (string.IsNullOrWhiteSpace(receiverName))
             throw new ValidationException(nameof(receiverName), "Tên người nhận không được trống");
@@ -65,7 +66,8 @@ public class Order : AggregateRoot
             DiscountAmount = Money.Zero(),
             PaymentMethod = PaymentMethod.COD,
             ShippingMethod = ShippingMethod.Standard,
-            StatusHistoryJson = "[]"
+            StatusHistoryJson = "[]",
+            CreatedAt = createdAt ?? DateTime.UtcNow
         };
 
         order.AddDomainEvent(new OrderCreatedEvent(
@@ -217,7 +219,7 @@ public class Order : AggregateRoot
 
         public void StartShipping()
         {
-            if (Status != OrderStatus.AwaitingPickup)
+            if (Status != OrderStatus.AwaitingPickup && Status != OrderStatus.Confirmed)
                 throw new InvalidOrderStateException(Status.ToString(), "bắt đầu giao hàng");
 
             Status = OrderStatus.Shipping;
@@ -238,6 +240,8 @@ public class Order : AggregateRoot
             {
                 item.MarkAsShipped();
             }
+
+            UpdateOverallStatus();
 
             AddDomainEvent(new OrderDeliveredEvent(Id, userId, DateTime.UtcNow));
         }

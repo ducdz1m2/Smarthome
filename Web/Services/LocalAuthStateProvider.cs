@@ -136,4 +136,23 @@ public class LocalAuthStateProvider : AuthenticationStateProvider
         Console.WriteLine($"[LocalAuthStateProvider] NotifyAuthenticationStateChanged called");
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
     }
+
+    public async Task<string?> GetTokenAsync()
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext != null)
+        {
+            var token = httpContext.Session.GetString("JWTToken");
+            if (!string.IsNullOrEmpty(token)) return token;
+        }
+
+        try
+        {
+            return await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "JWTToken");
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

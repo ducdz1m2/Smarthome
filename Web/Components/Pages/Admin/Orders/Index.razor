@@ -5,15 +5,16 @@
 @using Domain.Enums
 @using Microsoft.AspNetCore.Authorization
 @using Web.Helpers
+@using Web.Components.Shared.Common
 
 @inject IOrderService OrderService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 
-<MudText Typo="Typo.h4" Class="mb-4">Quản lý Đơn hàng</MudText>
+<PageHeader Title="Quản lý Đơn hàng" ShowAddButton="false" />
 
-<MudGrid Class="mb-4">
+<FilterBar>
     <MudItem xs="12" sm="6" md="3">
         <MudSelect T="string" Label="Lọc theo trạng thái" @bind-Value="_selectedStatus" Clearable="true" Variant="Variant.Outlined">
             <MudSelectItem T="string" Value="@null">Tất cả</MudSelectItem>
@@ -23,18 +24,10 @@
             }
         </MudSelect>
     </MudItem>
-</MudGrid>
+</FilterBar>
 
-<MudTable Items="_orders" Dense="true" Hover="true" Loading="_loading" 
-          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
-          Filter="@FilterOrders" sortMode="sortMode.Single" AllowUnsorted="false">
-    <ToolBarContent>
-        <MudText Typo="Typo.h6">Danh sách đơn hàng</MudText>
-        <MudSpacer />
-        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
-                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                      IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
-    </ToolBarContent>
+<DataTable Items="_orders" Title="Danh sách đơn hàng" Loading="_loading"
+           FilterFunc="@FilterOrders">
     <HeaderContent>
         <MudTh width="80px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.Id)">ID</MudTableSortLabel></MudTh>
         <MudTh width="100px">Loại</MudTh>
@@ -81,20 +74,12 @@
         </MudTd>
         <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
         <MudTd>
-            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" 
-                           OnClick="@(() => OpenOrderDialog(context))" Size="Size.Small" />
-            @if (CanCancel(context.Status))
-            {
-                <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" 
-                               OnClick="@(() => CancelOrder(context))" Size="Size.Small" />
-            }
+            <ActionButtons ShowEdit="false" ShowAdd="false" ShowDelete="false" ShowView="true" ShowCancel="@CanCancel(context.Status)"
+                          OnView="@(() => OpenOrderDialog(context))"
+                          OnCancel="@(() => CancelOrder(context))" />
         </MudTd>
     </RowTemplate>
-    <PagerContent>
-        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 5, 10, 25, 50 }"
-                       InfoFormat="{first_item}-{last_item} / {all_items}" />
-    </PagerContent>
-</MudTable>
+</DataTable>
 
 @code {
     private List<OrderResponse> _orders = new();
@@ -206,8 +191,4 @@
         return status != "Completed" && status != "Cancelled" && status != "Refunded";
     }
 
-    private static string GetStatusDisplayName(string status)
-    {
-        return StatusHelper.GetOrderStatusText(status);
-    }
 }

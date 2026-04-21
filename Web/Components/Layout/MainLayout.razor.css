@@ -1,7 +1,10 @@
+/* ===== Main Layout Styles ===== */
+
 .page {
     position: relative;
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
 }
 
 main {
@@ -36,6 +39,141 @@ main {
         text-overflow: ellipsis;
     }
 
+/* ===== Navbar Styles ===== */
+.navbar-gradient {
+    background: linear-gradient(135deg, var(--green-primary) 0%, var(--green-primary-dark) 100%) !important;
+    box-shadow: 0 4px 20px rgba(46, 125, 50, 0.3) !important;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.brand-icon {
+    color: white !important;
+}
+
+.brand-text {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: 500;
+    border-radius: 8px !important;
+    padding: 0.5rem 1rem !important;
+    transition: all 0.2s ease !important;
+    margin: 0 0.25rem;
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: white !important;
+}
+
+.nav-icon-btn {
+    border-radius: 50% !important;
+    transition: all 0.2s ease !important;
+}
+
+.nav-icon-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    transform: scale(1.1);
+}
+
+.cart-badge {
+    border-radius: 50% !important;
+}
+
+.avatar-btn {
+    border-radius: 50% !important;
+    transition: all 0.2s ease !important;
+}
+
+.avatar-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    transform: scale(1.05);
+}
+
+.nav-avatar {
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.main-content {
+    padding-top: 5rem !important;
+    padding-bottom: 2rem;
+    min-height: calc(100vh - 64px);
+    flex-grow: 1;
+}
+
+.content-container {
+    padding: 1rem 0;
+}
+
+/* ===== Footer Styles ===== */
+.footer {
+    background: linear-gradient(135deg, #1565C0 0%, #1976D2 100%) !important;
+    color: white !important;
+    padding: 3rem 0 1.5rem 0;
+    margin-top: auto;
+    position: relative;
+    z-index: 1000 !important;
+    min-height: 200px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.footer-grid {
+    margin-bottom: 2rem;
+}
+
+.footer-section {
+    padding: 1rem;
+}
+
+.footer-title {
+    color: white !important;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.footer-text {
+    color: rgba(255, 255, 255, 0.85) !important;
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+}
+
+.footer-link {
+    color: rgba(255, 255, 255, 0.75) !important;
+    display: block;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.footer-link:hover {
+    color: white !important;
+    padding-left: 0.5rem;
+}
+
+.footer-divider {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    margin: 2rem 0 1rem 0;
+}
+
+.footer-bottom {
+    text-align: center;
+}
+
+.footer-copyright {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* ===== Responsive Styles ===== */
 @media (max-width: 640.98px) {
     .top-row {
         justify-content: space-between;
@@ -43,6 +181,31 @@ main {
 
     .top-row ::deep a, .top-row ::deep .btn-link {
         margin-left: 0;
+    }
+
+    .navbar-brand {
+        gap: 0.5rem;
+    }
+
+    .brand-text {
+        font-size: 1rem;
+    }
+
+    .nav-link {
+        padding: 0.4rem 0.75rem !important;
+        font-size: 0.9rem;
+    }
+
+    .footer {
+        padding: 2rem 0 1rem 0;
+    }
+
+    .footer-section {
+        padding: 0.5rem;
+    }
+
+    .footer-title {
+        font-size: 1rem;
     }
 }
 

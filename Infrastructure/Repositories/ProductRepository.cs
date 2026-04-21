@@ -67,12 +67,12 @@ namespace Infrastructure.Repositories
 
         public async Task<List<Product>> GetAllAsync()
         {
+            // For list view, only include Category and Brand, not Variants and Images (too heavy)
             return await _context.Products
                 .AsNoTracking()
                 .Include(p => p.Category)
                 .Include(p => p.Brand)
-                .Include(p => p.Variants)
-                .Include(p => p.Images)
+                .Include(p => p.Images.Where(i => i.IsMain)) // Only load main image
                 .OrderByDescending(p => p.Id)
                 .ToListAsync();
         }
@@ -83,8 +83,7 @@ namespace Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(p => p.CategoryId == categoryId)
                 .Include(p => p.Brand)
-                .Include(p => p.Variants)
-                .Include(p => p.Images)
+                .Include(p => p.Images.Where(i => i.IsMain)) // Only load main image
                 .ToListAsync();
         }
 
@@ -94,7 +93,7 @@ namespace Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(p => p.BrandId == brandId)
                 .Include(p => p.Category)
-                .Include(p => p.Variants)
+                .Include(p => p.Images.Where(i => i.IsMain)) // Only load main image
                 .ToListAsync();
         }
 
@@ -204,11 +203,11 @@ namespace Infrastructure.Repositories
             if (categoryId.HasValue)
                 query = query.Where(p => p.CategoryId == categoryId.Value);
 
+            // For search results, only include Category and Brand, not Variants and Images
             return await query
                 .Include(p => p.Category)
                 .Include(p => p.Brand)
-                .Include(p => p.Variants)
-                .Include(p => p.Images)
+                .Include(p => p.Images.Where(i => i.IsMain)) // Only load main image
                 .ToListAsync();
         }
     }

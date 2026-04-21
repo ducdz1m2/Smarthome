@@ -70,8 +70,6 @@ namespace Infrastructure.Data
         public DbSet<Banner> Banners => Set<Banner>();
 
         // ML/Recommendation
-        public DbSet<UserBehavior> UserBehaviors => Set<UserBehavior>();
-
         // Communication
         public DbSet<Domain.Entities.Communication.ChatRoom> ChatRooms => Set<Domain.Entities.Communication.ChatRoom>();
         public DbSet<Domain.Entities.Communication.ChatMessage> ChatMessages => Set<Domain.Entities.Communication.ChatMessage>();

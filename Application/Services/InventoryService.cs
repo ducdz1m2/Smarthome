@@ -543,25 +543,36 @@ namespace Application.Services
 
         public async Task CompleteStockEntryAsync(int stockEntryId)
         {
+            Console.WriteLine($"[CompleteStockEntryAsync] ========== START for stock entry {stockEntryId} ==========");
             var entry = await _stockEntryRepository.GetByIdWithDetailsAsync(stockEntryId);
             if (entry == null)
                 throw new DomainException("Không tìm thấy phiếu nhập kho");
+
+            Console.WriteLine($"[CompleteStockEntryAsync] Stock entry found: {entry.Id}, WarehouseId: {entry.WarehouseId}, Details count: {entry.Details?.Count ?? 0}");
 
             if (entry.IsCompleted)
                 throw new DomainException("Phiếu nhập kho đã được hoàn thành");
 
             foreach (var detail in entry.Details)
             {
+                Console.WriteLine($"[CompleteStockEntryAsync] Processing detail: ProductId={detail.ProductId}, VariantId={detail.VariantId}, Quantity={detail.Quantity}, UnitCost={detail.UnitCost}");
+
                 var productWarehouse = await _productWarehouseRepository
                     .GetByProductVariantAndWarehouseAsync(detail.ProductId, detail.VariantId, entry.WarehouseId);
 
                 if (productWarehouse == null)
                 {
+                    Console.WriteLine($"[CompleteStockEntryAsync] ProductWarehouse not found, creating new one");
                     productWarehouse = ProductWarehouse.Create(detail.ProductId, detail.VariantId, entry.WarehouseId, 0);
                     await _productWarehouseRepository.AddAsync(productWarehouse);
                 }
+                else
+                {
+                    Console.WriteLine($"[CompleteStockEntryAsync] ProductWarehouse found: ID={productWarehouse.Id}, Current Quantity={productWarehouse.Quantity}");
+                }
 
                 productWarehouse.Receive(detail.Quantity);
+                Console.WriteLine($"[CompleteStockEntryAsync] After Receive: ProductWarehouse Quantity={productWarehouse.Quantity}");
 
                 if (productWarehouse.Id > 0)
                 {
@@ -569,15 +580,23 @@ namespace Application.Services
                 }
             }
 
+            // Save changes to product warehouses before completing entry
+            Console.WriteLine($"[CompleteStockEntryAsync] Saving product warehouse changes...");
+            await _productWarehouseRepository.SaveChangesAsync();
+            Console.WriteLine($"[CompleteStockEntryAsync] Product warehouse changes saved");
+
             entry.Complete();
             // Không cần gọi Update vì entry đã được tracked từ GetByIdWithDetailsAsync
             await _stockEntryRepository.SaveChangesAsync();
+            Console.WriteLine($"[CompleteStockEntryAsync] Stock entry marked as completed");
 
             // Đồng bộ Product.StockQuantity cho tất cả sản phẩm trong phiếu nhập
             foreach (var detail in entry.Details)
             {
+                Console.WriteLine($"[CompleteStockEntryAsync] Syncing stock for ProductId={detail.ProductId}");
                 await SyncProductStockFromWarehouses(detail.ProductId);
             }
+            Console.WriteLine($"[CompleteStockEntryAsync] ========== END ==========");
         }
 
         /// <summary>

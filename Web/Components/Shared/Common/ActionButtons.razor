@@ -1,0 +1,50 @@
+@using MudBlazor
+
+<div>
+    @if (ShowEdit)
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
+                       OnClick="@OnEdit" Size="Size.Small" 
+                       Title="Sửa" />
+    }
+    @if (ShowAdd)
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Info" 
+                       OnClick="@OnAdd" Size="Size.Small" 
+                       Title="Thêm" />
+    }
+    @if (ShowView)
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" 
+                       OnClick="@OnView" Size="Size.Small" 
+                       Title="Xem chi tiết" />
+    }
+    @if (ShowDelete)
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                       OnClick="@OnDelete" Size="Size.Small" 
+                       Title="Xóa" Disabled="@DeleteDisabled" />
+    }
+    @if (ShowCancel)
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" 
+                       OnClick="@OnCancel" Size="Size.Small" 
+                       Title="Hủy" />
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public bool ShowEdit { get; set; } = true;
+    [Parameter] public bool ShowAdd { get; set; } = false;
+    [Parameter] public bool ShowView { get; set; } = false;
+    [Parameter] public bool ShowDelete { get; set; } = true;
+    [Parameter] public bool ShowCancel { get; set; } = false;
+    [Parameter] public bool DeleteDisabled { get; set; }
+    [Parameter] public EventCallback OnEdit { get; set; }
+    [Parameter] public EventCallback OnAdd { get; set; }
+    [Parameter] public EventCallback OnView { get; set; }
+    [Parameter] public EventCallback OnDelete { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

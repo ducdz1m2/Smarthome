@@ -1,5 +1,43 @@
+/* ===== Green Theme Variables ===== */
+:root {
+    --green-primary: #2E7D32;
+    --green-primary-dark: #1B5E20;
+    --green-primary-light: #4CAF50;
+    --green-secondary: #66BB6A;
+    --green-accent: #81C784;
+    --green-surface: #E8F5E9;
+    --green-text: #1B5E20;
+    --green-text-secondary: #4E342E;
+}
+
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+/* ===== MudBlazor Green Theme Overrides ===== */
+.mud-primary-color {
+    background-color: var(--green-primary) !important;
+}
+
+.mud-primary-text {
+    color: var(--green-primary) !important;
+}
+
+.mud-primary-main {
+    background-color: var(--green-primary) !important;
+    color: white !important;
+}
+
+/* Override MudBlazor palette with green theme */
+.mud-theme {
+    --mud-palette-primary: var(--green-primary);
+    --mud-palette-primary-darken: var(--green-primary-dark);
+    --mud-palette-primary-lighten: var(--green-primary-light);
+    --mud-palette-secondary: var(--green-secondary);
+    --mud-palette-background: #ffffff;
+    --mud-palette-surface: var(--green-surface);
+    --mud-palette-text-primary: var(--green-text);
+    --mud-palette-text-secondary: var(--green-text-secondary);
 }
 
 a, .btn-link {
@@ -57,4 +95,144 @@ h1:focus {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+
+/* ===== Global Button Styling - Rounded Buttons ===== */
+
+/* MudBlazor Button Overrides */
+.mud-button {
+    border-radius: 12px !important;
+    transition: all 0.2s ease !important;
+    font-weight: 500 !important;
+    text-transform: none !important;
+}
+
+.mud-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.mud-button:active {
+    transform: translateY(0);
+}
+
+/* Filled Buttons */
+.mud-button-filled {
+    border-radius: 12px !important;
+    padding: 0.625rem 1.5rem !important;
+}
+
+.mud-button-filled:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Outlined Buttons */
+.mud-button-outlined {
+    border-radius: 12px !important;
+    padding: 0.625rem 1.5rem !important;
+}
+
+.mud-button-outlined:hover {
+    background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Text Buttons */
+.mud-button-text {
+    border-radius: 8px !important;
+    padding: 0.5rem 1rem !important;
+}
+
+.mud-button-text:hover {
+    background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Icon Buttons */
+.mud-icon-button {
+    border-radius: 50% !important;
+    transition: all 0.2s ease !important;
+}
+
+.mud-icon-button:hover {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+    transform: scale(1.05);
+}
+
+/* Fab Buttons (Floating Action Buttons) */
+.mud-fab {
+    border-radius: 16px !important;
+    transition: all 0.3s ease !important;
+}
+
+.mud-fab:hover {
+    transform: scale(1.05) translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Small Buttons */
+.mud-button-size-small {
+    border-radius: 10px !important;
+    padding: 0.375rem 1rem !important;
+}
+
+/* Medium Buttons */
+.mud-button-size-medium {
+    border-radius: 12px !important;
+    padding: 0.625rem 1.5rem !important;
+}
+
+/* Large Buttons */
+.mud-button-size-large {
+    border-radius: 14px !important;
+    padding: 0.75rem 2rem !important;
+}
+
+/* Button Groups */
+.mud-button-group-root .mud-button:first-child {
+    border-radius: 12px 0 0 12px !important;
+}
+
+.mud-button-group-root .mud-button:last-child {
+    border-radius: 0 12px 12px 0 !important;
+}
+
+.mud-button-group-root .mud-button:only-child {
+    border-radius: 12px !important;
+}
+
+/* Disabled Buttons */
+.mud-button.mud-disabled {
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+}
+
+/* Button with Icons */
+.mud-button .mud-icon {
+    margin-right: 0.5rem;
+}
+
+.mud-button.mud-button-icon-start .mud-icon {
+    margin-right: 0.5rem;
+    margin-left: 0;
+}
+
+.mud-button.mud-button-icon-end .mud-icon {
+    margin-left: 0.5rem;
+    margin-right: 0;
+}
+
+/* Loading State Buttons */
+.mud-button .mud-progress-circular {
+    margin-right: 0.5rem;
+}
+
+/* Responsive Button Adjustments */
+@media (max-width: 768px) {
+    .mud-button {
+        padding: 0.5rem 1.25rem !important;
+    }
+
+    .mud-button-filled,
+    .mud-button-outlined {
+        padding: 0.5rem 1.25rem !important;
+    }
 }

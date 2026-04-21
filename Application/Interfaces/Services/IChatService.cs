@@ -6,35 +6,21 @@ namespace Application.Interfaces.Services;
 
 public interface IChatService
 {
-    // Query methods
-    Task<List<ChatRoomResponse>> GetUserChatRoomsAsync(int userId, UserType userType);
+    // Room management
     Task<List<ChatRoomResponse>> GetAllSupportChatRoomsAsync();
-    Task<ChatRoomResponse?> GetChatRoomByIdAsync(int id, int userId);
-    Task<List<ChatMessageResponse>> GetChatMessagesAsync(int chatRoomId, int userId, UserType userType, int limit = 50);
-    Task<int> GetUnreadMessageCountAsync(int userId, UserType userType);
-    Task<bool> CanUserAccessChatRoomAsync(int chatRoomId, int userId, UserType userType);
-
-    // Chat Room management
-    Task<int> CreateOneToOneChatAsync(int user1Id, UserType user1Type, int user2Id, UserType user2Type, string? title = null);
-    Task<int> CreateSupportChatAsync(int customerId, int? orderId = null, int? installationId = null, int? warrantyClaimId = null);
-    Task<int> CreateInstallationChatAsync(int customerId, int technicianId, int installationId);
     Task<List<ChatRoomResponse>> GetInstallationChatRoomsAsync(int technicianId);
-    Task<List<ChatRoomResponse>> GetCustomerInstallationChatsAsync(int customerId);
-    Task CloseChatRoomAsync(int chatRoomId, int closedByUserId);
-    Task MarkChatAsReadAsync(int chatRoomId, int userId);
+    Task<List<ChatRoomResponse>> GetCustomerChatRoomsAsync(int customerId);
+    Task<ChatRoomResponse?> GetChatRoomAsync(int roomId, int userId, UserType userType);
+    Task<int> CreateInstallationChatAsync(int customerId, int technicianId, int installationId);
+    Task<int> CreateSupportChatAsync(CreateSupportChatRequest request, int adminId);
 
-    // Messaging
-    Task<int> SendMessageAsync(int chatRoomId, int senderId, UserType senderType, SendMessageRequest request);
-    Task EditMessageAsync(int messageId, int userId, EditMessageRequest request);
-    Task DeleteMessageAsync(int messageId, int userId);
+    // Messages
+    Task<List<ChatMessageResponse>> GetChatMessagesAsync(int roomId, int userId, UserType userType);
+    Task<ChatMessageResponse> SendMessageAsync(int roomId, int senderId, UserType senderType, SendMessageRequest request);
+    Task<ChatMessageResponse?> EditMessageAsync(int messageId, int userId, EditMessageRequest request);
+    Task<bool> DeleteMessageAsync(int messageId, int userId);
 
-    // Participant management (Admin/Technician)
-    Task JoinSupportChatAsync(int chatRoomId, int userId, UserType userType);
-    Task LeaveChatAsync(int chatRoomId, int userId);
-    Task AssignTechnicianAsync(int chatRoomId, int technicianId);
-    Task AssignAdminAsync(int chatRoomId, int adminId);
-
-    // Moderation
-    Task BlockParticipantAsync(int chatRoomId, int userId, string? reason = null);
-    Task UnblockParticipantAsync(int chatRoomId, int userId);
+    // Participants
+    Task MarkChatAsReadAsync(int roomId, int userId);
+    Task<bool> CloseChatRoomAsync(int roomId, int userId);
 }

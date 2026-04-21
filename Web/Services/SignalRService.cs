@@ -1,250 +1,110 @@
+using Application.DTOs.Responses;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.AspNetCore.Components;
 
 namespace Web.Services;
 
-public class SignalRService
+public class SignalRService : IAsyncDisposable
 {
-    private HubConnection? _chatConnection;
-    private HubConnection? _notificationConnection;
-    private HubConnection? _installationConnection;
-    private readonly NavigationManager _navigationManager;
-    private readonly HashSet<int> _pendingRoomJoins = new();
-    private readonly object _lock = new();
+    private HubConnection? _notificationHub;
+    private HubConnection? _chatHub;
+    private readonly IConfiguration _configuration;
+    private readonly LocalAuthStateProvider _authStateProvider;
+    private bool _initialized = false;
 
-    public event Action<object>? OnChatMessageReceived;
     public event Action<object>? OnNotificationReceived;
-    public event Action<string>? OnInstallationUpdate;
+    public event Action<ChatMessageResponse>? OnChatMessageReceived;
 
-    public SignalRService(NavigationManager navigationManager)
+    public SignalRService(IConfiguration configuration, LocalAuthStateProvider authStateProvider)
     {
-        _navigationManager = navigationManager;
+        _configuration = configuration;
+        _authStateProvider = authStateProvider;
     }
-
-    private bool _isInitialized = false;
 
     public async Task InitializeAsync()
     {
-        if (_isInitialized)
-        {
-            Console.WriteLine($"[SignalRService] Already initialized, skipping");
-            return;
-        }
+        if (_initialized) return;
 
-        var baseUrl = _navigationManager.BaseUri;
-        Console.WriteLine($"[SignalRService] Initializing with base URL: {baseUrl}");
+        var baseUrl = "https://localhost:7298";
+
+        // Notification hub
+        _notificationHub = new HubConnectionBuilder()
+            .WithUrl($"{baseUrl}/hubs/notification", options =>
+            {
+                options.AccessTokenProvider = async () => await _authStateProvider.GetTokenAsync();
+            })
+            .WithAutomaticReconnect()
+            .Build();
+
+        _notificationHub.On<object>("ReceiveNotification", (notification) =>
+        {
+            OnNotificationReceived?.Invoke(notification);
+        });
+
+        // Chat hub
+        _chatHub = new HubConnectionBuilder()
+            .WithUrl($"{baseUrl}/hubs/chat", options =>
+            {
+                options.AccessTokenProvider = async () => await _authStateProvider.GetTokenAsync();
+            })
+            .WithAutomaticReconnect()
+            .Build();
+
+        _chatHub.On<ChatMessageResponse>("ReceiveMessage", (message) =>
+        {
+            OnChatMessageReceived?.Invoke(message);
+        });
 
         try
         {
-            _chatConnection = new HubConnectionBuilder()
-                .WithUrl($"{baseUrl}hubs/chat")
-                .WithAutomaticReconnect()
-                .Build();
-
-            _notificationConnection = new HubConnectionBuilder()
-                .WithUrl($"{baseUrl}hubs/notification")
-                .WithAutomaticReconnect()
-                .Build();
-
-            _installationConnection = new HubConnectionBuilder()
-                .WithUrl($"{baseUrl}hubs/installation")
-                .WithAutomaticReconnect()
-                .Build();
-
-            // Register callback for receiving messages
-            _chatConnection.On<object>("ReceiveMessage", (message) =>
-            {
-                Console.WriteLine($"[SignalRService] ReceiveMessage called");
-                OnChatMessageReceived?.Invoke(message);
-            });
-
-            // Handle reconnection - re-register callbacks
-            _chatConnection.Reconnecting += (error) =>
-            {
-                Console.WriteLine($"[SignalRService] Chat reconnecting due to error: {error?.Message}");
-                return Task.CompletedTask;
-            };
-
-            _chatConnection.Reconnected += async (connectionId) =>
-            {
-                Console.WriteLine($"[SignalRService] Chat reconnected with connectionId: {connectionId}");
-                // Re-join all pending rooms
-                lock (_lock)
-                {
-                    foreach (var roomId in _pendingRoomJoins.ToList())
-                    {
-                        Console.WriteLine($"[SignalRService] Re-joining room {roomId} after reconnection");
-                        _ = JoinChatRoomInternalAsync(roomId);
-                    }
-                }
-                await Task.CompletedTask;
-            };
-
-            _chatConnection.Closed += (error) =>
-            {
-                Console.WriteLine($"[SignalRService] Chat connection closed: {error?.Message}");
-                return Task.CompletedTask;
-            };
-
-            _notificationConnection.On<object>("ReceiveNotification", (notification) =>
-            {
-                Console.WriteLine($"[SignalRService] ReceiveNotification called with: {notification}");
-                OnNotificationReceived?.Invoke(notification);
-            });
-
-            _installationConnection.On<string>("BookingCancelled", (message) =>
-            {
-                OnInstallationUpdate?.Invoke($"BookingCancelled: {message}");
-            });
-
-            _installationConnection.On<string>("JobCompleted", (message) =>
-            {
-                OnInstallationUpdate?.Invoke($"JobCompleted: {message}");
-            });
-
-            // Start connections separately to handle failures
-            try
-            {
-                await _chatConnection.StartAsync();
-                Console.WriteLine($"[SignalRService] Chat connection started");
-                // Process any pending room joins
-                lock (_lock)
-                {
-                    foreach (var roomId in _pendingRoomJoins.ToList())
-                    {
-                        Console.WriteLine($"[SignalRService] Processing pending join for room {roomId}");
-                        _ = JoinChatRoomInternalAsync(roomId);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SignalRService] Chat connection failed: {ex.Message}");
-            }
-
-            try
-            {
-                await _notificationConnection.StartAsync();
-                Console.WriteLine($"[SignalRService] Notification connection started");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SignalRService] Notification connection failed: {ex.Message}");
-            }
-
-            try
-            {
-                await _installationConnection.StartAsync();
-                Console.WriteLine($"[SignalRService] Installation connection started");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SignalRService] Installation connection failed: {ex.Message}");
-            }
-
-            _isInitialized = true;
-            Console.WriteLine($"[SignalRService] All connections initialized");
+            await _notificationHub.StartAsync();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SignalRService] Initialization error: {ex.Message}");
-            Console.WriteLine($"[SignalRService] Stack trace: {ex.StackTrace}");
-            throw;
+            Console.WriteLine($"[SignalRService] Failed to connect notification hub: {ex.Message}");
         }
-    }
 
-    public async Task JoinChatRoom(int chatRoomId)
-    {
-        Console.WriteLine($"[SignalRService] JoinChatRoom called with chatRoomId: {chatRoomId}");
-        
-        // Always add to pending set
-        lock (_lock)
+        try
         {
-            _pendingRoomJoins.Add(chatRoomId);
+            await _chatHub.StartAsync();
         }
-        
-        // Try to join immediately if connected
-        await JoinChatRoomInternalAsync(chatRoomId);
-    }
-    
-    private async Task JoinChatRoomInternalAsync(int chatRoomId)
-    {
-        Console.WriteLine($"[SignalRService] JoinChatRoomInternalAsync called with chatRoomId: {chatRoomId}");
-        Console.WriteLine($"[SignalRService] Chat connection state: {_chatConnection?.State}");
-        
-        if (_chatConnection != null && _chatConnection.State == HubConnectionState.Connected)
+        catch (Exception ex)
         {
-            try
-            {
-                Console.WriteLine($"[SignalRService] Invoking JoinChatRoom method on server");
-                await _chatConnection.InvokeAsync("JoinChatRoom", chatRoomId);
-                Console.WriteLine($"[SignalRService] JoinChatRoom invoked successfully");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SignalRService] Failed to join room {chatRoomId}: {ex.Message}");
-            }
+            Console.WriteLine($"[SignalRService] Failed to connect chat hub: {ex.Message}");
         }
-        else
-        {
-            Console.WriteLine($"[SignalRService] Cannot join chat room {chatRoomId} - connection not connected (will retry when connected)");
-        }
-    }
 
-    public async Task SendMessage(int chatRoomId, int senderId, string senderType, string content, string? fileUrl = null, string? fileName = null, string? fileType = null, long? fileSize = null)
-    {
-        Console.WriteLine($"[SignalRService] SendMessage called - Room:{chatRoomId}, Sender:{senderId}, Type:{senderType}, Content:{content}, FileUrl:{fileUrl}");
-        Console.WriteLine($"[SignalRService] Connection state: {_chatConnection?.State}");
-        
-        if (_chatConnection != null && _chatConnection.State == HubConnectionState.Connected)
-        {
-            try
-            {
-                await _chatConnection.InvokeAsync("SendMessage", chatRoomId, senderId, senderType, content, fileUrl, fileName, fileType, fileSize);
-                Console.WriteLine($"[SignalRService] SendMessage invoked successfully");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SignalRService] SendMessage failed: {ex.Message}");
-                throw;
-            }
-        }
-        else
-        {
-            Console.WriteLine($"[SignalRService] Cannot send message - connection not connected (State: {_chatConnection?.State})");
-            throw new InvalidOperationException("SignalR connection not established");
-        }
+        _initialized = true;
     }
 
     public async Task JoinUserNotificationGroup(string userId)
     {
-        if (_notificationConnection != null)
-        {
-            await _notificationConnection.InvokeAsync("JoinUserGroup", userId);
-        }
+        if (_notificationHub?.State == HubConnectionState.Connected)
+            await _notificationHub.InvokeAsync("JoinUserGroup", userId);
     }
 
     public async Task JoinAdminNotificationGroup()
     {
-        if (_notificationConnection != null)
-        {
-            await _notificationConnection.InvokeAsync("JoinAdminNotifGroup");
-        }
+        if (_notificationHub?.State == HubConnectionState.Connected)
+            await _notificationHub.InvokeAsync("JoinAdminNotifGroup");
     }
 
-    public async Task JoinTechnicianGroup(int technicianId)
+    public async Task JoinChatRoom(int roomId)
     {
-        if (_installationConnection != null)
-        {
-            await _installationConnection.InvokeAsync("JoinTechnicianGroup", technicianId);
-        }
+        if (_chatHub?.State == HubConnectionState.Connected)
+            await _chatHub.InvokeAsync("JoinChatRoom", roomId);
     }
 
-    public async Task JoinAdminInstallationGroup()
+    public async Task SendMessage(int roomId, int senderId, string senderType, string content,
+        string? fileUrl = null, string? fileName = null, string? fileType = null, long? fileSize = null)
     {
-        if (_installationConnection != null)
-        {
-            await _installationConnection.InvokeAsync("JoinAdminInstallationGroup");
-        }
+        if (_chatHub?.State == HubConnectionState.Connected)
+            await _chatHub.InvokeAsync("SendMessage", roomId, senderId, senderType, content, fileUrl, fileName, fileType, fileSize);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_notificationHub != null)
+            await _notificationHub.DisposeAsync();
+        if (_chatHub != null)
+            await _chatHub.DisposeAsync();
     }
 }

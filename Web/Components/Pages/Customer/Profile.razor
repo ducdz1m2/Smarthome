@@ -18,105 +18,114 @@
 @* For file upload *@
 @using System.Net.Http
 
-<MudCard Elevation="2">
-    <MudCardHeader>
-        <CardHeaderContent>
-            <MudText Typo="Typo.h6">Thông tin cá nhân</MudText>
-        </CardHeaderContent>
-    </MudCardHeader>
-    <MudCardContent>
-        <MudForm @ref="_form" @bind-IsValid="_isValid">
-            <MudTextField @bind-Value="_editModel.FullName" 
-                          Label="Họ và tên" 
+<div class="profile-container">
+    <MudCard Elevation="3" Class="profile-card">
+        <MudCardHeader Class="profile-header">
+            <CardHeaderContent>
+                <MudText Typo="Typo.h5" Class="profile-title">Thông tin cá nhân</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="profile-subtitle">Cập nhật thông tin tài khoản của bạn</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudForm @ref="_form" @bind-IsValid="_isValid">
+                <MudTextField @bind-Value="_editModel.FullName"
+                          Label="Họ và tên"
                           Required="true"
                           RequiredError="Vui lòng nhập họ tên"
-                          Variant="Variant.Outlined" 
-                          Class="mb-3" />
-            
-            <MudTextField @bind-Value="_editModel.Email" 
-                          Label="Email" 
+                          Variant="Variant.Outlined"
+                          Class="mb-3 profile-field" />
+
+                <MudTextField @bind-Value="_editModel.Email"
+                          Label="Email"
                           Required="true"
                           RequiredError="Vui lòng nhập email"
                           InputType="InputType.Email"
-                          Variant="Variant.Outlined" 
-                          Class="mb-3" />
-            
-            <MudTextField @bind-Value="_editModel.PhoneNumber" 
-                          Label="Số điện thoại" 
-                          Variant="Variant.Outlined" 
-                          Class="mb-3" />
-            
-            @* Avatar Upload Section *@
-            <MudText Typo="Typo.subtitle2" Class="mb-2">Ảnh đại diện</MudText>
-            
-            @if (!string.IsNullOrEmpty(_editModel.Avatar))
-            {
-                <div class="d-flex align-center mb-3">
-                    <MudAvatar Size="Size.Large" Class="mr-3">
-                        <MudImage Src="@_editModel.Avatar" Alt="Avatar" ObjectFit="ObjectFit.Cover" />
-                    </MudAvatar>
-                    <MudButton Variant="Variant.Text" 
-                               Color="Color.Error" 
-                               OnClick="RemoveAvatar"
-                               Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.Delete">
-                        Xóa ảnh
-                    </MudButton>
-                </div>
-            }
-            
-            <MudFileUpload T="IBrowserFile"
-                           FilesChanged="UploadAvatar"
-                           Accept=".jpg,.jpeg,.png,.gif,.webp">
-                <ActivatorContent>
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Secondary"
-                               StartIcon="@Icons.Material.Filled.CloudUpload"
-                               Disabled="_isUploading"
-                               Size="Size.Small">
-                        @if (_isUploading)
-                        {
-                            <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Class="mr-2" />
-                            <span>Đang upload...</span>
-                        }
-                        else
-                        {
-                            <span>Tải ảnh lên</span>
-                        }
-                    </MudButton>
-                </ActivatorContent>
-                <FileContent>
+                          Variant="Variant.Outlined"
+                          Class="mb-3 profile-field" />
+
+                <MudTextField @bind-Value="_editModel.PhoneNumber"
+                          Label="Số điện thoại"
+                          Variant="Variant.Outlined"
+                          Class="mb-3 profile-field" />
+
+                @* Avatar Upload Section *@
+                <div class="avatar-section">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2 section-label">Ảnh đại diện</MudText>
+
                     @if (!string.IsNullOrEmpty(_editModel.Avatar))
                     {
-                        <MudImage Src="@_editModel.Avatar" Alt="Avatar" ObjectFit="ObjectFit.Cover" Style="max-width: 200px; max-height: 200px;" />
+                        <div class="avatar-preview mb-3">
+                            <MudAvatar Size="Size.Large" Class="profile-avatar">
+                                <MudImage Src="@_editModel.Avatar" Alt="Avatar" ObjectFit="ObjectFit.Cover" />
+                            </MudAvatar>
+                            <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Error"
+                                   OnClick="RemoveAvatar"
+                                   Size="Size.Small"
+                                   Class="remove-avatar-btn"
+                                   StartIcon="@Icons.Material.Filled.Delete">
+                                Xóa ảnh
+                            </MudButton>
+                        </div>
                     }
-                </FileContent>
-            </MudFileUpload>
 
-            @if (_isUploading)
-            {
-                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-2" />
-            }
-        </MudForm>
-    </MudCardContent>
-    <MudCardActions Class="justify-end">
-        <MudButton Variant="Variant.Filled" 
+                    <MudFileUpload T="IBrowserFile"
+                           FilesChanged="UploadAvatar"
+                           Accept=".jpg,.jpeg,.png,.gif,.webp"
+                           Class="upload-section">
+                        <ActivatorContent>
+                            <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                               Disabled="_isUploading"
+                               Size="Size.Medium"
+                               Class="upload-btn">
+                                @if (_isUploading)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Class="mr-2" />
+                                    <span>Đang upload...</span>
+                                }
+                                else
+                                {
+                                    <span>Tải ảnh lên</span>
+                                }
+                            </MudButton>
+                        </ActivatorContent>
+                        <FileContent>
+                            @if (!string.IsNullOrEmpty(_editModel.Avatar))
+                            {
+                                <MudImage Src="@_editModel.Avatar" Alt="Avatar" ObjectFit="ObjectFit.Cover" Style="max-width: 200px; max-height: 200px;" />
+                            }
+                        </FileContent>
+                    </MudFileUpload>
+
+                    @if (_isUploading)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-2" />
+                    }
+                </div>
+            </MudForm>
+        </MudCardContent>
+        <MudCardActions Class="justify-end profile-actions">
+            <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    OnClick="SaveProfile"
                    Disabled="!_isValid || _isSaving"
-                   StartIcon="@Icons.Material.Filled.Save">
-            @if (_isSaving)
-            {
-                <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Class="mr-2" />
-                <span>Đang lưu...</span>
-            }
-            else
-            {
-                <span>Lưu thay đổi</span>
-            }
-        </MudButton>
-    </MudCardActions>
-</MudCard>
+                   StartIcon="@Icons.Material.Filled.Save"
+                   Class="save-btn">
+                @if (_isSaving)
+                {
+                    <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Class="mr-2" />
+                    <span>Đang lưu...</span>
+                }
+                else
+                {
+                    <span>Lưu thay đổi</span>
+                }
+            </MudButton>
+        </MudCardActions>
+    </MudCard>
+</div>
 
 @code {
     private MudForm _form = null!;

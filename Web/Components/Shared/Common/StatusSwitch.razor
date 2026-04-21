@@ -1,0 +1,21 @@
+@using MudBlazor
+
+<MudSwitch T="bool" Value="@IsActive" 
+           ValueChanged="OnValueChanged"
+           Color="Color.Success" UncheckedColor="Color.Error" />
+
+@code {
+    [Parameter] public bool IsActive { get; set; }
+    [Parameter] public EventCallback<bool> IsActiveChanged { get; set; }
+    [Parameter] public int ItemId { get; set; }
+    [Parameter] public Func<int, bool, Task>? OnToggle { get; set; }
+
+    private async Task OnValueChanged(bool value)
+    {
+        await IsActiveChanged.InvokeAsync(value);
+        if (OnToggle != null)
+        {
+            await OnToggle(ItemId, value);
+        }
+    }
+}

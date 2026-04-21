@@ -79,7 +79,7 @@
                     <div class="technician-chat-header-avatar">@GetInitials(GetSelectedRoomName())</div>
                     <div>
                         <MudText Typo="Typo.subtitle1" Class="mb-0">@GetSelectedRoomName()</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Đang hoạt động</MudText>
+
                         @if (_selectedRoom?.RelatedInstallationId.HasValue == true)
                         {
                             <MudText Typo="Typo.caption" Color="Color.Primary">Đơn lắp đặt #@_selectedRoom.RelatedInstallationId</MudText>

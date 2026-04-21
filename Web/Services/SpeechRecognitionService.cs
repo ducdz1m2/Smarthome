@@ -2,97 +2,201 @@ using Microsoft.JSInterop;
 
 namespace Web.Services;
 
-public class SpeechRecognitionService
+/// <summary>
+/// Quản lý ghi âm từ microphone (qua JS interop) và gửi audio lên SpeechService để nhận dạng.
+/// Cũng hỗ trợ TTS: gọi SpeechService.SynthesizeAsync rồi phát qua JS.
+/// </summary>
+public class SpeechRecognitionService : IAsyncDisposable
 {
+    private readonly SpeechService _speechService;
     private readonly IJSRuntime _jsRuntime;
-    private readonly IConfiguration _configuration;
 
-    public SpeechRecognitionService(IJSRuntime jsRuntime, IConfiguration configuration)
+    private bool _isRecording = false;
+    private Func<string, Task>? _onTranscribed;
+    private DotNetObjectReference<SpeechRecognitionService>? _dotNetRef;
+
+    public SpeechRecognitionService(SpeechService speechService, IJSRuntime jsRuntime)
     {
+        _speechService = speechService;
         _jsRuntime = jsRuntime;
-        _configuration = configuration;
     }
 
-    private string SpeechServiceUrl => _configuration["SpeechService:Url"] ?? "http://localhost:8003";
+    public bool IsRecording => _isRecording;
 
-    public bool IsRecording { get; private set; }
-    public bool IsTranscribing { get; private set; }
+    // ── STT ──────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Bắt đầu ghi âm từ micro với VAD
+    /// Bắt đầu ghi âm. Khi dừng, audio được gửi lên /stt và kết quả trả về qua callback.
     /// </summary>
-    public async Task StartRecordingAsync(Action<string> onTranscriptionComplete)
+    public async Task StartRecordingAsync(Func<string, Task> onTranscribed)
     {
+        if (_isRecording) return;
+
+        _onTranscribed = onTranscribed;
+        _dotNetRef = DotNetObjectReference.Create(this);
+
         try
         {
-            await _jsRuntime.InvokeVoidAsync("startRecording", SpeechServiceUrl, DotNetObjectReference.Create(new JsCallback(this, onTranscriptionComplete)));
-            IsRecording = true;
+            var started = await _jsRuntime.InvokeAsync<bool>(
+                "speechRecognition.startRecording", _dotNetRef);
+
+            if (started)
+            {
+                _isRecording = true;
+            }
+            else
+            {
+                _onTranscribed = null;
+                _dotNetRef?.Dispose();
+                _dotNetRef = null;
+                throw new InvalidOperationException(
+                    "Không thể truy cập microphone. Vui lòng kiểm tra quyền truy cập.");
+            }
         }
-        catch (Exception ex)
+        catch (JSException ex)
         {
-            Console.WriteLine($"Start recording error: {ex.Message}");
-            throw new Exception("Không thể truy cập micro. Vui lòng kiểm tra quyền truy cập.");
+            _onTranscribed = null;
+            _dotNetRef?.Dispose();
+            _dotNetRef = null;
+            throw new InvalidOperationException($"Lỗi khởi động ghi âm: {ex.Message}", ex);
         }
     }
 
     /// <summary>
-    /// Dừng ghi âm và chuyển đổi thành văn bản
+    /// Dừng ghi âm và chờ transcription. Dùng cho flow pull-based (Products.razor).
+    /// Kết quả thực sự được trả về qua callback đã đăng ký trong StartRecordingAsync.
     /// </summary>
-    public async Task<string> StopAndTranscribeAsync()
+    public async Task<string?> StopAndTranscribeAsync()
     {
+        if (!_isRecording) return null;
+
         try
         {
-            IsRecording = false;
-            IsTranscribing = true;
-            var text = await _jsRuntime.InvokeAsync<string>("stopAndTranscribe");
-            IsTranscribing = false;
-            return text ?? "";
+            await _jsRuntime.InvokeVoidAsync("speechRecognition.stopRecording");
         }
-        catch (Exception ex)
+        catch (JSException ex)
         {
-            IsTranscribing = false;
-            Console.WriteLine($"Stop recording error: {ex.Message}");
-            throw new Exception("Lỗi nhận dạng giọng nói. Vui lòng thử lại.");
+            Console.WriteLine($"[SpeechRecognitionService] stopRecording JS error: {ex.Message}");
         }
+
+        _isRecording = false;
+        return null; // Kết quả được trả về qua OnAudioCaptured → callback
     }
 
     /// <summary>
-    /// Hủy ghi âm
+    /// Hủy ghi âm, không transcribe.
     /// </summary>
     public async Task CancelRecordingAsync()
     {
+        if (!_isRecording) return;
+
+        _isRecording = false;
+        _onTranscribed = null;
+
         try
         {
-            await _jsRuntime.InvokeVoidAsync("cancelRecording");
-            IsRecording = false;
-            // Note: IsTranscribing will be reset by the callback
+            await _jsRuntime.InvokeVoidAsync("speechRecognition.cancelRecording");
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Cancel recording error: {ex.Message}");
+            // Bỏ qua lỗi JS khi circuit đang đóng
+        }
+        finally
+        {
+            _dotNetRef?.Dispose();
+            _dotNetRef = null;
         }
     }
 
     /// <summary>
-    /// Callback class for JavaScript interop
+    /// Được gọi từ JavaScript khi audio capture hoàn tất.
+    /// Gửi audio lên /stt và invoke callback với text kết quả.
     /// </summary>
-    private class JsCallback
+    [JSInvokable]
+    public async Task OnAudioCaptured(byte[] audioData, string mimeType)
     {
-        private readonly SpeechRecognitionService _service;
-        private readonly Action<string> _onTranscriptionComplete;
+        _isRecording = false;
 
-        public JsCallback(SpeechRecognitionService service, Action<string> onTranscriptionComplete)
+        var callback = _onTranscribed;
+        _onTranscribed = null;
+        _dotNetRef?.Dispose();
+        _dotNetRef = null;
+
+        if (callback == null || audioData.Length == 0)
         {
-            _service = service;
-            _onTranscriptionComplete = onTranscriptionComplete;
+            Console.WriteLine("[SpeechRecognitionService] OnAudioCaptured: no callback or empty audio");
+            return;
         }
 
-        [JSInvokable]
-        public void OnTranscriptionComplete(string text)
+        try
         {
-            _service.IsRecording = false;
-            _service.IsTranscribing = false;
-            _onTranscriptionComplete?.Invoke(text);
+            Console.WriteLine($"[SpeechRecognitionService] Sending {audioData.Length} bytes ({mimeType}) to STT...");
+            var text = await _speechService.TranscribeAsync(audioData, mimeType);
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                Console.WriteLine($"[SpeechRecognitionService] STT result: {text}");
+                await callback(text);
+            }
+            else
+            {
+                Console.WriteLine("[SpeechRecognitionService] STT returned empty text");
+            }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SpeechRecognitionService] Transcription error: {ex.Message}");
+        }
+    }
+
+    // ── TTS ──────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Chuyển text thành giọng nói và phát qua trình duyệt.
+    /// </summary>
+    public async Task SpeakAsync(string text, float speed = 1.0f, int speakerId = 0)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        try
+        {
+            Console.WriteLine($"[SpeechRecognitionService] TTS: '{text[..Math.Min(50, text.Length)]}...'");
+            var wavBytes = await _speechService.SynthesizeAsync(text, speed, speakerId);
+
+            if (wavBytes == null || wavBytes.Length == 0)
+            {
+                Console.WriteLine("[SpeechRecognitionService] TTS returned empty audio");
+                return;
+            }
+
+            // Phát audio qua JS
+            await _jsRuntime.InvokeVoidAsync("speechRecognition.playAudio", wavBytes);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SpeechRecognitionService] SpeakAsync error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Dừng phát TTS đang chạy.
+    /// </summary>
+    public async Task StopSpeakingAsync()
+    {
+        try
+        {
+            await _jsRuntime.InvokeVoidAsync("speechRecognition.stopAudio");
+        }
+        catch { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_isRecording)
+        {
+            try { await _jsRuntime.InvokeVoidAsync("speechRecognition.cancelRecording"); }
+            catch { }
+        }
+        _dotNetRef?.Dispose();
     }
 }

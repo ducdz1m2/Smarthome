@@ -1,90 +1,59 @@
+using Application.DTOs.Requests;
+using Application.DTOs.Responses;
 using Application.Interfaces.Services;
 using Domain.Enums;
 using Microsoft.AspNetCore.SignalR;
 
-namespace Web.Hubs
+namespace Web.Hubs;
+
+public class ChatHub : Hub
 {
-    public class ChatHub : Hub
+    private readonly IChatService _chatService;
+
+    public ChatHub(IChatService chatService)
     {
-        private readonly IChatService _chatService;
+        _chatService = chatService;
+    }
 
-        public ChatHub(IChatService chatService)
+    public async Task JoinChatRoom(int roomId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"chat_{roomId}");
+    }
+
+    public async Task LeaveChatRoom(int roomId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"chat_{roomId}");
+    }
+
+    public async Task SendMessage(int roomId, int senderId, string senderType, string content,
+        string? fileUrl = null, string? fileName = null, string? fileType = null, long? fileSize = null)
+    {
+        if (!Enum.TryParse<UserType>(senderType, out var userType))
+            userType = UserType.Customer;
+
+        var request = new SendMessageRequest
         {
-            _chatService = chatService;
-        }
-
-        public async Task SendMessage(int chatRoomId, int senderId, string senderType, string content, string? fileUrl = null, string? fileName = null, string? fileType = null, long? fileSize = null)
-        {
-            Console.WriteLine($"[ChatHub] SendMessage called: chatRoomId={chatRoomId}, senderId={senderId}, senderType={senderType}, content={content}, fileUrl={fileUrl}");
-            
-            var request = new Application.DTOs.Requests.SendMessageRequest
+            Content = content,
+            Attachments = fileUrl != null ? new List<ChatAttachmentRequest>
             {
-                Content = content,
-                Attachments = fileUrl != null ? new List<Application.DTOs.Requests.ChatAttachmentRequest>
+                new ChatAttachmentRequest
                 {
-                    new Application.DTOs.Requests.ChatAttachmentRequest
-                    {
-                        FileUrl = fileUrl,
-                        FileName = fileName ?? string.Empty,
-                        FileType = fileType ?? string.Empty,
-                        FileSize = fileSize ?? 0
-                    }
-                } : null
-            };
-
-            // Parse string to UserType enum
-            if (!Enum.TryParse<UserType>(senderType, out var userType))
-            {
-                userType = UserType.Customer; // Default fallback
-                Console.WriteLine($"[ChatHub] Failed to parse senderType '{senderType}', using default Customer");
-            }
-
-            try
-            {
-                var messageId = await _chatService.SendMessageAsync(chatRoomId, senderId, userType, request);
-                Console.WriteLine($"[ChatHub] Message saved to DB with ID: {messageId}");
-
-                await Clients.Group($"chat_{chatRoomId}").SendAsync("ReceiveMessage", new
-                {
-                    Id = messageId,
-                    ChatRoomId = chatRoomId,
-                    UserId = senderId,
-                    SenderType = senderType.ToString(),
-                    Content = content,
+                    FileName = fileName ?? "file",
                     FileUrl = fileUrl,
-                    FileName = fileName,
                     FileType = fileType,
-                    FileSize = fileSize,
-                    SentAt = DateTime.Now
-                });
-                Console.WriteLine($"[ChatHub] Message broadcasted to group chat_{chatRoomId}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ChatHub] Error saving message: {ex.Message}");
-                Console.WriteLine($"[ChatHub] Stack trace: {ex.StackTrace}");
-                throw;
-            }
-        }
+                    FileSize = fileSize
+                }
+            } : null
+        };
 
-        public async Task JoinChatRoom(int chatRoomId)
+        try
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, $"chat_{chatRoomId}");
+            var message = await _chatService.SendMessageAsync(roomId, senderId, userType, request);
+            await Clients.Group($"chat_{roomId}").SendAsync("ReceiveMessage", message);
         }
-
-        public async Task JoinAdminGroup()
+        catch (Exception ex)
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, "admins");
-        }
-
-        public async Task MarkAsRead(int chatRoomId, int userId)
-        {
-            await _chatService.MarkChatAsReadAsync(chatRoomId, userId);
-        }
-
-        public override async Task OnDisconnectedAsync(Exception? exception)
-        {
-            await base.OnDisconnectedAsync(exception);
+            Console.WriteLine($"[ChatHub] Error sending message: {ex.Message}");
         }
     }
 }

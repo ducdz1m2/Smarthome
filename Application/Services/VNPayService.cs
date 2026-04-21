@@ -76,10 +76,13 @@ namespace Application.Services
                     { "vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss") }
                 };
 
+                // VNPay requires sorted keys, raw values (no URL encoding) for hash computation
                 var sortedData = vnpayData.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
-                var queryString = string.Join("&", sortedData.Select(x => $"{x.Key}={Uri.EscapeDataString(x.Value)}"));
-                var secureHash = HmacSHA512(hashSecret, queryString);
+                var hashData = string.Join("&", sortedData.Select(x => $"{x.Key}={x.Value}"));
+                var secureHash = HmacSHA512(hashSecret, hashData);
 
+                // Build the actual payment URL with URL-encoded values
+                var queryString = string.Join("&", sortedData.Select(x => $"{x.Key}={Uri.EscapeDataString(x.Value)}"));
                 var paymentUrl = $"{baseUrl}?{queryString}&vnp_SecureHash={secureHash}";
 
                 return new VNPayResponse
@@ -117,12 +120,15 @@ namespace Application.Services
                 }
 
                 var receivedHash = vnpayData["vnp_SecureHash"];
-                var vnpayDataWithoutHash = vnpayData.Where(x => x.Key != "vnp_SecureHash")
+                // Exclude both vnp_SecureHash and vnp_SecureHashType from hash computation
+                var vnpayDataWithoutHash = vnpayData
+                    .Where(x => x.Key != "vnp_SecureHash" && x.Key != "vnp_SecureHashType")
                     .ToDictionary(x => x.Key, x => x.Value);
 
+                // VNPay requires sorted keys with raw (non-encoded) values for hash verification
                 var sortedData = vnpayDataWithoutHash.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
-                var queryString = string.Join("&", sortedData.Select(x => $"{x.Key}={Uri.EscapeDataString(x.Value)}"));
-                var calculatedHash = HmacSHA512(hashSecret, queryString);
+                var hashData = string.Join("&", sortedData.Select(x => $"{x.Key}={x.Value}"));
+                var calculatedHash = HmacSHA512(hashSecret, hashData);
 
                 if (receivedHash != calculatedHash)
                 {

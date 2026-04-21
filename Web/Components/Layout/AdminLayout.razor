@@ -10,30 +10,33 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 <MudLayout>
-    <MudAppBar Elevation="1" Color="Color.Primary">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
-        <MudText Typo="Typo.h6" Class="ml-3">Smarthome Admin</MudText>
+    <MudAppBar Elevation="3" Class="admin-navbar-gradient">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" Class="admin-menu-btn" />
+        <div class="admin-navbar-brand">
+            <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="Size.Large" Class="admin-brand-icon" />
+            <MudText Typo="Typo.h6" Class="admin-brand-text">Smarthome Admin</MudText>
+        </div>
         <MudSpacer />
-        <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" />
+        <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" Class="admin-icon-btn" />
         @* Avatar button *@
-        <MudIconButton Href="/profile" Title="Quản lý tài khoản">
+        <MudIconButton Href="/profile" Title="Quản lý tài khoản" Class="admin-avatar-btn">
             @if (!string.IsNullOrEmpty(_avatarUrl))
             {
-                <MudAvatar Size="Size.Medium">
+                <MudAvatar Size="Size.Medium" Class="admin-nav-avatar">
                     <MudImage Src="@_avatarUrl" ObjectFit="ObjectFit.Cover" />
                 </MudAvatar>
             }
             else
             {
-                <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" />
+                <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" Size="Size.Large" />
             }
         </MudIconButton>
     </MudAppBar>
-    <MudDrawer @bind-Open="@_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2" Variant="DrawerVariant.Mini" OpenMiniOnHover="true">
+    <MudDrawer @bind-Open="@_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="3" Variant="DrawerVariant.Mini" OpenMiniOnHover="true" Class="admin-drawer">
         <AdminNavMenu />
     </MudDrawer>
-    <MudMainContent Class="pt-16 px-4 pb-4">
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudMainContent Class="admin-main-content">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="admin-content-container">
             @Body
         </MudContainer>
     </MudMainContent>

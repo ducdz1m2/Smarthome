@@ -5,30 +5,19 @@
 @using Domain.Enums
 @using Microsoft.AspNetCore.Authorization
 @using Web.Helpers
+@using Web.Components.Shared.Common
 
 @inject IInstallationService InstallationService
 @inject ITechnicianProfileService TechnicianService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<MudText Typo="Typo.h4" Class="mb-4">Quản lý Lịch Lắp đặt</MudText>
+<PageHeader Title="Quản lý Lịch Lắp đặt" AddButtonText="Thêm lịch lắp đặt" OnAddClick="@(() => OpenDialog(null))" />
 
-<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
-           OnClick="@(() => OpenDialog(null))" Class="mb-4">
-    Thêm lịch lắp đặt
-</MudButton>
-
-<MudTable Items="_bookings" Dense="true" Hover="true" Loading="_loading" 
-          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
-          Filter="@FilterItems">
-    <ToolBarContent>
-        <MudText Typo="Typo.h6">Danh sách lịch lắp đặt</MudText>
-        <MudSpacer />
-        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
-                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                      Immediate="true" Class="mr-2" Style="width: 200px;" />
+<FilterBar>
+    <MudItem xs="12" sm="6" md="3">
         <MudSelect T="string" @bind-Value="_statusFilter" Label="Trạng thái" 
-                   Clearable="true" Dense="true" Class="mr-2" Style="width: 150px;"
+                   Clearable="true" Dense="true" Variant="Variant.Outlined"
                    AnchorOrigin="Origin.BottomCenter">
             <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
             <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
@@ -37,10 +26,16 @@
             <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
             <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
         </MudSelect>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadData">
             Lọc
         </MudButton>
-    </ToolBarContent>
+    </MudItem>
+</FilterBar>
+
+<DataTable Items="_bookings" Title="Danh sách lịch lắp đặt" Loading="_loading"
+           FilterFunc="@FilterItems">
     <HeaderContent>
         <MudTh>ID</MudTh>
         <MudTh>Loại</MudTh>
@@ -52,10 +47,10 @@
         <MudTh>Đánh giá</MudTh>
         <MudTh>Thao tác</MudTh>
     </HeaderContent>
-    <RowTemplate>
-        <MudTd DataLabel="ID">@context.Id</MudTd>
+    <RowTemplate Context="booking">
+        <MudTd DataLabel="ID">@booking.Id</MudTd>
         <MudTd DataLabel="Loại">
-            @if (context.IsUninstall)
+            @if (booking.IsUninstall)
             {
                 <MudChip T="string" Color="Color.Warning" Size="Size.Small">Tháo dỡ</MudChip>
             }
@@ -64,13 +59,13 @@
                 <MudChip T="string" Color="Color.Primary" Size="Size.Small">Lắp đặt</MudChip>
             }
         </MudTd>
-        <MudTd DataLabel="Đơn hàng">#@context.OrderId</MudTd>
-        <MudTd DataLabel="Kỹ thuật viên">@(context.TechnicianName ?? "Chưa phân công")</MudTd>
-        <MudTd DataLabel="Ngày lắp">@context.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
+        <MudTd DataLabel="Đơn hàng">#@booking.OrderId</MudTd>
+        <MudTd DataLabel="Kỹ thuật viên">@(booking.TechnicianName ?? "Chưa phân công")</MudTd>
+        <MudTd DataLabel="Ngày lắp">@booking.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
         <MudTd DataLabel="Khung giờ">
-            @if (context.StartTime.HasValue && context.EndTime.HasValue)
+            @if (booking.StartTime.HasValue && booking.EndTime.HasValue)
             {
-                <span>@context.StartTime.Value.ToString("hh\\:mm") - @context.EndTime.Value.ToString("hh\\:mm")</span>
+                <span>@booking.StartTime.Value.ToString("hh\\:mm") - @booking.EndTime.Value.ToString("hh\\:mm")</span>
             }
             else
             {
@@ -78,14 +73,14 @@
             }
         </MudTd>
         <MudTd DataLabel="Trạng thái">
-            <MudChip T="string" Color="@StatusHelper.GetInstallationStatusColor(context.Status, context.IsUninstall)" Size="Size.Small">
-                @StatusHelper.GetInstallationStatusText(context.Status, context.IsUninstall)
+            <MudChip T="string" Color="@StatusHelper.GetInstallationStatusColor(booking.Status, booking.IsUninstall)" Size="Size.Small">
+                @StatusHelper.GetInstallationStatusText(booking.Status, booking.IsUninstall)
             </MudChip>
         </MudTd>
         <MudTd DataLabel="Đánh giá">
-            @if (context.CustomerRating.HasValue)
+            @if (booking.CustomerRating.HasValue)
             {
-                <MudRating value="@context.CustomerRating.Value" ReadOnly="true" Size="Size.Small" />
+                <MudRating value="@booking.CustomerRating.Value" ReadOnly="true" Size="Size.Small" />
             }
             else
             {
@@ -93,17 +88,12 @@
             }
         </MudTd>
         <MudTd>
-            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
-                           OnClick="@(() => OpenDialog(context))" Size="Size.Small" />
-            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
-                           OnClick="@(() => DeleteItem(context))" Size="Size.Small" />
+            <ActionButtons ShowView="false" ShowAdd="false"
+                          OnEdit="@(() => OpenDialog(booking))" 
+                          OnDelete="@(() => DeleteItem(booking))" />
         </MudTd>
     </RowTemplate>
-    <PagerContent>
-        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 10, 25, 50, 100 }"
-                       InfoFormat="{first_item}-{last_item} / {all_items}" />
-    </PagerContent>
-</MudTable>
+</DataTable>
 
 @code {
     private List<InstallationBookingListResponse> _bookings = new();

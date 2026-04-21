@@ -3,6 +3,7 @@
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @using MudBlazor
+@using Web.Components.Shared.Common
 @layout AdminLayout
 @inject IProductService ProductService
 @inject ICategoryService CategoryService
@@ -10,40 +11,36 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<MudText Typo="Typo.h4" Class="mb-4">Quản lý Sản phẩm</MudText>
+<PageHeader Title="Quản lý Sản phẩm" AddButtonText="Thêm sản phẩm" OnAddClick="@(() => OpenProductDialog(null))" />
 
-<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
-           OnClick="@(() => OpenProductDialog(null))" Class="mb-4">
-    Thêm sản phẩm
-</MudButton>
-
-<MudTable Items="_products" Dense="true" Hover="true" Loading="_loading"
-          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
-          Filter="@FilterProducts" SortMode="SortMode.Single" AllowUnsorted="false">
-    <ToolBarContent>
-        <MudText Typo="Typo.h6">Danh sách sản phẩm</MudText>
-        <MudSpacer />
-        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..." 
-                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                      Immediate="true" Class="mr-2" Style="width: 200px;" />
+<FilterBar>
+    <MudItem xs="12" sm="6" md="3">
         <MudSelect T="int?" @bind-Value="_categoryFilter" Label="Danh mục" 
-                   Clearable="true" Dense="true" Class="mr-2" Style="width: 150px;"
+                   Clearable="true" Dense="true" Variant="Variant.Outlined"
                    AnchorOrigin="Origin.BottomCenter">
             @foreach (var cat in _categories)
             {
                 <MudSelectItem T="int?" Value="@cat.Id">@cat.Name</MudSelectItem>
             }
         </MudSelect>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
         <MudSelect T="bool?" @bind-Value="_statusFilter" Label="Trạng thái" 
-                   Clearable="true" Dense="true" Class="mr-2" Style="width: 130px;"
+                   Clearable="true" Dense="true" Variant="Variant.Outlined"
                    AnchorOrigin="Origin.BottomCenter">
             <MudSelectItem T="bool?" Value="@true">Đang bán</MudSelectItem>
             <MudSelectItem T="bool?" Value="@false">Ngừng bán</MudSelectItem>
         </MudSelect>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadProducts">
             Lọc
         </MudButton>
-    </ToolBarContent>
+    </MudItem>
+</FilterBar>
+
+<DataTable Items="_products" Title="Danh sách sản phẩm" Loading="_loading"
+           FilterFunc="@FilterProducts">
     <HeaderContent>
         <MudTh>ID</MudTh>
         <MudTh>Hình</MudTh>
@@ -83,24 +80,16 @@
         <MudTd DataLabel="Danh mục">@context.CategoryName</MudTd>
         <MudTd DataLabel="Thương hiệu">@context.BrandName</MudTd>
         <MudTd DataLabel="Trạng thái">
-            <MudSwitch T="bool" Value="@context.IsActive" 
-                       ValueChanged="@(v => OnToggleStatus(context.Id, v))"
-                       Color="Color.Success" UncheckedColor="Color.Error" />
+            <StatusSwitch IsActive="@context.IsActive" ItemId="@context.Id" OnToggle="@(async (id, isActive) => await ToggleStatus(id, isActive))" />
         </MudTd>
         <MudTd>
-            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
-                           OnClick="@(() => OpenProductDialog(context))" Size="Size.Small" />
-            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Info" 
-                           OnClick="@(() => OpenAddStockDialog(context))" Size="Size.Small" />
-            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
-                           OnClick="@(() => DeleteProduct(context))" Size="Size.Small" />
+            <ActionButtons ShowView="false" ShowAdd="true"
+                          OnEdit="@(() => OpenProductDialog(context))" 
+                          OnAdd="@(() => OpenAddStockDialog(context))"
+                          OnDelete="@(() => DeleteProduct(context))" />
         </MudTd>
     </RowTemplate>
-    <PagerContent>
-        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 10, 25, 50, 100 }"
-                       InfoFormat="{first_item}-{last_item} / {all_items}" />
-    </PagerContent>
-</MudTable>
+</DataTable>
 
 @code {
     private List<ProductListResponse> _products = new();
@@ -206,11 +195,6 @@
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
             await LoadProducts();
         }
-    }
-
-    private void OnToggleStatus(int id, bool isActive)
-    {
-        _ = ToggleStatus(id, isActive);
     }
 
     private async Task DeleteProduct(ProductListResponse product)

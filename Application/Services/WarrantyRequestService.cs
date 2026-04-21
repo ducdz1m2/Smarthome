@@ -23,6 +23,7 @@ public class WarrantyRequestService : IWarrantyRequestService
     private readonly IProductWarehouseRepository _productWarehouseRepository;
     private readonly IOrderWarehouseAllocationRepository _orderWarehouseAllocationRepository;
     private readonly IProductRepository _productRepository;
+    private readonly IInstallationBookingRepository _installationBookingRepository;
 
     public WarrantyRequestService(
         IWarrantyRequestRepository warrantyRequestRepository,
@@ -35,7 +36,8 @@ public class WarrantyRequestService : IWarrantyRequestService
         IInventoryService inventoryService,
         IProductWarehouseRepository productWarehouseRepository,
         IOrderWarehouseAllocationRepository orderWarehouseAllocationRepository,
-        IProductRepository productRepository)
+        IProductRepository productRepository,
+        IInstallationBookingRepository installationBookingRepository)
     {
         _warrantyRequestRepository = warrantyRequestRepository;
         _warrantyRepository = warrantyRepository;
@@ -48,6 +50,7 @@ public class WarrantyRequestService : IWarrantyRequestService
         _productWarehouseRepository = productWarehouseRepository;
         _orderWarehouseAllocationRepository = orderWarehouseAllocationRepository;
         _productRepository = productRepository;
+        _installationBookingRepository = installationBookingRepository;
     }
 
     public async Task<List<WarrantyRequestResponse>> GetAllAsync()
@@ -203,8 +206,21 @@ public class WarrantyRequestService : IWarrantyRequestService
                     WarrantyRequestId = warrantyRequest.Id
                 };
 
+                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] CreateRequest.IsWarranty: {createRequest.IsWarranty}");
+
                 var bookingId = await _installationService.CreateAsync(createRequest);
                 Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Installation booking created with ID: {bookingId}");
+
+                // Verify the booking was created with IsWarranty = true using repository directly
+                try
+                {
+                    var createdBooking = await _installationBookingRepository.GetByIdAsync(bookingId);
+                    Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Verified booking IsWarranty: {createdBooking?.IsWarranty}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Failed to verify booking: {ex.Message}");
+                }
 
                 // Link warranty request to installation booking
                 warrantyRequest.LinkToInstallationBooking(bookingId);

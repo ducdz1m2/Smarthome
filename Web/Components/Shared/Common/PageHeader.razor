@@ -1,0 +1,19 @@
+@using MudBlazor
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h4">@Title</MudText>
+    @if (ShowAddButton)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@OnAddClick">
+            @AddButtonText
+        </MudButton>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public bool ShowAddButton { get; set; } = true;
+    [Parameter] public string AddButtonText { get; set; } = "Thêm mới";
+    [Parameter] public EventCallback OnAddClick { get; set; }
+}

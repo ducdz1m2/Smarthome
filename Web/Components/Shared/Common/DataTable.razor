@@ -1,0 +1,72 @@
+@typeparam TItem
+@using MudBlazor
+
+<MudTable Items="@Items" Dense="@Dense" Hover="@Hover" Loading="@Loading"
+          LoadingProgressColor="Color.Primary" Striped="@Striped" Bordered="@Bordered"
+          Filter="@FilterFunc" SortMode="@SortMode" AllowUnsorted="@AllowUnsorted">
+    <ToolBarContent>
+        @if (Title != null)
+        {
+            <MudText Typo="Typo.h6">@Title</MudText>
+        }
+        <MudSpacer />
+        @if (ShowSearch)
+        {
+            <MudTextField @bind-Value="@_searchString" Placeholder="Tìm kiếm..." 
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
+        }
+        @if (FilterContent != null)
+        {
+            @FilterContent
+        }
+    </ToolBarContent>
+    <HeaderContent>
+        @HeaderContent
+    </HeaderContent>
+    <RowTemplate Context="item">
+        @RowTemplate(item)
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="@RowsPerPageOptions"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    [Parameter] public IEnumerable<TItem> Items { get; set; } = new List<TItem>();
+    [Parameter] public bool Dense { get; set; } = true;
+    [Parameter] public bool Hover { get; set; } = true;
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool Striped { get; set; } = true;
+    [Parameter] public bool Bordered { get; set; } = true;
+    [Parameter] public bool ShowSearch { get; set; } = true;
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public SortMode SortMode { get; set; } = SortMode.Single;
+    [Parameter] public bool AllowUnsorted { get; set; } = false;
+    [Parameter] public int[] RowsPerPageOptions { get; set; } = new[] { 5, 10, 25, 50 };
+    
+    [Parameter] public RenderFragment? FilterContent { get; set; }
+    [Parameter] public RenderFragment? HeaderContent { get; set; }
+    [Parameter] public RenderFragment<TItem>? RowTemplate { get; set; }
+    [Parameter] public Func<TItem, bool>? FilterFunc { get; set; }
+
+    private string _searchString = "";
+
+    protected override void OnParametersSet()
+    {
+        if (FilterFunc == null && ShowSearch)
+        {
+            FilterFunc = DefaultFilter;
+        }
+        base.OnParametersSet();
+    }
+
+    private bool DefaultFilter(TItem item)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return item.ToString()?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false;
+    }
+}

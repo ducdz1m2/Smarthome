@@ -80,12 +80,22 @@ else
             _loading = true;
             _damagedProducts.Clear();
 
+            Console.WriteLine($"[LoadDamagedProducts] ========== START ==========");
+
             // Get damaged products from warranty requests
             var warrantyRequests = await WarrantyRequestService.GetAllAsync();
+            Console.WriteLine($"[LoadDamagedProducts] Total warranty requests: {warrantyRequests.Count}");
+
             foreach (var wr in warrantyRequests)
             {
+                Console.WriteLine($"[LoadDamagedProducts] Warranty Request ID: {wr.Id}, OrderNumber: {wr.OrderNumber}, Items count: {wr.Items?.Count ?? 0}");
+                foreach (var item in wr.Items)
+                {
+                    Console.WriteLine($"[LoadDamagedProducts]   Item ID: {item.Id}, OrderItemId: {item.OrderItemId}, IsDamaged: {item.IsDamaged}, Quantity: {item.Quantity}");
+                }
                 foreach (var item in wr.Items.Where(i => i.IsDamaged))
                 {
+                    Console.WriteLine($"[LoadDamagedProducts] Adding damaged item: Item ID: {item.Id}, OrderItemId: {item.OrderItemId}");
                     _damagedProducts.Add(new DamagedProductResponse
                     {
                         Id = item.Id,
@@ -101,12 +111,22 @@ else
                 }
             }
 
+            Console.WriteLine($"[LoadDamagedProducts] Damaged products from warranty: {_damagedProducts.Count}");
+
             // Get damaged products from return orders
             var returnOrders = await ReturnOrderService.GetAllAsync();
+            Console.WriteLine($"[LoadDamagedProducts] Total return orders: {returnOrders.Count}");
+
             foreach (var ro in returnOrders)
             {
+                Console.WriteLine($"[LoadDamagedProducts] Return Order ID: {ro.Id}, OrderNumber: {ro.OrderNumber}, Items count: {ro.Items?.Count ?? 0}");
+                foreach (var item in ro.Items)
+                {
+                    Console.WriteLine($"[LoadDamagedProducts]   Item ID: {item.Id}, ProductId: {item.ProductId}, IsDamaged: {item.IsDamaged}, Quantity: {item.Quantity}");
+                }
                 foreach (var item in ro.Items.Where(i => i.IsDamaged))
                 {
+                    Console.WriteLine($"[LoadDamagedProducts] Adding damaged return item: Item ID: {item.Id}, ProductId: {item.ProductId}");
                     _damagedProducts.Add(new DamagedProductResponse
                     {
                         Id = item.Id,
@@ -121,9 +141,13 @@ else
                     });
                 }
             }
+
+            Console.WriteLine($"[LoadDamagedProducts] Total damaged products: {_damagedProducts.Count}");
+            Console.WriteLine($"[LoadDamagedProducts] ========== END ==========");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[LoadDamagedProducts] ERROR: {ex.Message}");
             Snackbar.Add($"Lỗi tải dữ liệu: {ex.Message}", Severity.Error);
         }
         finally

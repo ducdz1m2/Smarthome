@@ -4,22 +4,35 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Catalog;
 using Domain.Exceptions;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Application.Services
 {
     public class BrandService : IBrandService
     {
         private readonly IBrandRepository _brandRepository;
+        private readonly IMemoryCache _cache;
+        private const string BrandsCacheKey = "AllBrands";
+        private readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(30);
 
-        public BrandService(IBrandRepository brandRepository)
+        public BrandService(IBrandRepository brandRepository, IMemoryCache cache)
         {
             _brandRepository = brandRepository;
+            _cache = cache;
         }
 
         public async Task<List<BrandResponse>> GetAllAsync()
         {
+            if (_cache.TryGetValue(BrandsCacheKey, out List<BrandResponse>? cachedBrands))
+            {
+                return cachedBrands ?? new List<BrandResponse>();
+            }
+
             var brands = await _brandRepository.GetAllAsync();
-            return brands.Select(MapToResponse).ToList();
+            var result = brands.Select(MapToResponse).ToList();
+            
+            _cache.Set(BrandsCacheKey, result, _cacheDuration);
+            return result;
         }
 
         public async Task<BrandResponse?> GetByIdAsync(int id)
@@ -43,6 +56,8 @@ namespace Application.Services
 
             await _brandRepository.AddAsync(brand);
             await _brandRepository.SaveChangesAsync();
+            
+            _cache.Remove(BrandsCacheKey);
             return brand.Id;
         }
 
@@ -64,6 +79,8 @@ namespace Application.Services
 
             _brandRepository.Update(brand);
             await _brandRepository.SaveChangesAsync();
+            
+            _cache.Remove(BrandsCacheKey);
         }
 
         public async Task DeleteAsync(int id)
@@ -77,6 +94,8 @@ namespace Application.Services
 
             _brandRepository.Delete(brand);
             await _brandRepository.SaveChangesAsync();
+            
+            _cache.Remove(BrandsCacheKey);
         }
 
         public async Task<bool> ActivateAsync(int id)
@@ -87,6 +106,8 @@ namespace Application.Services
             brand.Activate();
             _brandRepository.Update(brand);
             await _brandRepository.SaveChangesAsync();
+            
+            _cache.Remove(BrandsCacheKey);
             return true;
         }
 
@@ -98,6 +119,8 @@ namespace Application.Services
             brand.Deactivate();
             _brandRepository.Update(brand);
             await _brandRepository.SaveChangesAsync();
+            
+            _cache.Remove(BrandsCacheKey);
             return true;
         }
 

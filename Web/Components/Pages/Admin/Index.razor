@@ -6,7 +6,10 @@
 @inject IStatisticsService StatisticsService
 @inject ISnackbar Snackbar
 
-<MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+<div class="admin-header">
+    <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary">Tổng quan hoạt động hệ thống</MudText>
+</div>
 
 @if (_loading)
 {
@@ -17,53 +20,53 @@ else if (_statistics != null)
     <!-- Overview Cards -->
     <MudGrid Class="mb-4">
         <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2" Class="pa-4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <MudCard Elevation="3" Class="stat-card gradient-purple">
                 <MudCardContent>
-                    <div class="d-flex align-center">
-                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Class="mr-4" />
+                    <div class="d-flex align-center justify-space-between">
                         <div>
-                            <MudText Typo="Typo.body2">Tổng đơn hàng</MudText>
+                            <MudText Typo="Typo.body2" Class="mb-2">Tổng đơn hàng</MudText>
                             <MudText Typo="Typo.h4" Style="font-weight: bold;">@_statistics.Overview.TotalOrders.ToString("N0")</MudText>
                         </div>
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Class="stat-icon" />
                     </div>
                 </MudCardContent>
             </MudCard>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2" Class="pa-4" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+            <MudCard Elevation="3" Class="stat-card gradient-pink">
                 <MudCardContent>
-                    <div class="d-flex align-center">
-                        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Class="mr-4" />
+                    <div class="d-flex align-center justify-space-between">
                         <div>
-                            <MudText Typo="Typo.body2">Tổng doanh thu</MudText>
+                            <MudText Typo="Typo.body2" Class="mb-2">Tổng doanh thu</MudText>
                             <MudText Typo="Typo.h4" Style="font-weight: bold;">@_statistics.Overview.TotalRevenue.ToString("N0")đ</MudText>
                         </div>
+                        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Class="stat-icon" />
                     </div>
                 </MudCardContent>
             </MudCard>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2" Class="pa-4" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+            <MudCard Elevation="3" Class="stat-card gradient-blue">
                 <MudCardContent>
-                    <div class="d-flex align-center">
-                        <MudIcon Icon="@Icons.Material.Filled.Devices" Size="Size.Large" Class="mr-4" />
+                    <div class="d-flex align-center justify-space-between">
                         <div>
-                            <MudText Typo="Typo.body2">Tổng sản phẩm</MudText>
+                            <MudText Typo="Typo.body2" Class="mb-2">Tổng sản phẩm</MudText>
                             <MudText Typo="Typo.h4" Style="font-weight: bold;">@_statistics.Overview.TotalProducts.ToString("N0")</MudText>
                         </div>
+                        <MudIcon Icon="@Icons.Material.Filled.Devices" Size="Size.Large" Class="stat-icon" />
                     </div>
                 </MudCardContent>
             </MudCard>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2" Class="pa-4" Style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white;">
+            <MudCard Elevation="3" Class="stat-card gradient-green">
                 <MudCardContent>
-                    <div class="d-flex align-center">
-                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Class="mr-4" />
+                    <div class="d-flex align-center justify-space-between">
                         <div>
-                            <MudText Typo="Typo.body2">Tổng người dùng</MudText>
+                            <MudText Typo="Typo.body2" Class="mb-2">Tổng người dùng</MudText>
                             <MudText Typo="Typo.h4" Style="font-weight: bold;">@_statistics.Overview.TotalUsers.ToString("N0")</MudText>
                         </div>
+                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Class="stat-icon" />
                     </div>
                 </MudCardContent>
             </MudCard>
@@ -73,37 +76,37 @@ else if (_statistics != null)
     <!-- Secondary Stats -->
     <MudGrid Class="mb-4">
         <MudItem xs="12" sm="6" md="2">
-            <MudPaper Elevation="1" Class="pa-4 text-center">
+            <MudPaper Elevation="2" Class="mini-stat-card pa-4 text-center">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Đơn hôm nay</MudText>
                 <MudText Typo="Typo.h6" Color="Color.Primary" Style="font-weight: bold;">@_statistics.Overview.TodayOrders</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="2">
-            <MudPaper Elevation="1" Class="pa-4 text-center">
+            <MudPaper Elevation="2" Class="mini-stat-card pa-4 text-center">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Doanh thu hôm nay</MudText>
                 <MudText Typo="Typo.h6" Color="Color.Success" Style="font-weight: bold;">@_statistics.Overview.TodayRevenue.ToString("N0")đ</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="2">
-            <MudPaper Elevation="1" Class="pa-4 text-center">
+            <MudPaper Elevation="2" Class="mini-stat-card pa-4 text-center">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Đơn chờ xử lý</MudText>
                 <MudText Typo="Typo.h6" Color="Color.Warning" Style="font-weight: bold;">@_statistics.Overview.PendingOrders</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="2">
-            <MudPaper Elevation="1" Class="pa-4 text-center">
+            <MudPaper Elevation="2" Class="mini-stat-card pa-4 text-center">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Sắp hết hàng</MudText>
                 <MudText Typo="Typo.h6" Color="Color.Error" Style="font-weight: bold;">@_statistics.Overview.LowStockProducts</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="2">
-            <MudPaper Elevation="1" Class="pa-4 text-center">
+            <MudPaper Elevation="2" Class="mini-stat-card pa-4 text-center">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Danh mục</MudText>
                 <MudText Typo="Typo.h6" Style="font-weight: bold;">@_statistics.Overview.TotalCategories</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="2">
-            <MudPaper Elevation="1" Class="pa-4 text-center">
+            <MudPaper Elevation="2" Class="mini-stat-card pa-4 text-center">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Thương hiệu</MudText>
                 <MudText Typo="Typo.h6" Style="font-weight: bold;">@_statistics.Overview.TotalBrands</MudText>
             </MudPaper>
@@ -113,7 +116,7 @@ else if (_statistics != null)
     <!-- Charts Row 1 -->
     <MudGrid Class="mb-4">
         <MudItem xs="12" lg="8">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="chart-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Doanh thu & Đơn hàng 6 tháng gần đây</MudText>
@@ -122,8 +125,8 @@ else if (_statistics != null)
                 <MudCardContent>
                     @if (_statistics.Charts?.RevenueChart != null && _statistics.Charts.RevenueChart.Any())
                     {
-                        <MudChart T="double" ChartType="ChartType.Bar" 
-                                  ChartSeries="@GetRevenueSeries()" 
+                        <MudChart T="double" ChartType="ChartType.Bar"
+                                  ChartSeries="@GetRevenueSeries()"
                                   xaxislabels="@GetMonthLabels()"
                                   ChartOptions="@(_chartOptions)"
                                   Width="100%" Height="300px" />
@@ -136,7 +139,7 @@ else if (_statistics != null)
             </MudCard>
         </MudItem>
         <MudItem xs="12" lg="4">
-            <MudCard Elevation="2" Style="height: 100%;">
+            <MudCard Elevation="3" Class="chart-card" Style="height: 100%;">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Trạng thái đơn hàng</MudText>
@@ -145,8 +148,8 @@ else if (_statistics != null)
                 <MudCardContent Class="d-flex justify-center">
                     @if (_statistics.Charts?.OrderStatusChart != null && _statistics.Charts.OrderStatusChart.Any())
                     {
-                        <MudChart T="double" ChartType="ChartType.Pie" 
-                                  inputdata="@GetOrderStatusData()" 
+                        <MudChart T="double" ChartType="ChartType.Pie"
+                                  inputdata="@GetOrderStatusData()"
                                   inputlabels="@GetOrderStatusLabels()"
                                   Width="250px" Height="250px" />
                     }
@@ -162,7 +165,7 @@ else if (_statistics != null)
     <!-- Charts Row 2 -->
     <MudGrid Class="mb-4">
         <MudItem xs="12" md="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="chart-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Người dùng mới</MudText>
@@ -171,8 +174,8 @@ else if (_statistics != null)
                 <MudCardContent>
                     @if (_statistics.Charts?.UsersChart != null && _statistics.Charts.UsersChart.Any())
                     {
-                        <MudChart T="double" ChartType="ChartType.Line" 
-                                  ChartSeries="@GetUsersSeries()" 
+                        <MudChart T="double" ChartType="ChartType.Line"
+                                  ChartSeries="@GetUsersSeries()"
                                   xaxislabels="@GetMonthLabels()"
                                   ChartOptions="@(_chartOptions)"
                                   Width="100%" Height="250px" />
@@ -185,7 +188,7 @@ else if (_statistics != null)
             </MudCard>
         </MudItem>
         <MudItem xs="12" md="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="chart-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Phương thức thanh toán</MudText>
@@ -194,8 +197,8 @@ else if (_statistics != null)
                 <MudCardContent Class="d-flex justify-center">
                     @if (_statistics.Charts?.PaymentMethodChart != null && _statistics.Charts.PaymentMethodChart.Any())
                     {
-                        <MudChart T="double" ChartType="ChartType.Donut" 
-                                  inputdata="@GetPaymentData()" 
+                        <MudChart T="double" ChartType="ChartType.Donut"
+                                  inputdata="@GetPaymentData()"
                                   inputlabels="@GetPaymentLabels()"
                                   Width="250px" Height="250px" />
                     }
@@ -209,7 +212,7 @@ else if (_statistics != null)
     </MudGrid>
 
     <!-- Category Distribution -->
-    <MudCard Elevation="2" Class="mb-4">
+    <MudCard Elevation="3" Class="chart-card mb-4">
         <MudCardHeader>
             <CardHeaderContent>
                 <MudText Typo="Typo.h6">Phân bố sản phẩm theo danh mục</MudText>
@@ -218,8 +221,8 @@ else if (_statistics != null)
         <MudCardContent>
             @if (_statistics.Charts?.CategoryDistribution != null && _statistics.Charts.CategoryDistribution.Any())
             {
-                <MudChart T="double" ChartType="ChartType.Pie" 
-                          inputdata="@GetCategoryData()" 
+                <MudChart T="double" ChartType="ChartType.Pie"
+                          inputdata="@GetCategoryData()"
                           inputlabels="@GetCategoryLabels()"
                           Width="300px" Height="300px" />
             }
@@ -233,7 +236,7 @@ else if (_statistics != null)
     <!-- Sales & Product Stats -->
     <MudGrid Class="mb-4">
         <MudItem xs="12" lg="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="stats-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Thống kê bán hàng</MudText>
@@ -283,7 +286,7 @@ else if (_statistics != null)
             </MudCard>
         </MudItem>
         <MudItem xs="12" lg="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="stats-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Thống kê sản phẩm</MudText>
@@ -337,7 +340,7 @@ else if (_statistics != null)
     <!-- User & Inventory Stats -->
     <MudGrid Class="mb-4">
         <MudItem xs="12" md="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="stats-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Thống kê người dùng</MudText>
@@ -374,7 +377,7 @@ else if (_statistics != null)
             </MudCard>
         </MudItem>
         <MudItem xs="12" md="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="stats-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Thống kê tồn kho</MudText>
@@ -416,7 +419,7 @@ else if (_statistics != null)
     <!-- Installation & Warranty Stats -->
     <MudGrid Class="mb-4">
         <MudItem xs="12" md="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="stats-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Thống kê lắp đặt</MudText>
@@ -466,7 +469,7 @@ else if (_statistics != null)
             </MudCard>
         </MudItem>
         <MudItem xs="12" md="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="stats-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Thống kê bảo hành</MudText>
@@ -518,7 +521,7 @@ else if (_statistics != null)
     </MudGrid>
 
     <!-- Promotions Stats -->
-    <MudCard Elevation="2" Class="mb-4">
+    <MudCard Elevation="3" Class="chart-card mb-4">
         <MudCardHeader>
             <CardHeaderContent>
                 <MudText Typo="Typo.h6">Thống kê khuyến mãi</MudText>
@@ -527,25 +530,25 @@ else if (_statistics != null)
         <MudCardContent>
             <MudGrid>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudPaper Elevation="0" Class="pa-4 text-center" Style="background-color: var(--mud-palette-background-grey);">
+                    <MudPaper Elevation="1" Class="promo-card pa-4 text-center">
                         <MudText Typo="Typo.h4" Color="Color.Primary" Style="font-weight: bold;">@_statistics.Promotions.TotalBanners</MudText>
                         <MudText Typo="Typo.body2">Banner (@_statistics.Promotions.ActiveBanners hoạt động)</MudText>
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudPaper Elevation="0" Class="pa-4 text-center" Style="background-color: var(--mud-palette-background-grey);">
+                    <MudPaper Elevation="1" Class="promo-card pa-4 text-center">
                         <MudText Typo="Typo.h4" Color="Color.Secondary" Style="font-weight: bold;">@_statistics.Promotions.TotalCoupons</MudText>
                         <MudText Typo="Typo.body2">Coupon (@_statistics.Promotions.ActiveCoupons hoạt động)</MudText>
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudPaper Elevation="0" Class="pa-4 text-center" Style="background-color: var(--mud-palette-background-grey);">
+                    <MudPaper Elevation="1" Class="promo-card pa-4 text-center">
                         <MudText Typo="Typo.h4" Color="Color.Info" Style="font-weight: bold;">@_statistics.Promotions.TotalPromotions</MudText>
                         <MudText Typo="Typo.body2">Chương trình (@_statistics.Promotions.ActivePromotions hoạt động)</MudText>
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudPaper Elevation="0" Class="pa-4 text-center" Style="background-color: var(--mud-palette-background-grey);">
+                    <MudPaper Elevation="1" Class="promo-card pa-4 text-center">
                         <MudText Typo="Typo.h4" Color="Color.Success" Style="font-weight: bold;">@_statistics.Promotions.UsedCouponsCount</MudText>
                         <MudText Typo="Typo.body2">Coupon đã sử dụng</MudText>
                     </MudPaper>
@@ -557,7 +560,7 @@ else if (_statistics != null)
     <!-- Additional Charts Row -->
     <MudGrid Class="mb-4">
         <MudItem xs="12" md="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="chart-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Xu hướng doanh thu (12 tháng)</MudText>
@@ -573,7 +576,7 @@ else if (_statistics != null)
             </MudCard>
         </MudItem>
         <MudItem xs="12" md="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="3" Class="chart-card">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Phân bố đơn hàng theo thành phố</MudText>

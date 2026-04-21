@@ -14,33 +14,40 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 <MudLayout>
-    <MudAppBar Elevation="2" Color="Color.Primary" Fixed="true">
-        <MudText Typo="Typo.h5" Color="Color.Inherit" Class="fw-bold">Smarthome Store</MudText>
+    <MudAppBar Elevation="3" Class="navbar-gradient" Fixed="true">
+        <div class="navbar-brand">
+            <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Large" Class="brand-icon" />
+            <MudText Typo="Typo.h5" Color="Color.Inherit" Class="brand-text">Smarthome Store</MudText>
+        </div>
         <MudSpacer />
         <MudHidden Breakpoint="Breakpoint.MdAndUp">
-            <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Inherit" />
+            <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Inherit" Class="nav-icon-btn" />
         </MudHidden>
-        
+
         @if (CurrentUserService.Roles.Contains("Admin"))
         {
-            <MudButton href="/admin" Variant="Variant.Text" Color="Color.Secondary">Quản trị</MudButton>
+            <MudButton href="/admin" Variant="Variant.Text" Color="Color.Inherit" Class="nav-link">Quản trị</MudButton>
         }
         else if (CurrentUserService.Roles.Contains("Technician"))
         {
-            <MudButton href="/technician" Variant="Variant.Text" Color="Color.Secondary">Kỹ thuật viên</MudButton>
+            <MudButton href="/technician" Variant="Variant.Text" Color="Color.Inherit" Class="nav-link">Kỹ thuật viên</MudButton>
         }
         else
         {
-            <MudButton href="/" Variant="Variant.Text">Trang chủ</MudButton>
-            <MudButton href="/products" Variant="Variant.Text">Sản phẩm</MudButton>
+            <MudButton href="/" Variant="Variant.Text" Color="Color.Inherit" Class="nav-link">Trang chủ</MudButton>
+            <MudButton href="/products" Variant="Variant.Text" Color="Color.Inherit" Class="nav-link">Sản phẩm</MudButton>
         }
-        
+
         @* Giỏ hàng với số lượng động - chỉ hiển thị cho customer *@
         @if (!CurrentUserService.Roles.Contains("Admin") && !CurrentUserService.Roles.Contains("Technician"))
         {
-            <MudBadge Content="@_cartCount" Color="Color.Secondary" Overlap="true" Class="mx-4" Visible="@(_cartCount > 0)">
-                <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" />
+            <MudBadge Content="@_cartCount" Color="Color.Secondary" Overlap="true" Class="cart-badge mx-3" Visible="@(_cartCount > 0)">
+                <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" Class="nav-icon-btn" />
             </MudBadge>
+            @if (_cartCount == 0)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" Class="nav-icon-btn" />
+            }
         }
 
         @* Notification widget - hiển thị cho tất cả user đã đăng nhập *@
@@ -50,24 +57,71 @@
         }
 
         @* Nút tài khoản với avatar *@
-        <MudIconButton Href="/profile" Title="Quản lý tài khoản">
+        <MudIconButton Href="/profile" Title="Quản lý tài khoản" Class="avatar-btn">
             @if (!string.IsNullOrEmpty(_avatarUrl))
             {
-                <MudAvatar Size="Size.Medium">
+                <MudAvatar Size="Size.Medium" Class="nav-avatar">
                     <MudImage Src="@_avatarUrl" ObjectFit="ObjectFit.Cover" />
                 </MudAvatar>
             }
             else
             {
-                <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" />
+                <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" Size="Size.Large" />
             }
         </MudIconButton>
     </MudAppBar>
-    <MudMainContent Class="mt-16 pa-4">
-        <MudContainer MaxWidth="MaxWidth.Large">
+    <MudMainContent Class="main-content">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="content-container">
             @Body
         </MudContainer>
     </MudMainContent>
+    <div class="footer" style="background: linear-gradient(135deg, #1565C0 0%, #1976D2 100%) !important; color: white !important; padding: 3rem 0 1.5rem 0; min-height: 200px; position: relative; z-index: 1000;">
+        <MudContainer MaxWidth="MaxWidth.Large">
+            <MudGrid Class="footer-grid">
+                <MudItem xs="12" sm="6" md="3">
+                    <div class="footer-section">
+                        <MudText Typo="Typo.h6" Class="footer-title">Smarthome Store</MudText>
+                        <MudText Typo="Typo.body2" Class="footer-text">Giải pháp nhà thông minh toàn diện cho cuộc sống hiện đại</MudText>
+                    </div>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <div class="footer-section">
+                        <MudText Typo="Typo.h6" Class="footer-title">Sản phẩm</MudText>
+                        <MudText Class="footer-link">Đèn thông minh</MudText>
+                        <MudText Class="footer-link">Cảm biến</MudText>
+                        <MudText Class="footer-link">Camera</MudText>
+                        <MudText Class="footer-link">Thiết bị an ninh</MudText>
+                    </div>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <div class="footer-section">
+                        <MudText Typo="Typo.h6" Class="footer-title">Hỗ trợ</MudText>
+                        <MudText Class="footer-link">Trung tâm trợ giúp</MudText>
+                        <MudText Class="footer-link">Chính sách bảo hành</MudText>
+                        <MudText Class="footer-link">Hướng dẫn sử dụng</MudText>
+                        <MudText Class="footer-link">Liên hệ</MudText>
+                    </div>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <div class="footer-section">
+                        <MudText Typo="Typo.h6" Class="footer-title">Liên hệ</MudText>
+                        <MudText Typo="Typo.body2" Class="footer-text">
+                            <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" /> 1900-1234
+                        </MudText>
+                        <MudText Typo="Typo.body2" Class="footer-text">
+                            <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" /> support@smarthome.vn
+                        </MudText>
+                    </div>
+                </MudItem>
+            </MudGrid>
+            <MudDivider Class="footer-divider" />
+            <div class="footer-bottom">
+                <MudText Typo="Typo.body2" Class="footer-copyright">
+                    2026 Smarthome Store. All rights reserved.
+                </MudText>
+            </div>
+        </MudContainer>
+    </div>
     <ChatWidget />
 </MudLayout>
 

@@ -4,22 +4,52 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Content;
 using Domain.Exceptions;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Application.Services
 {
     public class BannerService : IBannerService
     {
         private readonly IBannerRepository _bannerRepository;
+        private readonly IMemoryCache _cache;
+        private const string BannersCacheKey = "AllBanners";
+        private const string BannersByPositionCacheKey = "BannersByPosition_";
+        private readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(15);
 
-        public BannerService(IBannerRepository bannerRepository)
+        public BannerService(IBannerRepository bannerRepository, IMemoryCache cache)
         {
             _bannerRepository = bannerRepository;
+            _cache = cache;
         }
 
         public async Task<List<BannerResponse>> GetAllAsync()
         {
+            if (_cache.TryGetValue(BannersCacheKey, out List<BannerResponse>? cachedBanners))
+            {
+                return cachedBanners ?? new List<BannerResponse>();
+            }
+
             var banners = await _bannerRepository.GetAllAsync();
-            return banners.Select(MapToResponse).ToList();
+            var result = banners.Select(MapToResponse).ToList();
+            
+            _cache.Set(BannersCacheKey, result, _cacheDuration);
+            return result;
+        }
+
+        public async Task<List<BannerResponse>> GetByPositionAsync(string position)
+        {
+            var cacheKey = BannersByPositionCacheKey + position;
+            
+            if (_cache.TryGetValue(cacheKey, out List<BannerResponse>? cachedBanners))
+            {
+                return cachedBanners ?? new List<BannerResponse>();
+            }
+
+            var banners = await _bannerRepository.GetByPositionAsync(position);
+            var result = banners.Select(MapToResponse).ToList();
+            
+            _cache.Set(cacheKey, result, _cacheDuration);
+            return result;
         }
 
         public async Task<BannerResponse?> GetByIdAsync(int id)
@@ -27,12 +57,6 @@ namespace Application.Services
             var banner = await _bannerRepository.GetByIdAsync(id);
             if (banner == null) return null;
             return MapToResponse(banner);
-        }
-
-        public async Task<List<BannerResponse>> GetByPositionAsync(string position)
-        {
-            var banners = await _bannerRepository.GetByPositionAsync(position);
-            return banners.Select(MapToResponse).ToList();
         }
 
         public async Task<int> CreateAsync(CreateBannerRequest request)
@@ -53,6 +77,8 @@ namespace Application.Services
 
             await _bannerRepository.AddAsync(banner);
             await _bannerRepository.SaveChangesAsync();
+            
+            InvalidateCache();
             return banner.Id;
         }
 
@@ -79,6 +105,8 @@ namespace Application.Services
 
             _bannerRepository.Update(banner);
             await _bannerRepository.SaveChangesAsync();
+            
+            InvalidateCache();
         }
 
         public async Task DeleteAsync(int id)
@@ -89,6 +117,8 @@ namespace Application.Services
 
             _bannerRepository.Delete(banner);
             await _bannerRepository.SaveChangesAsync();
+            
+            InvalidateCache();
         }
 
         public async Task<bool> ActivateAsync(int id)
@@ -99,6 +129,8 @@ namespace Application.Services
             banner.Activate();
             _bannerRepository.Update(banner);
             await _bannerRepository.SaveChangesAsync();
+            
+            InvalidateCache();
             return true;
         }
 
@@ -110,7 +142,20 @@ namespace Application.Services
             banner.Deactivate();
             _bannerRepository.Update(banner);
             await _bannerRepository.SaveChangesAsync();
+            
+            InvalidateCache();
             return true;
+        }
+
+        private void InvalidateCache()
+        {
+            _cache.Remove(BannersCacheKey);
+            // Remove all position-based cache entries
+            var positions = new[] { "HomeTop", "HomeMiddle", "HomeBottom", "ProductPage" };
+            foreach (var position in positions)
+            {
+                _cache.Remove(BannersByPositionCacheKey + position);
+            }
         }
 
         private BannerResponse MapToResponse(Banner banner)
