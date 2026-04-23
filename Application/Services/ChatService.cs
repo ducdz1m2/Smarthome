@@ -127,25 +127,21 @@ public class ChatService : IChatService
 
         var message = ChatMessage.Create(roomId, senderId, senderType, request.Content, senderId.ToString());
 
-        // We need to persist via repository - add message through EF
+        // Add message to room before saving
+        room.AddMessage(message);
+
         _chatRoomRepository.Update(room);
         await _chatRoomRepository.SaveChangesAsync();
 
-        // Reload to get the saved message with ID
-        var updatedRoom = await _chatRoomRepository.GetByIdWithMessagesAsync(roomId);
-        var savedMessage = updatedRoom?.Messages
-            .OrderByDescending(m => m.SentAt)
-            .FirstOrDefault(m => m.SenderId == senderId && m.Content == request.Content);
-
         await _eventDispatcher.DispatchAsync(new ChatMessageSentEvent(
             roomId,
-            savedMessage?.Id ?? 0,
+            message.Id,
             senderId,
             (int)senderType,
             request.Content,
             DateTime.UtcNow));
 
-        return MapToMessageResponse(savedMessage ?? message, senderId, senderType);
+        return MapToMessageResponse(message, senderId, senderType);
     }
 
     public async Task<ChatMessageResponse?> EditMessageAsync(int messageId, int userId, EditMessageRequest request)

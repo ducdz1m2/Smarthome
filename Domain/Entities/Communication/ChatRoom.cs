@@ -68,4 +68,9 @@ public class ChatRoom : Entity
         IsActive = true;
         ClosedAt = null;
     }
+
+    public void AddMessage(ChatMessage message)
+    {
+        _messages.Add(message);
+    }
 }

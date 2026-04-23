@@ -1,0 +1,721 @@
+@startuml Smarthome Entity Class Diagram
+
+' Style settings
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor White
+    ArrowColor #2C3E50
+    BorderColor #2C3E50
+}
+skinparam linetype ortho
+
+' ==================== ABSTRACTIONS ====================
+abstract class AggregateRoot {
+    + int Id
+    + DateTime CreatedAt
+    + DateTime? UpdatedAt
+    + string CreatedBy
+    + string? UpdatedBy
+    + List<DomainEvent> DomainEvents
+}
+
+abstract class Entity {
+    + int Id
+    + DateTime CreatedAt
+    + DateTime? UpdatedAt
+    + string CreatedBy
+    + string? UpdatedBy
+}
+
+' ==================== IDENTITY ====================
+class ApplicationUser {
+    + string FullName
+    + string? Avatar
+    + bool IsActive
+    + DateTime? LastLoginAt
+    + DateTime CreatedAt
+}
+
+class ApplicationRole {
+}
+
+' ==================== CATALOG ====================
+class Product <<AggregateRoot>> {
+    + string Name
+    + Sku Sku
+    + int StockQuantity
+    + int FrozenStockQuantity
+    + string? Description
+    + string SpecsJson
+    + bool IsActive
+    + bool RequiresInstallation
+    + int CategoryId
+    + int BrandId
+    + int? SupplierId
+    + Category Category
+    + Brand Brand
+    + Supplier? Supplier
+    + List<ProductVariant> Variants
+    + List<ProductImage> Images
+    + List<ProductComment> Comments
+}
+
+class Category <<Entity>> {
+    + string Name
+    + string? Description
+    + int? ParentId
+    + int SortOrder
+    + bool IsActive
+    + Category? Parent
+    + List<Category> Children
+    + List<Product> Products
+}
+
+class Brand <<Entity>> {
+    + string Name
+    + string? Description
+    + string? LogoUrl
+    + string? Website
+    + bool IsActive
+    + List<Product> Products
+}
+
+class ProductVariant <<Entity>> {
+    + int ProductId
+    + Sku Sku
+    + Money Price
+    + int StockQuantity
+    + int FrozenStockQuantity
+    + int WarrantyPeriod
+    + string AttributesJson
+    + bool IsActive
+    + Product Product
+}
+
+class ProductImage <<Entity>> {
+    + int ProductId
+    + string Url
+    + string? AltText
+    + bool IsMain
+    + int SortOrder
+    + Product Product
+}
+
+class ProductComment <<Entity>> {
+    + int ProductId
+    + int UserId
+    + string Content
+    + int Rating
+    + Product Product
+    + ApplicationUser User
+}
+
+' ==================== SALES ====================
+class Order <<AggregateRoot>> {
+    + string OrderNumber
+    + OrderStatus Status
+    + int UserId
+    + string ReceiverName
+    + PhoneNumber ReceiverPhone
+    + Address ShippingAddress
+    + Money TotalAmount
+    + Money ShippingFee
+    + Money DiscountAmount
+    + DateTime? InstallationDate
+    + PaymentMethod PaymentMethod
+    + ShippingMethod ShippingMethod
+    + string StatusHistoryJson
+    + string? CancelReason
+    + ApplicationUser User
+    + List<OrderItem> Items
+    + List<OrderShipment> Shipments
+    + PaymentTransaction? PaymentTransaction
+}
+
+class OrderItem <<Entity>> {
+    + int OrderId
+    + int ProductId
+    + int? VariantId
+    + int Quantity
+    + Money UnitPrice
+    + bool IsShipped
+    + bool IsInstalled
+    + bool IsReserved
+    + bool RequiresInstallation
+    + int? WarehouseId
+    + int? InstallationBookingId
+    + Order Order
+    + Product Product
+    + ProductVariant? Variant
+    + InstallationBooking? InstallationBooking
+    + List<OrderWarehouseAllocation> WarehouseAllocations
+}
+
+class CartItem <<Entity>> {
+    + int UserId
+    + int ProductId
+    + int? VariantId
+    + int Quantity
+    + DateTime AddedAt
+    + ApplicationUser User
+    + Product Product
+    + ProductVariant? Variant
+}
+
+class PaymentTransaction <<Entity>> {
+    + int OrderId
+    + Money Amount
+    + PaymentMethod Method
+    + PaymentTransactionStatus Status
+    + string? TransactionCode
+    + string? GatewayResponse
+    + DateTime? PaidAt
+    + Order Order
+}
+
+class OrderShipment <<Entity>> {
+    + int OrderId
+    + int? ShipperId
+    + string Carrier
+    + string TrackingNumber
+    + OrderShipmentStatus Status
+    + DateTime? PickedUpAt
+    + DateTime? DeliveredAt
+    + string? Notes
+    + DateTime? ApprovedAt
+    + int? ApprovedBy
+    + Order Order
+}
+
+class Warranty <<AggregateRoot>> {
+    + int ProductId
+    + int? VariantId
+    + int OrderItemId
+    + DateTime StartDate
+    + DateTime EndDate
+    + WarrantyStatus Status
+    + int DurationMonths
+    + int? InstalledByTechnicianId
+    + int ClaimsCount
+    + Product Product
+    + ProductVariant? Variant
+    + OrderItem OrderItem
+    + List<WarrantyClaim> Claims
+}
+
+class WarrantyClaim <<Entity>> {
+    + int WarrantyId
+    + int ProductId
+    + int? VariantId
+    + int OrderItemId
+    + string Issue
+    + WarrantyClaimStatus Status
+    + string? Resolution
+    + DateTime? ResolvedAt
+    + Warranty Warranty
+    + Product Product
+    + OrderItem OrderItem
+}
+
+class ReturnOrder <<AggregateRoot>> {
+    + int OrderId
+    + int OrderItemId
+    + string Reason
+    + ReturnOrderStatus Status
+    + DateTime? ReturnedAt
+    + Order Order
+    + OrderItem OrderItem
+}
+
+class ProductRating <<Entity>> {
+    + int ProductId
+    + int UserId
+    + int Rating
+    + string? Comment
+    + Product Product
+    + ApplicationUser User
+}
+
+class OrderWarehouseAllocation <<Entity>> {
+    + int OrderItemId
+    + int WarehouseId
+    + int Quantity
+    + OrderItem OrderItem
+    + Warehouse Warehouse
+}
+
+' ==================== INVENTORY ====================
+class Warehouse <<AggregateRoot>> {
+    + string Name
+    + string Code
+    + Address Address
+    + PhoneNumber? Phone
+    + string? ManagerName
+    + bool IsActive
+    + List<ProductWarehouse> ProductWarehouses
+}
+
+class Supplier <<AggregateRoot>> {
+    + string Name
+    + string? TaxCode
+    + Address? Address
+    + string? ContactName
+    + PhoneNumber? Phone
+    + Email? Email
+    + string? BankAccount
+    + string? BankName
+    + bool IsActive
+    + List<StockEntry> StockEntries
+}
+
+class StockEntry <<AggregateRoot>> {
+    + DateTime EntryDate
+    + int SupplierId
+    + int WarehouseId
+    + string? Note
+    + decimal TotalCost
+    + bool IsCompleted
+    + Supplier Supplier
+    + Warehouse Warehouse
+    + List<StockEntryDetail> Details
+}
+
+class StockEntryDetail <<Entity>> {
+    + int StockEntryId
+    + int ProductId
+    + int? VariantId
+    + int Quantity
+    + Money UnitCost
+    + StockEntry StockEntry
+    + Product Product
+    + ProductVariant? Variant
+}
+
+class StockIssue <<AggregateRoot>> {
+    + DateTime IssueDate
+    + int WarehouseId
+    + string? Note
+    + decimal TotalCost
+    + bool IsCompleted
+    + Warehouse Warehouse
+    + List<StockIssueDetail> Details
+}
+
+class StockIssueDetail <<Entity>> {
+    + int StockIssueId
+    + int ProductId
+    + int? VariantId
+    + int Quantity
+    + Money UnitCost
+    + StockIssue StockIssue
+    + Product Product
+    + ProductVariant? Variant
+}
+
+class ProductWarehouse <<Entity>> {
+    + int ProductId
+    + int? VariantId
+    + int WarehouseId
+    + int Quantity
+    + int ReservedQuantity
+    + Warehouse Warehouse
+    + Product Product
+    + ProductVariant? Variant
+}
+
+class WarehouseTransfer <<AggregateRoot>> {
+    + DateTime TransferDate
+    + int FromWarehouseId
+    + int ToWarehouseId
+    + string? Note
+    + TransferStatus Status
+    + Warehouse FromWarehouse
+    + Warehouse ToWarehouse
+    + List<WarehouseTransferDetail> Details
+}
+
+class WarehouseTransferDetail <<Entity>> {
+    + int WarehouseTransferId
+    + int ProductId
+    + int? VariantId
+    + int Quantity
+    + WarehouseTransfer WarehouseTransfer
+    + Product Product
+    + ProductVariant? Variant
+}
+
+class ProductReservation <<Entity>> {
+    + int ProductId
+    + int? VariantId
+    + int OrderItemId
+    + int Quantity
+    + DateTime ReservedAt
+    + DateTime? ExpiresAt
+    + ReservationStatus Status
+    + Product Product
+    + ProductVariant? Variant
+    + OrderItem OrderItem
+}
+
+' ==================== INSTALLATION ====================
+class InstallationBooking <<AggregateRoot>> {
+    + int OrderId
+    + int TechnicianId
+    + int? SlotId
+    + InstallationStatus Status
+    + DateTime ScheduledDate
+    + TimeSpan EstimatedDuration
+    + bool MaterialsPrepared
+    + DateTime? OnTheWayAt
+    + DateTime? StartedAt
+    + DateTime? CompletedAt
+    + int? CustomerRating
+    + string? CustomerSignature
+    + string? Notes
+    + bool IsUninstall
+    + bool IsWarranty
+    + int CustomerRescheduleCount
+    + Order Order
+    + TechnicianProfile Technician
+    + InstallationSlot Slot
+    + List<InstallationMaterial> Materials
+}
+
+class TechnicianProfile <<AggregateRoot>> {
+    + int? UserId
+    + string FullName
+    + PhoneNumber PhoneNumber
+    + Email? Email
+    + string? IdentityCard
+    + Address? Address
+    + DateTime? DateOfBirth
+    + ApplicationUser? User
+    + string EmployeeCode
+    + DateTime HireDate
+    + Money BaseSalary
+    + string City
+    + string Districts
+    + string SkillsJson
+    + bool IsAvailable
+    + double Rating
+    + int CompletedJobs
+    + int CancelledJobs
+    + List<InstallationSlot> Slots
+    + List<InstallationBooking> Bookings
+}
+
+class InstallationSlot <<Entity>> {
+    + int TechnicianId
+    + DateTime Date
+    + TimeSpan StartTime
+    + TimeSpan EndTime
+    + bool IsAvailable
+    + TechnicianProfile Technician
+    + InstallationBooking? Booking
+}
+
+class InstallationMaterial <<Entity>> {
+    + int InstallationBookingId
+    + int ProductId
+    + int QuantityTaken
+    + int? WarehouseId
+    + int? VariantId
+    + InstallationBooking InstallationBooking
+    + Product Product
+    + Warehouse? Warehouse
+    + ProductVariant? Variant
+}
+
+class TechnicianRating <<Entity>> {
+    + int TechnicianId
+    + int InstallationBookingId
+    + int Rating
+    + string? Comment
+    + DateTime RatedAt
+    + TechnicianProfile Technician
+    + InstallationBooking InstallationBooking
+}
+
+' ==================== PROMOTIONS ====================
+class Promotion <<AggregateRoot>> {
+    + string Name
+    + string? Description
+    + Percentage DiscountPercent
+    + DateTime StartDate
+    + DateTime EndDate
+    + Money? MinOrderAmount
+    + bool IsActive
+    + int Priority
+    + List<PromotionProduct> PromotionProducts
+}
+
+class PromotionProduct <<Entity>> {
+    + int PromotionId
+    + int ProductId
+    + Percentage? CustomDiscount
+    + Promotion Promotion
+    + Product Product
+}
+
+class Coupon <<AggregateRoot>> {
+    + string Code
+    + DiscountType DiscountType
+    + Money DiscountValue
+    + Money? MinOrderAmount
+    + Money? MaxDiscountAmount
+    + DateTime ExpiryDate
+    + int MaxUsage
+    + int UsedCount
+    + bool IsActive
+}
+
+' ==================== COMMUNICATION ====================
+class ChatRoom <<Entity>> {
+    + string Title
+    + ChatRoomType Type
+    + bool IsActive
+    + DateTime? ClosedAt
+    + int? RelatedOrderId
+    + int? RelatedInstallationId
+    + int? RelatedWarrantyClaimId
+    + List<ChatMessage> Messages
+    + List<ChatParticipant> Participants
+}
+
+class ChatMessage <<Entity>> {
+    + int ChatRoomId
+    + int UserId
+    + string Content
+    + MessageType Type
+    + bool IsRead
+    + DateTime? ReadAt
+    + ChatRoom ChatRoom
+    + ApplicationUser User
+    + ChatAttachment? Attachment
+}
+
+class ChatParticipant <<Entity>> {
+    + int ChatRoomId
+    + int UserId
+    + ParticipantRole Role
+    + DateTime JoinedAt
+    + ChatRoom ChatRoom
+    + ApplicationUser User
+}
+
+class ChatAttachment <<Entity>> {
+    + int ChatMessageId
+    + string FileName
+    + string FileUrl
+    + string FileType
+    + long FileSize
+    + ChatMessage ChatMessage
+}
+
+class Notification <<Entity>> {
+    + int UserId
+    + UserType UserType
+    + NotificationType Type
+    + string Title
+    + string Message
+    + string? ActionUrl
+    + string? Icon
+    + bool IsRead
+    + DateTime? ReadAt
+    + bool IsSent
+    + DateTime? SentAt
+    + DateTime CreatedAt
+    + string? SendError
+    + int? RelatedEntityId
+    + string? RelatedEntityType
+}
+
+' ==================== CONTENT ====================
+class Banner <<Entity>> {
+    + string Title
+    + string? Subtitle
+    + WebsiteUrl ImageUrl
+    + WebsiteUrl? LinkUrl
+    + string Position
+    + int SortOrder
+    + DateTime? StartDate
+    + DateTime? EndDate
+    + bool IsActive
+    + int ClickCount
+}
+
+class UserAddress <<AggregateRoot>> {
+    + int UserId
+    + string Label
+    + string ReceiverName
+    + PhoneNumber ReceiverPhone
+    + Address Address
+    + bool IsDefault
+    + ApplicationUser User
+}
+
+' ==================== SHIPPING ====================
+class ShippingRate <<Entity>> {
+    + string City
+    + string District
+    + decimal BaseRate
+    + decimal PerKgRate
+    + decimal PerKmRate
+    + bool IsActive
+}
+
+' ==================== RELATIONSHIPS ====================
+
+' Catalog relationships
+Product --> Category : belongs to
+Product --> Brand : belongs to
+Product --> Supplier : supplied by
+Product "1" --> "*" ProductVariant : has
+Product "1" --> "*" ProductImage : has
+Product "1" --> "*" ProductComment : has
+Category "1" --> "*" Category : parent-child
+Category "1" --> "*" Product : contains
+Brand "1" --> "*" Product : manufactures
+ProductVariant --> Product : belongs to
+ProductImage --> Product : belongs to
+ProductComment --> Product : comments on
+ProductComment --> ApplicationUser : written by
+
+' Sales relationships
+Order --> ApplicationUser : placed by
+Order "1" --> "*" OrderItem : contains
+Order "1" --> "*" OrderShipment : has
+Order "1" --> "0..1" PaymentTransaction : has
+OrderItem --> Order : belongs to
+OrderItem --> Product : references
+OrderItem --> ProductVariant : references
+OrderItem --> InstallationBooking : assigned to
+OrderItem "1" --> "*" OrderWarehouseAllocation : allocated to
+CartItem --> ApplicationUser : belongs to
+CartItem --> Product : references
+CartItem --> ProductVariant : references
+PaymentTransaction --> Order : for
+OrderShipment --> Order : for
+Warranty --> Product : covers
+Warranty --> ProductVariant : covers
+Warranty --> OrderItem : for
+Warranty "1" --> "*" WarrantyClaim : has
+WarrantyClaim --> Warranty : for
+WarrantyClaim --> Product : for
+WarrantyClaim --> OrderItem : for
+ReturnOrder --> Order : for
+ReturnOrder --> OrderItem : for
+ProductRating --> Product : rates
+ProductRating --> ApplicationUser : by
+OrderWarehouseAllocation --> OrderItem : for
+OrderWarehouseAllocation --> Warehouse : from
+
+' Inventory relationships
+Warehouse "1" --> "*" ProductWarehouse : stores
+Supplier "1" --> "*" StockEntry : provides
+StockEntry --> Supplier : from
+StockEntry --> Warehouse : to
+StockEntry "1" --> "*" StockEntryDetail : contains
+StockEntryDetail --> StockEntry : belongs to
+StockEntryDetail --> Product : for
+StockEntryDetail --> ProductVariant : for
+StockIssue --> Warehouse : from
+StockIssue "1" --> "*" StockIssueDetail : contains
+StockIssueDetail --> StockIssue : belongs to
+StockIssueDetail --> Product : for
+StockIssueDetail --> ProductVariant : for
+ProductWarehouse --> Warehouse : in
+ProductWarehouse --> Product : for
+ProductWarehouse --> ProductVariant : for
+WarehouseTransfer --> Warehouse : from
+WarehouseTransfer --> Warehouse : to
+WarehouseTransfer "1" --> "*" WarehouseTransferDetail : contains
+WarehouseTransferDetail --> WarehouseTransfer : belongs to
+WarehouseTransferDetail --> Product : for
+WarehouseTransferDetail --> ProductVariant : for
+ProductReservation --> Product : reserves
+ProductReservation --> ProductVariant : reserves
+ProductReservation --> OrderItem : for
+
+' Installation relationships
+InstallationBooking --> Order : for
+InstallationBooking --> TechnicianProfile : assigned to
+InstallationBooking --> InstallationSlot : scheduled at
+InstallationBooking "1" --> "*" InstallationMaterial : uses
+TechnicianProfile --> ApplicationUser : linked to
+TechnicianProfile "1" --> "*" InstallationSlot : has
+TechnicianProfile "1" --> "*" InstallationBooking : assigned
+InstallationSlot --> TechnicianProfile : belongs to
+InstallationSlot --> InstallationBooking : booked by
+InstallationMaterial --> InstallationBooking : for
+InstallationMaterial --> Product : material
+InstallationMaterial --> Warehouse : from
+InstallationMaterial --> ProductVariant : variant
+TechnicianRating --> TechnicianProfile : rates
+TechnicianRating --> InstallationBooking : for
+
+' Promotion relationships
+Promotion "1" --> "*" PromotionProduct : applies to
+PromotionProduct --> Promotion : belongs to
+PromotionProduct --> Product : for
+
+' Communication relationships
+ChatRoom "1" --> "*" ChatMessage : contains
+ChatRoom "1" --> "*" ChatParticipant : has
+ChatMessage --> ChatRoom : in
+ChatMessage --> ApplicationUser : sent by
+ChatMessage --> ChatAttachment : has
+ChatParticipant --> ChatRoom : in
+ChatParticipant --> ApplicationUser : is
+ChatAttachment --> ChatMessage : attached to
+Notification --> ApplicationUser : for
+
+' Content relationships
+UserAddress --> ApplicationUser : belongs to
+
+' Inheritance
+AggregateRoot <|-- Product
+AggregateRoot <|-- Order
+AggregateRoot <|-- Warranty
+AggregateRoot <|-- Warehouse
+AggregateRoot <|-- Supplier
+AggregateRoot <|-- StockEntry
+AggregateRoot <|-- StockIssue
+AggregateRoot <|-- WarehouseTransfer
+AggregateRoot <|-- InstallationBooking
+AggregateRoot <|-- TechnicianProfile
+AggregateRoot <|-- Promotion
+AggregateRoot <|-- Coupon
+AggregateRoot <|-- UserAddress
+
+Entity <|-- Category
+Entity <|-- Brand
+Entity <|-- ProductVariant
+Entity <|-- ProductImage
+Entity <|-- ProductComment
+Entity <|-- OrderItem
+Entity <|-- CartItem
+Entity <|-- PaymentTransaction
+Entity <|-- OrderShipment
+Entity <|-- WarrantyClaim
+Entity <|-- ReturnOrder
+Entity <|-- ProductRating
+Entity <|-- OrderWarehouseAllocation
+Entity <|-- StockEntryDetail
+Entity <|-- StockIssueDetail
+Entity <|-- ProductWarehouse
+Entity <|-- WarehouseTransferDetail
+Entity <|-- ProductReservation
+Entity <|-- InstallationSlot
+Entity <|-- InstallationMaterial
+Entity <|-- TechnicianRating
+Entity <|-- PromotionProduct
+Entity <|-- ChatRoom
+Entity <|-- ChatMessage
+Entity <|-- ChatParticipant
+Entity <|-- ChatAttachment
+Entity <|-- Notification
+Entity <|-- Banner
+Entity <|-- ShippingRate
+
+@enduml

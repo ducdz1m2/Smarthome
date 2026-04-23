@@ -283,26 +283,28 @@
 }
 
 .chat-box {
-    position: absolute;
-    bottom: 70px;
-    right: 0;
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
     width: 450px;
-    max-height: 700px;
+    height: 500px;
     background: white;
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    display: flex;
-    flex-direction: column;
+    display: block;
     overflow: hidden;
+    z-index: 1001;
 }
 
 .chat-header {
+    height: 60px;
     padding: 16px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-shrink: 0;
 }
 
 .bot-avatar {
@@ -344,11 +346,10 @@
 }
 
 .chat-messages {
-    flex: 1;
+    height: 330px;
     padding: 16px;
     overflow-y: auto;
     background: #f5f5f5;
-    max-height: 400px;
 }
 
 .msg-row {
@@ -451,9 +452,11 @@
 }
 
 .chat-input-area {
+    max-height: 110px;
     padding: 12px;
     background: white;
     border-top: 1px solid #e0e0e0;
+    overflow-y: auto;
 }
 
 .quick-replies {
@@ -820,7 +823,7 @@
                 List<ChatRoomResponse> chatRooms;
                 try
                 {
-                    chatRooms = await ChatService.GetUserChatRoomsAsync(userId.Value, Domain.Enums.UserType.Customer);
+                    chatRooms = await ChatService.GetCustomerChatRoomsAsync(userId.Value);
                 }
                 catch (Exception ex)
                 {
@@ -952,7 +955,8 @@
                 try
                 {
                     Console.WriteLine($"[ChatWidget] Creating support chat room for user {userId}");
-                    _chatRoomId = await ChatService.CreateSupportChatAsync(userId.Value);
+                    var request = new CreateSupportChatRequest { CustomerId = userId.Value };
+                    _chatRoomId = await ChatService.CreateSupportChatAsync(request, 1); // Using adminId = 1 as default
                     Console.WriteLine($"[ChatWidget] Created support chat room: {_chatRoomId}");
                 }
                 catch (Exception ex)
@@ -1259,7 +1263,7 @@
         {
             try
             {
-                await SpeechService.SpeakAsync(text);
+                await SpeechService.SynthesizeAsync(text);
             }
             catch (Exception ex)
             {
