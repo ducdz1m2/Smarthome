@@ -12,6 +12,7 @@ public class ReturnOrder : AggregateRoot
     {
         public int OriginalOrderId { get; private set; }
         public ReturnType ReturnType { get; private set; }
+        public ReturnMethod ReturnMethod { get; private set; }
         public string Reason { get; private set; } = string.Empty;
         public ReturnOrderStatus Status { get; private set; } = ReturnOrderStatus.Pending;
         public Money? RefundAmount { get; private set; }
@@ -23,7 +24,7 @@ public class ReturnOrder : AggregateRoot
 
         private ReturnOrder() { }
 
-        public static ReturnOrder Create(int originalOrderId, ReturnType returnType, string reason)
+        public static ReturnOrder Create(int originalOrderId, ReturnType returnType, ReturnMethod returnMethod, string reason)
         {
             if (string.IsNullOrWhiteSpace(reason))
                 throw new ValidationException(nameof(reason), "Lý do trả hàng không được trống");
@@ -32,6 +33,7 @@ public class ReturnOrder : AggregateRoot
             {
                 OriginalOrderId = originalOrderId,
                 ReturnType = returnType,
+                ReturnMethod = returnMethod,
                 Reason = reason.Trim(),
                 Status = ReturnOrderStatus.Pending
             };

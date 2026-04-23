@@ -1,0 +1,33 @@
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Chọn ngày thực hiện</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudDatePicker Label="Ngày thực hiện" @bind-Date="_selectedDate" MinDate="@DateTime.Today" Required="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(!_selectedDate.HasValue)">Xác nhận</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    private DateTime? _selectedDate = DateTime.Today.AddDays(1);
+    
+    private void Submit()
+    {
+        if (_selectedDate.HasValue)
+        {
+            MudDialog.Close(DialogResult.Ok(_selectedDate.Value));
+        }
+    }
+    
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

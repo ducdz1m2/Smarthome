@@ -7,8 +7,31 @@
 @inject ISnackbar Snackbar
 
 <div class="admin-header">
-    <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
-    <MudText Typo="Typo.body2" Color="Color.Secondary">Tổng quan hoạt động hệ thống</MudText>
+    <div class="d-flex align-center justify-space-between mb-4">
+        <div>
+            <MudText Typo="Typo.h4">Dashboard</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Tổng quan hoạt động hệ thống</MudText>
+        </div>
+        <div class="d-flex gap-2 align-center">
+            <MudSelect T="string" @bind-Value="_selectedPeriod" Variant="Variant.Outlined" Dense="true" Class="period-select">
+                <MudSelectItem T="string" Value="@("today")">Hôm nay</MudSelectItem>
+                <MudSelectItem T="string" Value="@("week")">Tuần này</MudSelectItem>
+                <MudSelectItem T="string" Value="@("month")">Tháng này</MudSelectItem>
+                <MudSelectItem T="string" Value="@("quarter")">Quý này</MudSelectItem>
+                <MudSelectItem T="string" Value="@("year")">Năm nay</MudSelectItem>
+                <MudSelectItem T="string" Value="@("custom")">Tùy chỉnh</MudSelectItem>
+            </MudSelect>
+            @if (_selectedPeriod == "custom")
+            {
+                <MudDatePicker T="DateTime?" @bind-Date="_customFromDate" Label="Từ ngày" Variant="Variant.Outlined" Dense="true" />
+                <MudDatePicker T="DateTime?" @bind-Date="_customToDate" Label="Đến ngày" Variant="Variant.Outlined" Dense="true" />
+            }
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadStatistics" Disabled="_loading">
+                <MudIcon Icon="@Icons.Material.Filled.Refresh" Class="mr-2" />
+                Làm mới
+            </MudButton>
+        </div>
+    </div>
 </div>
 
 @if (_loading)
@@ -113,13 +136,13 @@ else if (_statistics != null)
         </MudItem>
     </MudGrid>
 
-    <!-- Charts Row 1 -->
+    <!-- Charts Row -->
     <MudGrid Class="mb-4">
-        <MudItem xs="12" lg="8">
+        <MudItem xs="12">
             <MudCard Elevation="3" Class="chart-card">
                 <MudCardHeader>
                     <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Doanh thu & Đơn hàng 6 tháng gần đây</MudText>
+                        <MudText Typo="Typo.h6">Doanh thu & Đơn hàng (@GetPeriodLabel())</MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
@@ -138,100 +161,7 @@ else if (_statistics != null)
                 </MudCardContent>
             </MudCard>
         </MudItem>
-        <MudItem xs="12" lg="4">
-            <MudCard Elevation="3" Class="chart-card" Style="height: 100%;">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Trạng thái đơn hàng</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent Class="d-flex justify-center">
-                    @if (_statistics.Charts?.OrderStatusChart != null && _statistics.Charts.OrderStatusChart.Any())
-                    {
-                        <MudChart T="double" ChartType="ChartType.Pie"
-                                  inputdata="@GetOrderStatusData()"
-                                  inputlabels="@GetOrderStatusLabels()"
-                                  Width="250px" Height="250px" />
-                    }
-                    else
-                    {
-                        <MudText Align="Align.Center" Color="Color.Secondary">Chưa có dữ liệu</MudText>
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
     </MudGrid>
-
-    <!-- Charts Row 2 -->
-    <MudGrid Class="mb-4">
-        <MudItem xs="12" md="6">
-            <MudCard Elevation="3" Class="chart-card">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Người dùng mới</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    @if (_statistics.Charts?.UsersChart != null && _statistics.Charts.UsersChart.Any())
-                    {
-                        <MudChart T="double" ChartType="ChartType.Line"
-                                  ChartSeries="@GetUsersSeries()"
-                                  xaxislabels="@GetMonthLabels()"
-                                  ChartOptions="@(_chartOptions)"
-                                  Width="100%" Height="250px" />
-                    }
-                    else
-                    {
-                        <MudText Align="Align.Center" Color="Color.Secondary">Chưa có dữ liệu</MudText>
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" md="6">
-            <MudCard Elevation="3" Class="chart-card">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Phương thức thanh toán</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent Class="d-flex justify-center">
-                    @if (_statistics.Charts?.PaymentMethodChart != null && _statistics.Charts.PaymentMethodChart.Any())
-                    {
-                        <MudChart T="double" ChartType="ChartType.Donut"
-                                  inputdata="@GetPaymentData()"
-                                  inputlabels="@GetPaymentLabels()"
-                                  Width="250px" Height="250px" />
-                    }
-                    else
-                    {
-                        <MudText Align="Align.Center" Color="Color.Secondary">Chưa có dữ liệu</MudText>
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
-
-    <!-- Category Distribution -->
-    <MudCard Elevation="3" Class="chart-card mb-4">
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudText Typo="Typo.h6">Phân bố sản phẩm theo danh mục</MudText>
-            </CardHeaderContent>
-        </MudCardHeader>
-        <MudCardContent>
-            @if (_statistics.Charts?.CategoryDistribution != null && _statistics.Charts.CategoryDistribution.Any())
-            {
-                <MudChart T="double" ChartType="ChartType.Pie"
-                          inputdata="@GetCategoryData()"
-                          inputlabels="@GetCategoryLabels()"
-                          Width="300px" Height="300px" />
-            }
-            else
-            {
-                <MudText Align="Align.Center" Color="Color.Secondary">Chưa có dữ liệu</MudText>
-            }
-        </MudCardContent>
-    </MudCard>
 
     <!-- Sales & Product Stats -->
     <MudGrid Class="mb-4">
@@ -556,41 +486,6 @@ else if (_statistics != null)
             </MudGrid>
         </MudCardContent>
     </MudCard>
-
-    <!-- Additional Charts Row -->
-    <MudGrid Class="mb-4">
-        <MudItem xs="12" md="6">
-            <MudCard Elevation="3" Class="chart-card">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Xu hướng doanh thu (12 tháng)</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudChart T="double" ChartType="ChartType.Line"
-                              ChartSeries="@GetRevenueTrendSeries()"
-                              xaxislabels="@GetMonthLabels()"
-                              ChartOptions="@(_chartOptions)"
-                              Width="100%" Height="300px" />
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" md="6">
-            <MudCard Elevation="3" Class="chart-card">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Phân bố đơn hàng theo thành phố</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent Class="d-flex justify-center">
-                    <MudChart T="double" ChartType="ChartType.Pie"
-                              inputdata="@GetCityData()"
-                              inputlabels="@GetCityLabels()"
-                              Width="300px" Height="300px" />
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
 }
 else if (_loadError)
 {
@@ -606,6 +501,9 @@ else if (_loadError)
     private DashboardStatisticsResponse? _statistics;
     private bool _loading = true;
     private bool _loadError = false;
+    private string _selectedPeriod = "month";
+    private DateTime? _customFromDate;
+    private DateTime? _customToDate;
 
     private readonly ChartOptions _chartOptions = new()
     {
@@ -617,6 +515,25 @@ else if (_loadError)
         await LoadStatistics();
     }
 
+    private (DateTime? fromDate, DateTime? toDate) GetDateRange()
+    {
+        var today = DateTime.Now.Date;
+
+        return _selectedPeriod switch
+        {
+            "today" => (today, today.AddDays(1).AddTicks(-1)),
+            "week" => (today.AddDays(-(int)today.DayOfWeek), today.AddDays(1).AddTicks(-1)),
+            "month" => (new DateTime(today.Year, today.Month, 1), today.AddDays(1).AddTicks(-1)),
+            "quarter" => (
+                new DateTime(today.Year, ((today.Month - 1) / 3) * 3 + 1, 1),
+                today.AddDays(1).AddTicks(-1)
+            ),
+            "year" => (new DateTime(today.Year, 1, 1), today.AddDays(1).AddTicks(-1)),
+            "custom" => (_customFromDate, _customToDate?.AddDays(1).AddTicks(-1)),
+            _ => (null, null)
+        };
+    }
+
     private async Task LoadStatistics()
     {
         _loading = true;
@@ -625,7 +542,8 @@ else if (_loadError)
 
         try
         {
-            _statistics = await StatisticsService.GetDashboardStatisticsAsync();
+            var (fromDate, toDate) = GetDateRange();
+            _statistics = await StatisticsService.GetDashboardStatisticsAsync(fromDate, toDate);
         }
         catch (Exception ex)
         {
@@ -653,84 +571,30 @@ else if (_loadError)
         {
             new ChartSeries<double>
             {
-                Name = "Doanh thu",
-                Data = _statistics.Charts.RevenueChart.Select(x => (double)x.Value).ToArray()
+                Name = "Doanh thu (triệu VNĐ)",
+                Data = _statistics.Charts.RevenueChart.Select(x => (double)x.Value / 1_000_000).ToArray()
             },
             new ChartSeries<double>
             {
                 Name = "Đơn hàng",
-                Data = _statistics.Charts.OrdersChart?.Select(x => (double)x.Count).ToArray() ?? Array.Empty<double>()
+                Data = _statistics.Charts.RevenueChart.Select(x => (double)x.Count).ToArray()
             }
         };
     }
 
-    private List<ChartSeries<double>> GetUsersSeries()
+    private string GetPeriodLabel()
     {
-        if (_statistics?.Charts?.UsersChart == null) return new List<ChartSeries<double>>();
-
-        return new List<ChartSeries<double>>
+        return _selectedPeriod switch
         {
-            new ChartSeries<double>
-            {
-                Name = "Người dùng mới",
-                Data = _statistics.Charts.UsersChart.Select(x => (double)x.Count).ToArray()
-            }
+            "today" => "Hôm nay",
+            "week" => "Tuần này",
+            "month" => "Tháng này",
+            "quarter" => "Quý này",
+            "year" => "Năm nay",
+            "custom" => _customFromDate.HasValue && _customToDate.HasValue
+                ? $"{_customFromDate.Value:dd/MM/yyyy} - {_customToDate.Value:dd/MM/yyyy}"
+                : "Tùy chỉnh",
+            _ => ""
         };
-    }
-
-    private double[] GetOrderStatusData()
-    {
-        return _statistics?.Charts?.OrderStatusChart?.Select(x => (double)x.Value).ToArray() ?? Array.Empty<double>();
-    }
-
-    private string[] GetOrderStatusLabels()
-    {
-        return _statistics?.Charts?.OrderStatusChart?.Select(x => x.Label).ToArray() ?? Array.Empty<string>();
-    }
-
-    private double[] GetPaymentData()
-    {
-        return _statistics?.Charts?.PaymentMethodChart?.Select(x => (double)x.Value).ToArray() ?? Array.Empty<double>();
-    }
-
-    private string[] GetPaymentLabels()
-    {
-        return _statistics?.Charts?.PaymentMethodChart?.Select(x => x.Label).ToArray() ?? Array.Empty<string>();
-    }
-
-    private double[] GetCategoryData()
-    {
-        return _statistics?.Charts?.CategoryDistribution?.Select(x => (double)x.Value).ToArray() ?? Array.Empty<double>();
-    }
-
-    private string[] GetCategoryLabels()
-    {
-        return _statistics?.Charts?.CategoryDistribution?.Select(x => x.Label).ToArray() ?? Array.Empty<string>();
-    }
-
-    private List<ChartSeries<double>> GetRevenueTrendSeries()
-    {
-        if (_statistics?.Charts?.RevenueChart == null) return new List<ChartSeries<double>>();
-
-        return new List<ChartSeries<double>>
-        {
-            new ChartSeries<double>
-            {
-                Name = "Doanh thu",
-                Data = _statistics.Charts.RevenueChart.Select(x => (double)x.Value).ToArray()
-            }
-        };
-    }
-
-    private double[] GetCityData()
-    {
-        // Mock data for city distribution - in real app, this would come from statistics service
-        return new double[] { 35, 25, 20, 12, 8 };
-    }
-
-    private string[] GetCityLabels()
-    {
-        // Mock data for city labels - in real app, this would come from statistics service
-        return new string[] { "Hà Nội", "TP.HCM", "Đà Nẵng", "Hải Phòng", "Khác" };
     }
 }

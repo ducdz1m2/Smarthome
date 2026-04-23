@@ -40,6 +40,12 @@
                     </MudText>
                 </MudItem>
                 <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle2">Phương thức trả:</MudText>
+                    <MudText Typo="Typo.body2">
+                        @(_returnOrder.ReturnMethod == "Shipping" ? "Vận chuyển" : "Kỹ thuật viên")
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" md="6">
                     <MudText Typo="Typo.subtitle2">Loại:</MudText>
                     <MudText Typo="Typo.body2">
                         @(_returnOrder.ReturnType == "Exchange" ? "Đổi hàng" : "Hoàn tiền")

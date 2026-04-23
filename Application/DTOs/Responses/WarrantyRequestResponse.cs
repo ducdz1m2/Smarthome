@@ -1,5 +1,7 @@
 namespace Application.DTOs.Responses;
 
+using Domain.Enums;
+
 public class WarrantyRequestResponse
 {
     public int Id { get; set; }
@@ -30,7 +32,11 @@ public class WarrantyRequestItemResponseDto
     public int Id { get; set; }
     public int OrderItemId { get; set; }
     public int Quantity { get; set; }
-    public string Description { get; set; } = string.Empty;
+    public string Description { get; set; }
     public bool IsDamaged { get; set; }
     public bool ReturnedToInventory { get; set; }
+    public DamagedProductStatus DamagedStatus { get; set; }
+    public int? WarehouseId { get; set; }
+    public decimal? RepairCost { get; set; }
+    public string? RepairNotes { get; set; }
 }

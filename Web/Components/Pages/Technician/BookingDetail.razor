@@ -769,8 +769,6 @@ else
 
     // Prepare Materials Dialog fields
     private bool _showPrepareMaterialsDialog = false;
-    private MudForm _prepareForm = null!;
-    private bool _isPrepareFormValid = false;
     private bool _loadingWarehouses = false;
     private List<WarehouseStockForTechnicianResponse> _availableWarehouses = new();
     private List<MaterialPreparationItem> _selectedMaterials = new();
@@ -1311,10 +1309,11 @@ else
 
             if (productIds.Any())
             {
+                Console.WriteLine($"[OpenPrepareReplacementDialog] Booking District: {_booking?.District}, City: {_booking?.City}");
                 _replacementWarehouses = await InstallationApiService.GetWarehousesForProductsAsync(
                     productIds,
-                    _booking.District,
-                    _booking.City);
+                    _booking.City,
+                    _booking.District);
             }
 
             _showPrepareReplacementDialog = true;

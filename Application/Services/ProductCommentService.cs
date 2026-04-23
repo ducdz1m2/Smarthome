@@ -27,43 +27,68 @@ namespace Application.Services
         public async Task<List<ProductCommentResponse>> GetAllAsync()
         {
             var comments = await _commentRepository.GetAllAsync();
-            return comments.Select(MapToResponse).ToList();
+            var result = new List<ProductCommentResponse>();
+            foreach (var comment in comments)
+            {
+                result.Add(await MapToResponseAsync(comment));
+            }
+            return result;
         }
 
         public async Task<List<ProductCommentResponse>> GetByProductAsync(int productId)
         {
             var comments = await _commentRepository.GetByProductAsync(productId);
-            return comments.Select(MapToResponse).ToList();
+            var result = new List<ProductCommentResponse>();
+            foreach (var comment in comments)
+            {
+                result.Add(await MapToResponseAsync(comment));
+            }
+            return result;
         }
 
         public async Task<List<ProductCommentResponse>> GetByUserAsync(int userId)
         {
             var comments = await _commentRepository.GetByUserAsync(userId);
-            return comments.Select(MapToResponse).ToList();
+            var result = new List<ProductCommentResponse>();
+            foreach (var comment in comments)
+            {
+                result.Add(await MapToResponseAsync(comment));
+            }
+            return result;
         }
 
         public async Task<List<ProductCommentResponse>> GetByOrderAsync(int orderId)
         {
             var comments = await _commentRepository.GetByOrderAsync(orderId);
-            return comments.Select(MapToResponse).ToList();
+            var result = new List<ProductCommentResponse>();
+            foreach (var comment in comments)
+            {
+                result.Add(await MapToResponseAsync(comment));
+            }
+            return result;
         }
 
         public async Task<ProductCommentResponse?> GetByProductAndOrderAsync(int productId, int orderId)
         {
             var comment = await _commentRepository.GetByProductAndOrderAsync(productId, orderId);
-            return comment == null ? null : MapToResponse(comment);
+            return comment == null ? null : await MapToResponseAsync(comment);
         }
 
         public async Task<List<ProductCommentResponse>> GetPendingApprovalAsync()
         {
             var comments = await _commentRepository.GetPendingApprovalAsync();
-            return comments.Select(MapToResponse).ToList();
+            var result = new List<ProductCommentResponse>();
+            foreach (var comment in comments)
+            {
+                result.Add(await MapToResponseAsync(comment));
+            }
+            return result;
         }
 
         public async Task<ProductCommentResponse?> GetByIdAsync(int id)
         {
             var comment = await _commentRepository.GetByIdAsync(id);
-            return comment == null ? null : MapToResponse(comment);
+            return comment == null ? null : await MapToResponseAsync(comment);
         }
 
         public async Task<int> CountAsync()
@@ -91,7 +116,7 @@ namespace Application.Services
 
             // Reload with Product for mapping
             var created = await _commentRepository.GetByIdAsync(comment.Id);
-            return MapToResponse(created!);
+            return await MapToResponseAsync(created!);
         }
 
         public async Task<ProductCommentResponse> AddReplyAsync(int parentCommentId, int userId, int orderId, string content, int rating, bool isVerifiedPurchase = false)
@@ -117,7 +142,7 @@ namespace Application.Services
 
             // Reload with Product for mapping
             var created = await _commentRepository.GetByIdAsync(reply.Id);
-            return MapToResponse(created!);
+            return await MapToResponseAsync(created!);
         }
 
         public async Task<ProductCommentResponse> UpdateAsync(int id, CreateProductCommentRequest request)
@@ -139,7 +164,7 @@ namespace Application.Services
 
             // Reload with Product for mapping
             var updated = await _commentRepository.GetByIdAsync(id);
-            return MapToResponse(updated!);
+            return await MapToResponseAsync(updated!);
         }
 
         public async Task ApproveAsync(int id)
@@ -196,21 +221,30 @@ namespace Application.Services
             await _commentRepository.DeleteByIdAsync(id);
         }
 
-        private ProductCommentResponse MapToResponse(ProductComment comment)
+        private async Task<ProductCommentResponse> MapToResponseAsync(ProductComment comment)
         {
+            var user = await _userRepository.GetByIdAsync(comment.UserId);
+            var userName = user?.FullName ?? user?.UserName ?? $"User #{comment.UserId}";
+
+            var replies = new List<ProductCommentResponse>();
+            foreach (var reply in comment.Replies)
+            {
+                replies.Add(await MapToResponseAsync(reply));
+            }
+
             return new ProductCommentResponse
             {
                 Id = comment.Id,
                 ProductId = comment.ProductId,
                 ProductName = comment.Product?.Name ?? $"Product #{comment.ProductId}",
                 UserId = comment.UserId,
-                UserName = $"User #{comment.UserId}", // TODO: Get actual user name
+                UserName = userName,
                 Content = comment.Content,
                 Rating = comment.Rating,
                 IsApproved = comment.IsApproved,
                 IsVerifiedPurchase = comment.IsVerifiedPurchase,
                 CreatedAt = comment.CreatedAt,
-                Replies = comment.Replies.Select(MapToResponse).ToList()
+                Replies = replies
             };
         }
     }

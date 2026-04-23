@@ -1532,6 +1532,7 @@ namespace Infrastructure.Data
                     var returnOrder = ReturnOrder.Create(
                         order.Id,
                         random.Next(2) == 0 ? ReturnType.Refund : ReturnType.Exchange,
+                        random.Next(2) == 0 ? ReturnMethod.Shipping : ReturnMethod.Technician,
                         reasons[random.Next(reasons.Length)]
                     );
 

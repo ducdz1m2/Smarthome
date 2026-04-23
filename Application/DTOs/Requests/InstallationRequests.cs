@@ -82,4 +82,9 @@ namespace Application.DTOs.Requests
         public int MaterialId { get; set; }
         public int QuantityUsed { get; set; }
     }
+
+    public class ResetFromAwaitingMaterialRequest
+    {
+        public DateTime? NewScheduledDate { get; set; }
+    }
 }

@@ -298,4 +298,29 @@ public class EmailService : IEmailService
 
         await SendEmailAsync(toEmail, subject, htmlContent);
     }
+
+    public async Task SendMaterialReadyEmailAsync(string toEmail, int bookingId, DateTime scheduledDate)
+    {
+        var subject = $"Vật tư đã sẵn sàng - Lịch lắp đặt #{bookingId}";
+        var htmlContent = $@"
+            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb; padding: 20px; border-radius: 8px;'>
+                <div style='background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 30px; border-radius: 8px 8px 0 0; text-align: center;'>
+                    <h1 style='color: white; margin: 0; font-size: 24px;'>Vật tư đã sẵn sàng</h1>
+                </div>
+                <div style='background-color: white; padding: 30px; border-radius: 0 0 8px 8px;'>
+                    <p style='color: #374151; font-size: 16px; margin: 0 0 20px 0;'>Chào bạn,</p>
+                    <p style='color: #374151; font-size: 16px; margin: 0 0 20px 0;'>Vật tư cho lịch lắp đặt <strong>#{bookingId}</strong> đã được điều phối và sẵn sàng.</p>
+                    <div style='background-color: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;'>
+                        <p style='color: #374151; font-size: 14px; margin: 0 0 10px 0; font-weight: bold;'>Ngày thực hiện:</p>
+                        <p style='color: #1f2937; font-size: 18px; margin: 0; font-weight: bold;'>{scheduledDate:dd/MM/yyyy}</p>
+                    </div>
+                    <p style='color: #6b7280; font-size: 14px; margin: 20px 0 0 0;'>Vui lòng kiểm tra thông tin chi tiết và xác nhận lịch trong tài khoản của bạn.</p>
+                    <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
+                        <p style='color: #9ca3af; font-size: 12px; margin: 0;'>Trân trọng,<br/>Đội ngũ Smarthome</p>
+                    </div>
+                </div>
+            </div>";
+
+        await SendEmailAsync(toEmail, subject, htmlContent);
+    }
 }

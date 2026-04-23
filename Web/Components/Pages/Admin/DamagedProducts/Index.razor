@@ -1,8 +1,11 @@
 @page "/admin/damaged-products"
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Domain.Enums
 @inject IWarrantyRequestService WarrantyRequestService
 @inject IReturnOrderService ReturnOrderService
+@inject IWarehouseService WarehouseService
+@inject IProductService ProductService
 @inject ISnackbar Snackbar
 
 <MudText Typo="Typo.h4" Class="mb-4">Quản lý sản phẩm hỏng</MudText>
@@ -24,6 +27,7 @@ else
             <MudTh>Sản phẩm</MudTh>
             <MudTh>SL</MudTh>
             <MudTh>Trạng thái</MudTh>
+            <MudTh>Kho</MudTh>
             <MudTh>Ngày tạo</MudTh>
             <MudTh>Thao tác</MudTh>
         </HeaderContent>
@@ -35,25 +39,86 @@ else
             <MudTd>@context.ProductName</MudTd>
             <MudTd>@context.Quantity</MudTd>
             <MudTd>
-                <MudChip T="string" Size="Size.Small" Color="@GetReturnedColor(context.ReturnedToInventory)">
-                    @(context.ReturnedToInventory ? "Đã trả kho" : "Chưa trả")
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.DamagedStatus)">
+                    @GetStatusText(context.DamagedStatus)
                 </MudChip>
             </MudTd>
+            <MudTd>@context.WarehouseName</MudTd>
             <MudTd>@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
             <MudTd>
-                @if (!context.ReturnedToInventory)
-                {
-                    <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
-                               OnClick="() => MarkAsReturned(context)">Đã trả kho</MudButton>
-                }
+                <div class="d-flex gap-1">
+                    @if (context.SourceType == "Warranty" && context.DamagedStatus == DamagedProductStatus.Pending)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Info" Size="Size.Small"
+                                   OnClick="() => OpenUpdateStatusDialog(context)">Xử lý</MudButton>
+                    }
+                    @if (!context.ReturnedToInventory && context.DamagedStatus == DamagedProductStatus.Repaired)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+                                   OnClick="() => MarkAsReturned(context)">Đã trả kho</MudButton>
+                    }
+                </div>
             </MudTd>
         </RowTemplate>
     </MudTable>
 }
 
+<!-- Update Status Dialog -->
+<MudDialog @bind-IsVisible="_showUpdateStatusDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Xử lý sản phẩm hỏng</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_updateStatusForm" @bind-IsValid="_isUpdateStatusFormValid">
+            <MudText Typo="Typo.body2" Class="mb-3">Sản phẩm: @_selectedItem?.ProductName</MudText>
+            
+            <MudSelect T="DamagedProductStatus" @bind-Value="_newStatus" Label="Trạng thái *" Required="true">
+                <MudSelectItem T="DamagedProductStatus" Value="DamagedProductStatus.UnderRepair">Đang sửa chữa</MudSelectItem>
+                <MudSelectItem T="DamagedProductStatus" Value="DamagedProductStatus.Repaired">Đã sửa xong</MudSelectItem>
+                <MudSelectItem T="DamagedProductStatus" Value="DamagedProductStatus.NeedsReplacement">Cần thay thế</MudSelectItem>
+                <MudSelectItem T="DamagedProductStatus" Value="DamagedProductStatus.Disposed">Hủy bỏ</MudSelectItem>
+            </MudSelect>
+
+            @if (_newStatus == DamagedProductStatus.Repaired)
+            {
+                <MudNumericField T="decimal" @bind-Value="_repairCost" Label="Chi phí sửa chữa" 
+                                  Variant="Variant.Outlined" Class="mt-3" />
+                <MudTextField @bind-Value="_repairNotes" Label="Ghi chú sửa chữa" 
+                              Variant="Variant.Outlined" Lines="2" Class="mt-2" />
+            }
+
+            <MudSelect T="int" @bind-Value="_selectedWarehouseId" Label="Kho lưu trữ *" Required="true" Class="mt-3">
+                @if (_warehouses.Any())
+                {
+                    @foreach (var warehouse in _warehouses)
+                    {
+                        <MudSelectItem T="int" Value="@warehouse.Id">@warehouse.Name</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showUpdateStatusDialog = false">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="ConfirmUpdateStatus" Disabled="!_isUpdateStatusFormValid">Lưu</MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private bool _loading = true;
     private List<DamagedProductResponse> _damagedProducts = new();
+    private List<WarehouseResponse> _warehouses = new();
+
+    // Update Status Dialog
+    private bool _showUpdateStatusDialog = false;
+    private DamagedProductResponse? _selectedItem;
+    private DamagedProductStatus _newStatus = DamagedProductStatus.Pending;
+    private decimal _repairCost = 0;
+    private string _repairNotes = "";
+    private int _selectedWarehouseId = 0;
+    private MudForm _updateStatusForm = null!;
+    private bool _isUpdateStatusFormValid = false;
+    private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
 
     public class DamagedProductResponse
     {
@@ -63,6 +128,9 @@ else
         public string ProductName { get; set; } = "";
         public int Quantity { get; set; }
         public bool ReturnedToInventory { get; set; }
+        public DamagedProductStatus DamagedStatus { get; set; }
+        public int? WarehouseId { get; set; }
+        public string WarehouseName { get; set; } = "";
         public DateTime CreatedAt { get; set; }
         public int ItemId { get; set; }
         public string SourceType { get; set; } = ""; // "Warranty" or "Return"
@@ -70,7 +138,20 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadWarehouses();
         await LoadDamagedProducts();
+    }
+
+    private async Task LoadWarehouses()
+    {
+        try
+        {
+            _warehouses = await WarehouseService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LoadWarehouses] ERROR: {ex.Message}");
+        }
     }
 
     private async Task LoadDamagedProducts()
@@ -91,19 +172,27 @@ else
                 Console.WriteLine($"[LoadDamagedProducts] Warranty Request ID: {wr.Id}, OrderNumber: {wr.OrderNumber}, Items count: {wr.Items?.Count ?? 0}");
                 foreach (var item in wr.Items)
                 {
-                    Console.WriteLine($"[LoadDamagedProducts]   Item ID: {item.Id}, OrderItemId: {item.OrderItemId}, IsDamaged: {item.IsDamaged}, Quantity: {item.Quantity}");
+                    Console.WriteLine($"[LoadDamagedProducts]   Item ID: {item.Id}, OrderItemId: {item.OrderItemId}, IsDamaged: {item.IsDamaged}, Quantity: {item.Quantity}, DamagedStatus: {item.DamagedStatus}");
                 }
                 foreach (var item in wr.Items.Where(i => i.IsDamaged))
                 {
-                    Console.WriteLine($"[LoadDamagedProducts] Adding damaged item: Item ID: {item.Id}, OrderItemId: {item.OrderItemId}");
+                    var product = await ProductService.GetByIdAsync(wr.ProductId);
+                    var warehouseName = item.WarehouseId.HasValue 
+                        ? _warehouses.FirstOrDefault(w => w.Id == item.WarehouseId.Value)?.Name ?? $"Kho {item.WarehouseId}"
+                        : "Chưa phân bổ";
+
+                    Console.WriteLine($"[LoadDamagedProducts] Adding damaged item: Item ID: {item.Id}, OrderItemId: {item.OrderItemId}, DamagedStatus: {item.DamagedStatus}");
                     _damagedProducts.Add(new DamagedProductResponse
                     {
                         Id = item.Id,
                         OrderNumber = wr.OrderNumber,
                         Type = "Bảo hành",
-                        ProductName = $"Product #{item.OrderItemId}",
+                        ProductName = product?.Name ?? $"Product #{wr.ProductId}",
                         Quantity = item.Quantity,
                         ReturnedToInventory = item.ReturnedToInventory,
+                        DamagedStatus = item.DamagedStatus,
+                        WarehouseId = item.WarehouseId,
+                        WarehouseName = warehouseName,
                         CreatedAt = wr.CreatedAt,
                         ItemId = item.Id,
                         SourceType = "Warranty"
@@ -126,15 +215,23 @@ else
                 }
                 foreach (var item in ro.Items.Where(i => i.IsDamaged))
                 {
+                    var product = await ProductService.GetByIdAsync(item.ProductId);
+                    var warehouseName = item.WarehouseId.HasValue 
+                        ? _warehouses.FirstOrDefault(w => w.Id == item.WarehouseId.Value)?.Name ?? $"Kho {item.WarehouseId}"
+                        : "Chưa phân bổ";
+
                     Console.WriteLine($"[LoadDamagedProducts] Adding damaged return item: Item ID: {item.Id}, ProductId: {item.ProductId}");
                     _damagedProducts.Add(new DamagedProductResponse
                     {
                         Id = item.Id,
                         OrderNumber = ro.OrderNumber,
                         Type = "Trả hàng",
-                        ProductName = $"Product #{item.ProductId}",
+                        ProductName = product?.Name ?? $"Product #{item.ProductId}",
                         Quantity = item.Quantity,
                         ReturnedToInventory = item.ReturnedToInventory,
+                        DamagedStatus = DamagedProductStatus.Pending, // ReturnOrder doesn't have DamagedStatus yet
+                        WarehouseId = item.WarehouseId,
+                        WarehouseName = warehouseName,
                         CreatedAt = ro.CreatedAt,
                         ItemId = item.Id,
                         SourceType = "Return"
@@ -156,13 +253,50 @@ else
         }
     }
 
+    private void OpenUpdateStatusDialog(DamagedProductResponse item)
+    {
+        _selectedItem = item;
+        _newStatus = item.DamagedStatus;
+        _repairCost = 0;
+        _repairNotes = "";
+        _selectedWarehouseId = item.WarehouseId ?? 0;
+        _showUpdateStatusDialog = true;
+    }
+
+    private async Task ConfirmUpdateStatus()
+    {
+        if (_selectedItem == null) return;
+
+        try
+        {
+            if (_selectedItem.SourceType == "Warranty")
+            {
+                await WarrantyRequestService.UpdateDamagedItemStatusAsync(
+                    _selectedItem.ItemId,
+                    _newStatus,
+                    _selectedWarehouseId > 0 ? _selectedWarehouseId : null,
+                    _newStatus == DamagedProductStatus.Repaired ? _repairCost : null,
+                    _newStatus == DamagedProductStatus.Repaired ? _repairNotes : null
+                );
+                Snackbar.Add("Đã cập nhật trạng thái sản phẩm hỏng", Severity.Success);
+            }
+
+            _showUpdateStatusDialog = false;
+            await LoadDamagedProducts();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
     private async Task MarkAsReturned(DamagedProductResponse item)
     {
         try
         {
             if (item.SourceType == "Warranty")
             {
-                await WarrantyRequestService.MarkItemAsReturnedAsync(item.ItemId);
+                await WarrantyRequestService.MarkItemAsReturnedAsync(item.ItemId, item.WarehouseId);
                 Snackbar.Add("Đã đánh dấu sản phẩm đã trả kho", Severity.Success);
             }
             else if (item.SourceType == "Return")
@@ -185,8 +319,29 @@ else
         return type == "Bảo hành" ? Color.Primary : Color.Secondary;
     }
 
-    private Color GetReturnedColor(bool returned)
+    private Color GetStatusColor(DamagedProductStatus status)
     {
-        return returned ? Color.Success : Color.Warning;
+        return status switch
+        {
+            DamagedProductStatus.Pending => Color.Warning,
+            DamagedProductStatus.UnderRepair => Color.Info,
+            DamagedProductStatus.Repaired => Color.Success,
+            DamagedProductStatus.NeedsReplacement => Color.Error,
+            DamagedProductStatus.Disposed => Color.Secondary,
+            _ => Color.Default
+        };
+    }
+
+    private string GetStatusText(DamagedProductStatus status)
+    {
+        return status switch
+        {
+            DamagedProductStatus.Pending => "Chờ xử lý",
+            DamagedProductStatus.UnderRepair => "Đang sửa",
+            DamagedProductStatus.Repaired => "Đã sửa",
+            DamagedProductStatus.NeedsReplacement => "Cần thay thế",
+            DamagedProductStatus.Disposed => "Đã hủy",
+            _ => status.ToString()
+        };
     }
 }

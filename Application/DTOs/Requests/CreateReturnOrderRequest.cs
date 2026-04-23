@@ -1,8 +1,11 @@
-﻿namespace Application.DTOs.Requests
+﻿using Domain.Enums;
+
+namespace Application.DTOs.Requests
 {
     public class CreateReturnOrderRequest
     {
         public int OrderId { get; set; }
+        public ReturnMethod ReturnMethod { get; set; } = ReturnMethod.Shipping;
         public string Reason { get; set; } = string.Empty;
         public List<CreateReturnOrderItemRequest> Items { get; set; } = new();
     }

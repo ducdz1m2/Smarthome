@@ -1,12 +1,14 @@
 @page "/admin/reviews"
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Domain.Interfaces
 @using MudBlazor
 @layout AdminLayout
 @inject IProductCommentService CommentService
 @inject ITechnicianRatingService TechnicianRatingService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject ICurrentUserService CurrentUserService
 
 <MudText Typo="Typo.h4" Class="mb-4">Quản lý đánh giá</MudText>
 
@@ -329,7 +331,7 @@
             { "ParentCommentId", comment.Id },
             { "ProductId", comment.ProductId },
             { "OrderId", 0 }, // Admin reply doesn't need order context
-            { "UserId", 1 }, // TODO: Get current admin user ID
+            { "UserId", CurrentUserService.UserId ?? 1 },
             { "OriginalComment", comment.Content }
         };
 

@@ -105,10 +105,14 @@ public class InstallationBooking : AggregateRoot
             if (IsUninstall && Status != InstallationStatus.Confirmed && Status != InstallationStatus.Preparing)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể di chuyển từ trạng thái đã xác nhận hoặc đang chuẩn bị");
 
-            // Validate that it's the scheduled date or close to it (allow starting travel on the day before)
-            var daysUntilScheduled = (ScheduledDate.Date - DateTime.UtcNow.Date).Days;
-            if (daysUntilScheduled > 1)
-                throw new BusinessRuleViolationException("BookingDate", $"Chỉ có thể bắt đầu di chuyển trong vòng 1 ngày trước ngày hẹn. Ngày hẹn: {ScheduledDate:dd/MM/yyyy}");
+            // Skip date validation for warranty bookings (they're urgent)
+            if (!IsWarranty)
+            {
+                // Validate that it's the scheduled date or close to it (allow starting travel on the day before)
+                var daysUntilScheduled = (ScheduledDate.Date - DateTime.UtcNow.Date).Days;
+                if (daysUntilScheduled > 1)
+                    throw new BusinessRuleViolationException("BookingDate", $"Chỉ có thể bắt đầu di chuyển trong vòng 1 ngày trước ngày hẹn. Ngày hẹn: {ScheduledDate:dd/MM/yyyy}");
+            }
 
             Status = InstallationStatus.OnTheWay;
             OnTheWayAt = DateTime.UtcNow;

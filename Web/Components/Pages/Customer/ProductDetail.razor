@@ -300,6 +300,24 @@ else
                                     </div>
                                     <MudRating ReadOnly="true" SelectedValue="@comment.Rating"/>
                                     <MudText Typo="Typo.body2" Class="mt-2">@comment.Content</MudText>
+                                    @if (comment.Replies?.Any() == true)
+                                    {
+                                        <div class="mt-3 ml-4">
+                                            @foreach (var reply in comment.Replies)
+                                            {
+                                                <MudCard Class="mb-2" Elevation="0" Outlined="true" Style="background-color: #f5f5f5;">
+                                                    <MudCardContent Class="pa-2">
+                                                        <div class="d-flex align-center gap-2 mb-1">
+                                                            <MudText Typo="Typo.caption" Class="fw-bold">@reply.UserName</MudText>
+                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@reply.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
+                                                        </div>
+                                                        <MudRating SelectedValue="reply.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
+                                                        <MudText Typo="Typo.caption">@reply.Content</MudText>
+                                                    </MudCardContent>
+                                                </MudCard>
+                                            }
+                                        </div>
+                                    }
                                 </MudCardContent>
                             </MudCard>
                         }

@@ -32,7 +32,7 @@ namespace Application.Interfaces.Services
         Task AcceptBookingAsync(int bookingId, int technicianId);
         Task RejectBookingAsync(int bookingId, int technicianId, RejectBookingRequest request);
         Task ReportOutOfStockAsync(int bookingId, int technicianId);
-        Task ResetFromAwaitingMaterialAsync(int bookingId);
+        Task ResetFromAwaitingMaterialAsync(int bookingId, DateTime? newScheduledDate = null);
         Task FailBookingAsync(int bookingId, string reason);
         Task<List<InstallationBookingListResponse>> GetPendingForTechnicianAsync(int technicianId);
 

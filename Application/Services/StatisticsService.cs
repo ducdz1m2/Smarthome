@@ -66,28 +66,39 @@ namespace Application.Services
             _bannerRepository = bannerRepository;
         }
 
-        public async Task<DashboardStatisticsResponse> GetDashboardStatisticsAsync()
+        public async Task<DashboardStatisticsResponse> GetDashboardStatisticsAsync(DateTime? fromDate = null, DateTime? toDate = null)
         {
             var today = DateTime.Now.Date;
             var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
 
             return new DashboardStatisticsResponse
             {
-                Overview = await GetOverviewStatsAsync(today, firstDayOfMonth),
-                Sales = await GetSalesStatisticsAsync(),
+                Overview = await GetOverviewStatsAsync(today, firstDayOfMonth, fromDate, toDate),
+                Sales = await GetSalesStatisticsAsync(fromDate, toDate),
                 Products = await GetProductStatisticsAsync(),
                 Users = await GetUserStatisticsAsync(),
                 Inventory = await GetInventoryStatisticsAsync(),
                 Installation = await GetInstallationStatisticsAsync(),
                 Warranty = await GetWarrantyStatisticsAsync(),
                 Promotions = await GetPromotionStatisticsAsync(),
-                Charts = await GetChartDataAsync()
+                Charts = await GetChartDataAsync(fromDate, toDate)
             };
         }
 
-        private async Task<OverviewStatsResponse> GetOverviewStatsAsync(DateTime today, DateTime firstDayOfMonth)
+        private async Task<OverviewStatsResponse> GetOverviewStatsAsync(DateTime today, DateTime firstDayOfMonth, DateTime? fromDate = null, DateTime? toDate = null)
         {
             var orders = await _orderRepository.GetAllAsync();
+
+            // Filter by date range if provided
+            if (fromDate.HasValue)
+            {
+                orders = orders.Where(o => o.CreatedAt >= fromDate.Value).ToList();
+            }
+            if (toDate.HasValue)
+            {
+                orders = orders.Where(o => o.CreatedAt <= toDate.Value).ToList();
+            }
+
             var totalOrders = orders.Count;
             var totalRevenue = orders
                 .Where(o => o.Status == OrderStatus.Completed || o.Status == OrderStatus.Delivered)
@@ -465,23 +476,46 @@ namespace Application.Services
             };
         }
 
-        private async Task<ChartDataResponse> GetChartDataAsync()
+        private async Task<ChartDataResponse> GetChartDataAsync(DateTime? fromDate = null, DateTime? toDate = null)
         {
             var orders = await _orderRepository.GetAllAsync();
             var users = await _userManager.Users.ToListAsync();
             var categories = await _categoryRepository.GetAllAsync();
 
-            var last6Months = Enumerable.Range(0, 6)
-                .Select(i => DateTime.Now.AddMonths(-i))
-                .Select(d => new { Year = d.Year, Month = d.Month, Label = $"{d.Month:00}/{d.Year}" })
-                .Reverse()
-                .ToList();
+            // Filter by date range if provided
+            if (fromDate.HasValue)
+            {
+                orders = orders.Where(o => o.CreatedAt >= fromDate.Value).ToList();
+            }
+            if (toDate.HasValue)
+            {
+                orders = orders.Where(o => o.CreatedAt <= toDate.Value).ToList();
+            }
+
+            // Determine date range for chart labels
+            var (chartFromDate, chartToDate) = (fromDate, toDate) switch
+            {
+                (null, null) => (DateTime.Now.AddMonths(-5), DateTime.Now),
+                (not null, not null) => (fromDate.Value, toDate.Value),
+                (not null, null) => (fromDate.Value, DateTime.Now),
+                (null, not null) => (toDate.Value.AddMonths(-5), toDate.Value)
+            };
+
+            var monthsInRange = new List<(int Year, int Month, string Label)>();
+            var current = new DateTime(chartFromDate.Year, chartFromDate.Month, 1);
+            var end = new DateTime(chartToDate.Year, chartToDate.Month, 1);
+
+            while (current <= end)
+            {
+                monthsInRange.Add((current.Year, current.Month, $"{current.Month:00}/{current.Year}"));
+                current = current.AddMonths(1);
+            }
 
             var revenueChart = new List<ChartDataPointResponse>();
             var ordersChart = new List<ChartDataPointResponse>();
             var usersChart = new List<ChartDataPointResponse>();
 
-            foreach (var month in last6Months)
+            foreach (var month in monthsInRange)
             {
                 var monthOrders = orders.Where(o => o.CreatedAt.Year == month.Year && o.CreatedAt.Month == month.Month).ToList();
                 var newUsers = users.Count(u => u.CreatedAt.Year == month.Year && u.CreatedAt.Month == month.Month);

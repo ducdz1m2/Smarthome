@@ -17,6 +17,16 @@
 
 <PageHeader Title="Quản lý Lịch Lắp đặt" AddButtonText="Thêm lịch lắp đặt" OnAddClick="@(() => OpenDialog(null))" />
 
+@if (_awaitingMaterialCount > 0)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">
+        <MudText Typo="Typo.body1">
+            <b>Đang chờ xử lý:</b> Có @_awaitingMaterialCount lịch bảo hành đang chờ vật tư (hết sản phẩm thay thế).
+            Vui lòng chuyển đến tab "Bảo hành" và lọc theo trạng thái "Chờ vật tư" để xử lý.
+        </MudText>
+    </MudAlert>
+}
+
 <MudTabs Elevation="2" Rounded="true" ApplyEffects="true">
     <MudTabPanel Text="Lắp đặt">
         <FilterBar>
@@ -224,6 +234,7 @@
     private bool _loading = true;
     private string _searchString = "";
     private string? _statusFilter;
+    private int _awaitingMaterialCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -254,6 +265,9 @@
             _installBookings = _bookings.Where(b => !b.IsWarranty && !b.IsUninstall).ToList();
             _warrantyBookings = _bookings.Where(b => b.IsWarranty && !b.IsUninstall).ToList();
             _uninstallBookings = _bookings.Where(b => b.IsUninstall).ToList();
+
+            // Count bookings waiting for materials
+            _awaitingMaterialCount = _warrantyBookings.Count(b => b.Status == "AwaitingMaterial");
         }
         catch (Exception ex)
         {
@@ -338,29 +352,58 @@
                 return;
             }
 
-            // Find warehouse in technician's area (district/city)
-            var warehouses = await WarehouseService.GetAllAsync();
-            int toWarehouseId = 0;
+            // Get all warehouses for source (show all that have stock)
+            var allWarehouses = await WarehouseService.GetAllAsync();
 
+            // Filter destination warehouses to only show those in same district/city as booking
+            List<WarehouseResponse> destinationWarehouses;
             if (!string.IsNullOrWhiteSpace(bookingDetails.District))
             {
-                toWarehouseId = warehouses.FirstOrDefault(w => w.AddressDistrict == bookingDetails.District)?.Id ?? 0;
+                destinationWarehouses = allWarehouses.Where(w => w.AddressDistrict == bookingDetails.District).ToList();
             }
-
-            if (toWarehouseId == 0 && !string.IsNullOrWhiteSpace(bookingDetails.City))
+            else if (!string.IsNullOrWhiteSpace(bookingDetails.City))
             {
-                toWarehouseId = warehouses.FirstOrDefault(w => w.AddressCity == bookingDetails.City)?.Id ?? 0;
+                destinationWarehouses = allWarehouses.Where(w => w.AddressCity == bookingDetails.City).ToList();
+            }
+            else
+            {
+                destinationWarehouses = allWarehouses;
             }
 
-            // Don't filter by product availability for now - let user select any warehouse
-            // The API call for filtering is causing 401 errors
-            var filteredWarehouses = warehouses;
+            // Auto-select first destination warehouse as default
+            int toWarehouseId = destinationWarehouses.FirstOrDefault()?.Id ?? 0;
 
             var parameters = new DialogParameters<WarehouseTransferDialog>
             {
-                { x => x.SelectedProductId, bookingDetails.Products.First().ProductId },
-                { x => x.AvailableWarehouses, filteredWarehouses }
+                { x => x.AvailableWarehouses, allWarehouses }, // Source: all warehouses
+                { x => x.DestinationWarehouses, destinationWarehouses } // Destination: filtered by location
             };
+
+            // Pass booking materials if available (materials already taken by technician)
+            // Otherwise, pass booking products (products that need to be installed)
+            if (bookingDetails.Materials.Any())
+            {
+                var materialsNeedingTransfer = bookingDetails.Materials.Where(m => m.QuantityTaken > 0).ToList();
+                if (materialsNeedingTransfer.Any())
+                {
+                    parameters.Add(x => x.BookingMaterials, materialsNeedingTransfer);
+                }
+            }
+            else
+            {
+                // For bookings with no materials prepared (e.g., reported out of stock),
+                // convert Products to InstallationMaterialResponse format
+                var productsAsMaterials = bookingDetails.Products.Select(p => new InstallationMaterialResponse
+                {
+                    Id = p.ProductId, // Use ProductId as temporary Id for selection tracking
+                    ProductId = p.ProductId,
+                    VariantId = p.VariantId,
+                    ProductName = p.ProductName,
+                    QuantityTaken = p.Quantity, // Default to required quantity
+                    QuantityUsed = null
+                }).ToList();
+                parameters.Add(x => x.BookingMaterials, productsAsMaterials);
+            }
 
             if (toWarehouseId > 0)
             {
@@ -373,10 +416,31 @@
 
             if (!result.Canceled)
             {
-                // After successful transfer, reset booking status to Assigned
-                await InstallationService.ResetFromAwaitingMaterialAsync(booking.Id);
-                Snackbar.Add("Đã chuyển kho và reset trạng thái booking", Severity.Success);
-                await LoadData();
+                // Prompt admin to select a date for rescheduling
+                var dateDialog = await DialogService.ShowAsync<DateSelectionDialog>("Chọn ngày thực hiện",
+                    new DialogParameters { },
+                    new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
+                var dateResult = await dateDialog.Result;
+
+                if (!dateResult.Canceled && dateResult.Data != null)
+                {
+                    var selectedDate = (DateTime)dateResult.Data;
+
+                    // Reset booking status to Assigned with selected date
+                    await InstallationService.ResetFromAwaitingMaterialAsync(booking.Id, selectedDate);
+
+                    // For warranty bookings without a slot (no time assigned), prompt admin to assign a slot
+                    if (booking.IsWarranty && booking.StartTime == null && booking.EndTime == null)
+                    {
+                        Snackbar.Add("Đã chuyển kho. Vui lòng xếp lịch cho kỹ thuật viên.", Severity.Info);
+                        await OpenDialog(booking);
+                    }
+                    else
+                    {
+                        Snackbar.Add("Đã chuyển kho và reset trạng thái booking", Severity.Success);
+                    }
+                    await LoadData();
+                }
             }
         }
         catch (Exception ex)

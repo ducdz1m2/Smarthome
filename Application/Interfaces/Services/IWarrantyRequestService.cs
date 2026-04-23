@@ -1,5 +1,6 @@
 using Application.DTOs.Requests;
 using Application.DTOs.Responses;
+using Domain.Enums;
 
 namespace Application.Interfaces.Services;
 
@@ -14,5 +15,6 @@ public interface IWarrantyRequestService
     Task RejectAsync(int id, string reason);
     Task StartAsync(int id);
     Task CompleteAsync(int id, string? technicianNotes = null);
-    Task MarkItemAsReturnedAsync(int itemId);
+    Task MarkItemAsReturnedAsync(int itemId, int? warehouseId = null);
+    Task UpdateDamagedItemStatusAsync(int itemId, DamagedProductStatus status, int? warehouseId = null, decimal? repairCost = null, string? repairNotes = null);
 }

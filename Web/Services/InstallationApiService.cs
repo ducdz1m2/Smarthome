@@ -131,10 +131,11 @@ namespace Web.Services
             response.EnsureSuccessStatusCode();
         }
 
-        public async Task ResetFromAwaitingMaterialAsync(int bookingId)
+        public async Task ResetFromAwaitingMaterialAsync(int bookingId, DateTime? newScheduledDate = null)
         {
             await AddAuthTokenAsync();
-            var response = await _httpClient.PostAsync($"api/installation/{bookingId}/reset-from-awaiting-material", null);
+            var request = new ResetFromAwaitingMaterialRequest { NewScheduledDate = newScheduledDate };
+            var response = await _httpClient.PostAsJsonAsync($"api/installation/{bookingId}/reset-from-awaiting-material", request);
             response.EnsureSuccessStatusCode();
         }
 

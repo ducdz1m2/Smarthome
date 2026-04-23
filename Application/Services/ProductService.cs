@@ -396,7 +396,19 @@ namespace Application.Services
                         Rating = c.Rating,
                         IsApproved = c.IsApproved,
                         IsVerifiedPurchase = c.IsVerifiedPurchase,
-                        CreatedAt = c.CreatedAt
+                        CreatedAt = c.CreatedAt,
+                        Replies = c.Replies?.Select(r => new ProductCommentResponse
+                        {
+                            Id = r.Id,
+                            ProductId = r.ProductId,
+                            UserId = r.UserId,
+                            UserName = $"User_{r.UserId}",
+                            Content = r.Content,
+                            Rating = r.Rating,
+                            IsApproved = r.IsApproved,
+                            IsVerifiedPurchase = r.IsVerifiedPurchase,
+                            CreatedAt = r.CreatedAt
+                        }).ToList() ?? new List<ProductCommentResponse>()
                     }).ToList() ?? new List<ProductCommentResponse>(),
                 CreatedAt = product.CreatedAt
             };

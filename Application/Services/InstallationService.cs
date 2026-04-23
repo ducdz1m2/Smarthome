@@ -849,9 +849,9 @@ namespace Application.Services
             if (booking == null)
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
-            // For warranty bookings, allow preparing replacement products even if not in Confirmed status
-            if (booking.Status != InstallationStatus.Confirmed && !booking.IsWarranty)
-                throw new DomainException("Chỉ có thể chuẩn bị vật tư khi đang ở trạng thái Đã xác nhận");
+            // For warranty bookings or bookings in Assigned status (after material transfer), allow preparing materials
+            if (booking.Status != InstallationStatus.Confirmed && !booking.IsWarranty && booking.Status != InstallationStatus.Assigned)
+                throw new DomainException("Chỉ có thể chuẩn bị vật tư khi đang ở trạng thái Đã xác nhận hoặc Đã phân công");
 
             // Verify warehouse exists
             var warehouse = await _warehouseRepository.GetByIdAsync(request.WarehouseId);
@@ -1227,14 +1227,28 @@ namespace Application.Services
             await _bookingRepository.SaveChangesAsync();
         }
 
-        public async Task ResetFromAwaitingMaterialAsync(int bookingId)
+        public async Task ResetFromAwaitingMaterialAsync(int bookingId, DateTime? newScheduledDate = null)
         {
             var booking = await _bookingRepository.GetByIdAsync(bookingId);
             if (booking == null)
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
-            booking.ResetFromAwaitingMaterial();
+            booking.ResetFromAwaitingMaterial(newScheduledDate);
             await _bookingRepository.SaveChangesAsync();
+
+            // Notify technician that materials are ready
+            var technician = await _technicianRepository.GetByIdAsync(booking.TechnicianId);
+            if (technician != null && technician.UserId.HasValue)
+            {
+                await _notificationService.NotifyInstallationStatusChangedAsync(booking.Id, technician.UserId.Value, "material_ready");
+
+                // Send email notification
+                var user = await _userRepository.GetByIdAsync(technician.UserId.Value);
+                if (user != null && !string.IsNullOrEmpty(user.Email))
+                {
+                    await _emailService.SendMaterialReadyEmailAsync(user.Email, booking.Id, booking.ScheduledDate);
+                }
+            }
         }
 
         public async Task FailBookingAsync(int bookingId, string reason)
@@ -1455,11 +1469,11 @@ namespace Application.Services
         {
             var order = booking.Order;
             var technician = booking.Technician;
-            
-            // Use Slot's time if available, otherwise use ScheduledDate's time
-            TimeSpan? startTime = booking.Slot?.StartTime ?? booking.ScheduledDate.TimeOfDay;
-            TimeSpan? endTime = booking.Slot?.EndTime ?? booking.ScheduledDate.Add(booking.EstimatedDuration).TimeOfDay;
-            
+
+            // Use Slot's time if available, otherwise leave as null (will show as --:-- in UI)
+            TimeSpan? startTime = booking.Slot?.StartTime;
+            TimeSpan? endTime = booking.Slot?.EndTime;
+
             return new InstallationBookingListResponse
             {
                 Id = booking.Id,

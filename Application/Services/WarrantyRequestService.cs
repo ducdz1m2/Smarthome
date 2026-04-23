@@ -219,22 +219,72 @@ public class WarrantyRequestService : IWarrantyRequestService
         }
     }
 
-    public async Task MarkItemAsReturnedAsync(int itemId)
+    public async Task MarkItemAsReturnedAsync(int itemId, int? warehouseId = null)
     {
+        Console.WriteLine($"[WarrantyRequestService.MarkItemAsReturnedAsync] ========== STARTED for ItemId: {itemId} ==========");
+        Console.WriteLine($"[WarrantyRequestService.MarkItemAsReturnedAsync] WarehouseId: {warehouseId}");
+
         // Load warranty request with items to find and update the item
         var warrantyRequests = await _warrantyRequestRepository.GetAllAsync();
         var warrantyRequest = warrantyRequests.FirstOrDefault(wr => wr.Items.Any(i => i.Id == itemId));
 
         if (warrantyRequest == null)
+        {
+            Console.WriteLine($"[WarrantyRequestService.MarkItemAsReturnedAsync] ERROR: Warranty request not found");
             throw new DomainException("Không tìm thấy yêu cầu bảo hành");
+        }
 
         var item = warrantyRequest.Items.FirstOrDefault(i => i.Id == itemId);
         if (item == null)
+        {
+            Console.WriteLine($"[WarrantyRequestService.MarkItemAsReturnedAsync] ERROR: Item not found");
             throw new DomainException("Không tìm thấy sản phẩm");
+        }
 
-        item.MarkAsReturnedToInventory();
+        Console.WriteLine($"[WarrantyRequestService.MarkItemAsReturnedAsync] Item found: IsDamaged={item.IsDamaged}, CurrentStatus={item.DamagedStatus}");
+
+        item.MarkAsReturnedToInventory(warehouseId);
         _warrantyRequestRepository.Update(warrantyRequest);
         await _warrantyRequestRepository.SaveChangesAsync();
+
+        Console.WriteLine($"[WarrantyRequestService.MarkItemAsReturnedAsync] ========== COMPLETED ==========");
+    }
+
+    public async Task UpdateDamagedItemStatusAsync(int itemId, DamagedProductStatus status, int? warehouseId = null, decimal? repairCost = null, string? repairNotes = null)
+    {
+        Console.WriteLine($"[WarrantyRequestService.UpdateDamagedItemStatusAsync] ========== STARTED for ItemId: {itemId} ==========");
+        Console.WriteLine($"[WarrantyRequestService.UpdateDamagedItemStatusAsync] NewStatus: {status}, WarehouseId: {warehouseId}, RepairCost: {repairCost}");
+
+        var warrantyRequests = await _warrantyRequestRepository.GetAllAsync();
+        var warrantyRequest = warrantyRequests.FirstOrDefault(wr => wr.Items.Any(i => i.Id == itemId));
+
+        if (warrantyRequest == null)
+        {
+            Console.WriteLine($"[WarrantyRequestService.UpdateDamagedItemStatusAsync] ERROR: Warranty request not found");
+            throw new DomainException("Không tìm thấy yêu cầu bảo hành");
+        }
+
+        var item = warrantyRequest.Items.FirstOrDefault(i => i.Id == itemId);
+        if (item == null)
+        {
+            Console.WriteLine($"[WarrantyRequestService.UpdateDamagedItemStatusAsync] ERROR: Item not found");
+            throw new DomainException("Không tìm thấy sản phẩm");
+        }
+
+        Console.WriteLine($"[WarrantyRequestService.UpdateDamagedItemStatusAsync] Item found: CurrentStatus={item.DamagedStatus}");
+
+        item.SetDamagedStatus(status);
+        if (warehouseId.HasValue)
+            item.SetWarehouseId(warehouseId.Value);
+        if (repairCost.HasValue)
+            item.SetRepairCost(repairCost.Value);
+        if (!string.IsNullOrEmpty(repairNotes))
+            item.SetRepairNotes(repairNotes);
+
+        _warrantyRequestRepository.Update(warrantyRequest);
+        await _warrantyRequestRepository.SaveChangesAsync();
+
+        Console.WriteLine($"[WarrantyRequestService.UpdateDamagedItemStatusAsync] ========== COMPLETED ==========");
     }
 
     private async Task<WarrantyRequestResponse> MapToResponseAsync(WarrantyRequest warrantyRequest)
@@ -291,7 +341,11 @@ public class WarrantyRequestService : IWarrantyRequestService
                 Quantity = item.Quantity,
                 Description = item.Description,
                 IsDamaged = item.IsDamaged,
-                ReturnedToInventory = item.ReturnedToInventory
+                ReturnedToInventory = item.ReturnedToInventory,
+                DamagedStatus = item.DamagedStatus,
+                WarehouseId = item.WarehouseId,
+                RepairCost = item.RepairCost,
+                RepairNotes = item.RepairNotes
             }).ToList()
         };
     }

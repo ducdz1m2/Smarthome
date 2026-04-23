@@ -30,7 +30,7 @@
             </MudItem>
             <MudItem xs="12" md="6">
                 <MudSelect T="int" Label="Kho đích" @bind-Value="_toWarehouseId" Required="true">
-                    @foreach (var warehouse in _warehouses)
+                    @foreach (var warehouse in (DestinationWarehouses ?? AvailableWarehouses))
                     {
                         <MudSelectItem T="int" Value="@warehouse.Id">@warehouse.Name (@warehouse.Code)</MudSelectItem>
                     }
@@ -41,58 +41,55 @@
         <MudTextField T="string" Label="Lý do" @bind-Value="_reason" Class="mt-3" />
         
         <MudDivider Class="my-4" />
-        <MudText Typo="Typo.h6" Class="mb-3">Sản phẩm chuyển</MudText>
+        <MudText Typo="Typo.h6" Class="mb-3">Vật tư cần chuyển</MudText>
         
-        <MudGrid>
-            <MudItem xs="12" md="6">
-                <MudSelect T="int" Label="Sản phẩm" @bind-Value="_selectedProductId" Required="true">
-                    @foreach (var product in _products)
-                    {
-                        <MudSelectItem T="int" Value="@product.ProductId">@product.ProductName (@product.Sku)</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" md="4">
-                <MudNumericField T="int" Label="Số lượng" @bind-Value="_selectedQuantity" Required="true" Min="1" />
-            </MudItem>
-            <MudItem xs="12" md="2">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddProduct" Class="mt-4" StartIcon="@Icons.Material.Filled.Add">
-                </MudButton>
-            </MudItem>
-        </MudGrid>
-        
-        <MudTable Items="_productQuantities" Dense="true" Hover="true" Class="mt-3">
-            <HeaderContent>
-                <MudTh>Sản phẩm</MudTh>
-                <MudTh>Số lượng</MudTh>
-                <MudTh>Thao tác</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd>@GetProductName(context.Key)</MudTd>
-                <MudTd>@context.Value</MudTd>
-                <MudTd>
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
-                                   OnClick="@(() => RemoveProduct(context.Key))" Size="Size.Small" />
-                </MudTd>
-            </RowTemplate>
-        </MudTable>
+        @if (_materials.Any())
+        {
+            <MudTable Items="_materials" Dense="true" Hover="true" Class="mt-3">
+                <HeaderContent>
+                    <MudTh>Chọn</MudTh>
+                    <MudTh>Vật tư</MudTh>
+                    <MudTh>Số lượng đã lấy</MudTh>
+                    <MudTh>Số lượng chuyển</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudCheckBox @bind-Value="@_selectedMaterials[context.Id]" Color="Color.Primary" />
+                    </MudTd>
+                    <MudTd>@context.ProductName</MudTd>
+                    <MudTd>@context.QuantityTaken</MudTd>
+                    <MudTd>
+                        <MudNumericField T="int" @bind-Value="@context.QuantityTaken" Required="true" Min="1" Dense="true" 
+                                       Variant="Variant.Outlined" Class="mt-n2" Disabled="@(!_selectedMaterials[context.Id])" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Error">Không có vật tư nào cần chuyển</MudText>
+        }
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel" StartIcon="@Icons.Material.Filled.Cancel">Hủy</MudButton>
-        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(_productQuantities.Count == 0)" StartIcon="@Icons.Material.Filled.Send">Tạo phiếu chuyển</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(!HasSelectedMaterials())" StartIcon="@Icons.Material.Filled.Send">Tạo phiếu chuyển</MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
-    
+
     [Parameter] public int FromWarehouseId { get; set; }
     [Parameter] public int SelectedProductId { get; set; }
     [Parameter] public int ToWarehouseId { get; set; }
     [Parameter] public List<WarehouseResponse>? AvailableWarehouses { get; set; }
+    [Parameter] public List<WarehouseResponse>? DestinationWarehouses { get; set; }
+    [Parameter] public List<InstallationMaterialResponse>? BookingMaterials { get; set; }
     
     private List<WarehouseResponse> _warehouses = new();
     private List<ProductInventoryResponse> _products = new();
+    private List<InstallationMaterialResponse> _materials = new();
+    private Dictionary<int, bool> _selectedMaterials = new(); // Track which materials are selected for transfer
     private Dictionary<int, int> _productQuantities = new();
     private Dictionary<int, int> _warehouseStock = new(); // Warehouse ID -> Available stock
     
@@ -100,16 +97,12 @@
     private int _toWarehouseId = 0;
     private string _reason = "";
     
-    private int _selectedProductId = 0;
-    private int _selectedQuantity = 1;
-    
     [Inject] private IInventoryService InventoryService { get; set; } = null!;
     [Inject] private IWarehouseService WarehouseService { get; set; } = null!;
-    [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private HttpClient Http { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
-    [Inject] private InstallationApiService InstallationApiService { get; set; } = null!;
     [Inject] private JwtTokenHandler TokenHandler { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
     
     protected override async Task OnInitializedAsync()
     {
@@ -123,12 +116,6 @@
         if (ToWarehouseId > 0)
         {
             _toWarehouseId = ToWarehouseId;
-        }
-        
-        // Pre-fill product if provided
-        if (SelectedProductId > 0)
-        {
-            _selectedProductId = SelectedProductId;
         }
         
         await LoadData();
@@ -150,10 +137,37 @@
             
             _products = await InventoryService.GetProductInventoryAsync();
 
-            // Load stock for the selected product in each warehouse
-            if (SelectedProductId > 0)
+            // Use booking materials if provided, otherwise use all products
+            if (BookingMaterials != null && BookingMaterials.Any())
             {
-                await LoadWarehouseStock();
+                _materials = BookingMaterials;
+                // Initialize all materials as selected by default
+                foreach (var material in _materials)
+                {
+                    _selectedMaterials[material.Id] = true;
+                }
+            }
+            else
+            {
+                // Convert products to materials format for backward compatibility
+                _materials = _products.Select(p => new InstallationMaterialResponse
+                {
+                    ProductId = p.ProductId,
+                    ProductName = p.ProductName,
+                    QuantityTaken = 1
+                }).ToList();
+                // Initialize all materials as selected by default
+                foreach (var material in _materials)
+                {
+                    _selectedMaterials[material.Id] = true;
+                }
+            }
+
+            // Load stock for each material
+            foreach (var material in _materials)
+            {
+                var productId = material.ProductId;
+                await LoadWarehouseStockForProduct(productId);
             }
         }
         catch (Exception ex)
@@ -162,44 +176,37 @@
         }
     }
 
-    private async Task LoadWarehouseStock()
+    private async Task LoadWarehouseStockForProduct(int productId)
     {
         try
         {
-            Console.WriteLine($"[LoadWarehouseStock] SelectedProductId: {SelectedProductId}");
-            Console.WriteLine($"[LoadWarehouseStock] Loading stock for {_warehouses.Count} warehouses");
+            Console.WriteLine($"[LoadWarehouseStockForProduct] ProductId: {productId}");
+            Console.WriteLine($"[LoadWarehouseStockForProduct] Loading stock for {_warehouses.Count} warehouses");
             
             // Use InventoryService to get stock for each warehouse
             foreach (var warehouse in _warehouses)
             {
-                Console.WriteLine($"[LoadWarehouseStock] Checking warehouse {warehouse.Id}");
+                Console.WriteLine($"[LoadWarehouseStockForProduct] Checking warehouse {warehouse.Id}");
                 
-                var productInventory = await InventoryService.GetProductInventoryByIdAsync(SelectedProductId, warehouse.Id);
+                var productInventory = await InventoryService.GetProductInventoryByIdAsync(productId, warehouse.Id);
                 
                 if (productInventory != null)
                 {
                     var totalAvailable = productInventory.AvailableStock;
                     _warehouseStock[warehouse.Id] = totalAvailable;
-                    Console.WriteLine($"[LoadWarehouseStock] Warehouse {warehouse.Id}: {totalAvailable} available");
+                    Console.WriteLine($"[LoadWarehouseStockForProduct] Warehouse {warehouse.Id}: {totalAvailable} available");
                 }
                 else
                 {
                     _warehouseStock[warehouse.Id] = 0;
-                    Console.WriteLine($"[LoadWarehouseStock] Warehouse {warehouse.Id}: 0 (no inventory data)");
+                    Console.WriteLine($"[LoadWarehouseStockForProduct] Warehouse {warehouse.Id}: 0 (no inventory data)");
                 }
-            }
-            
-            // Log final warehouse stock dictionary
-            Console.WriteLine($"[LoadWarehouseStock] Final warehouse stock dict: {_warehouseStock.Count} entries");
-            foreach (var kvp in _warehouseStock)
-            {
-                Console.WriteLine($"[LoadWarehouseStock] Warehouse {kvp.Key}: {kvp.Value}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[LoadWarehouseStock] Exception: {ex.Message}");
-            Console.WriteLine($"[LoadWarehouseStock] Stack trace: {ex.StackTrace}");
+            Console.WriteLine($"[LoadWarehouseStockForProduct] Exception: {ex.Message}");
+            Console.WriteLine($"[LoadWarehouseStockForProduct] Stack trace: {ex.StackTrace}");
             Snackbar.Add($"Lỗi khi tải tồn kho: {ex.Message}", Severity.Error);
             // Set all to 0 on error
             foreach (var warehouse in _warehouses)
@@ -213,59 +220,51 @@
     {
         return _warehouseStock.TryGetValue(warehouseId, out var stock) ? stock : 0;
     }
-    
-    private void AddProduct()
+
+    private bool HasSelectedMaterials()
     {
-        if (_selectedProductId == 0 || _selectedQuantity <= 0)
-        {
-            Snackbar.Add("Vui lòng chọn sản phẩm và số lượng", Severity.Warning);
-            return;
-        }
-        
-        if (_productQuantities.ContainsKey(_selectedProductId))
-        {
-            _productQuantities[_selectedProductId] += _selectedQuantity;
-        }
-        else
-        {
-            _productQuantities[_selectedProductId] = _selectedQuantity;
-        }
-        
-        _selectedProductId = 0;
-        _selectedQuantity = 1;
-    }
-    
-    private void RemoveProduct(int productId)
-    {
-        _productQuantities.Remove(productId);
-    }
-    
-    private string GetProductName(int productId)
-    {
-        var product = _products.FirstOrDefault(p => p.ProductId == productId);
-        return product != null ? $"{product.ProductName} ({product.Sku})" : "Unknown";
+        return _selectedMaterials.Values.Any(selected => selected);
     }
     
     private async Task Submit()
     {
-        if (_fromWarehouseId == 0 || _toWarehouseId == 0)
+        try
         {
-            Snackbar.Add("Vui lòng chọn kho nguồn và kho đích", Severity.Warning);
+            // Validate warehouses
+            if (_fromWarehouseId == 0 || _toWarehouseId == 0)
+            {
+                Snackbar.Add("Vui lòng chọn kho nguồn và kho đích", Severity.Warning);
+                return;
+            }
+
+            if (_fromWarehouseId == _toWarehouseId)
+            {
+                Snackbar.Add("Kho nguồn và kho đích không được giống nhau", Severity.Warning);
+                return;
+            }
+
+            // Build product quantities from selected materials only
+            _productQuantities.Clear();
+            foreach (var material in _materials)
+            {
+                if (_selectedMaterials.TryGetValue(material.Id, out var isSelected) && isSelected && material.QuantityTaken > 0)
+                {
+                    _productQuantities[material.ProductId] = material.QuantityTaken;
+                }
+            }
+
+            if (!_productQuantities.Any())
+            {
+                Snackbar.Add("Vui lòng nhập số lượng chuyển cho ít nhất một vật tư", Severity.Warning);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi chuyển kho: {ex.Message}", Severity.Error);
             return;
         }
-        
-        if (_fromWarehouseId == _toWarehouseId)
-        {
-            Snackbar.Add("Kho nguồn và kho đích không thể giống nhau", Severity.Warning);
-            return;
-        }
-        
-        if (_productQuantities.Count == 0)
-        {
-            Snackbar.Add("Vui lòng thêm ít nhất một sản phẩm", Severity.Warning);
-            return;
-        }
-        
+
         try
         {
             // Add auth token
@@ -316,17 +315,21 @@
                 else
                 {
                     var error = await executeResponse.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[WarehouseTransferDialog] Execute transfer failed: {error}");
                     Snackbar.Add($"Lỗi khi thực hiện chuyển kho: {error}", Severity.Error);
                 }
             }
             else
             {
                 var error = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[WarehouseTransferDialog] Initiate transfer failed: {error}");
                 Snackbar.Add($"Lỗi: {error}", Severity.Error);
             }
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[WarehouseTransferDialog] Exception: {ex.Message}");
+            Console.WriteLine($"[WarehouseTransferDialog] StackTrace: {ex.StackTrace}");
             Snackbar.Add($"Lỗi khi chuyển kho: {ex.Message}", Severity.Error);
         }
     }

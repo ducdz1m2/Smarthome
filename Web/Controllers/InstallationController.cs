@@ -41,17 +41,29 @@ namespace Web.Controllers
             [FromQuery] string? city = null,
             [FromQuery] string? district = null)
         {
+            Console.WriteLine($"[GetWarehousesForProducts] Received - District: {district}, City: {city}, ProductIds: {string.Join(",", productIds)}");
+
             var warehouses = await _warehouseRepository.GetAllAsync();
             var result = new List<WarehouseStockForTechnicianResponse>();
 
-            // Filter by location if provided - strict filtering, no fallback
+            // Filter by location if provided
             if (!string.IsNullOrWhiteSpace(district))
             {
                 warehouses = warehouses.Where(w => w.Address?.District == district).ToList();
+                Console.WriteLine($"[GetWarehousesForProducts] After district filter: {warehouses.Count} warehouses");
+
+                // If no warehouses in district, fallback to same city
+                if (!warehouses.Any() && !string.IsNullOrWhiteSpace(city))
+                {
+                    warehouses = await _warehouseRepository.GetAllAsync();
+                    warehouses = warehouses.Where(w => w.Address?.City == city).ToList();
+                    Console.WriteLine($"[GetWarehousesForProducts] After city fallback: {warehouses.Count} warehouses");
+                }
             }
             else if (!string.IsNullOrWhiteSpace(city))
             {
                 warehouses = warehouses.Where(w => w.Address?.City == city).ToList();
+                Console.WriteLine($"[GetWarehousesForProducts] After city filter: {warehouses.Count} warehouses");
             }
 
             foreach (var warehouse in warehouses.Where(w => w.IsActive))
@@ -276,14 +288,14 @@ namespace Web.Controllers
         /// </summary>
         [HttpPost("{bookingId}/reset-from-awaiting-material")]
         [Authorize(Roles = "Admin")]
-        public async Task<ActionResult> ResetFromAwaitingMaterial(int bookingId)
+        public async Task<ActionResult> ResetFromAwaitingMaterial(int bookingId, [FromBody] ResetFromAwaitingMaterialRequest request)
         {
             try
             {
-                await _installationService.ResetFromAwaitingMaterialAsync(bookingId);
+                await _installationService.ResetFromAwaitingMaterialAsync(bookingId, request.NewScheduledDate);
                 return Ok(new { message = "Đã reset trạng thái booking" });
             }
-            catch (DomainException ex)
+            catch (Exception ex)
             {
                 return BadRequest(new { error = ex.Message });
             }
@@ -316,11 +328,24 @@ namespace Web.Controllers
         {
             try
             {
+                Console.WriteLine($"[StartTravel Controller] Received request for booking {bookingId}");
                 await _installationService.StartTravelAsync(bookingId);
+                Console.WriteLine($"[StartTravel Controller] StartTravelAsync completed successfully for booking {bookingId}");
                 return Ok(new { message = "Đã bắt đầu di chuyển" });
+            }
+            catch (BusinessRuleViolationException ex)
+            {
+                Console.WriteLine($"[StartTravel Controller] BusinessRuleViolationException: {ex.Message}");
+                return BadRequest(new { error = ex.Message });
             }
             catch (DomainException ex)
             {
+                Console.WriteLine($"[StartTravel Controller] DomainException: {ex.Message}");
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[StartTravel Controller] Exception: {ex.Message}");
                 return BadRequest(new { error = ex.Message });
             }
         }

@@ -13,4 +13,5 @@ public interface IEmailService
     Task SendOrderStatusChangedEmailAsync(string toEmail, string orderNumber, string status);
     Task SendInstallationAssignedEmailAsync(string toEmail, string orderNumber, string technicianName);
     Task SendRatingApprovedEmailAsync(string toEmail, string type, int entityId);
+    Task SendMaterialReadyEmailAsync(string toEmail, int bookingId, DateTime scheduledDate);
 }

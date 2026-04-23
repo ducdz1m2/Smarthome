@@ -4,7 +4,7 @@ namespace Application.Interfaces.Services
 {
     public interface IStatisticsService
     {
-        Task<DashboardStatisticsResponse> GetDashboardStatisticsAsync();
+        Task<DashboardStatisticsResponse> GetDashboardStatisticsAsync(DateTime? fromDate = null, DateTime? toDate = null);
         Task<SalesStatsResponse> GetSalesStatisticsAsync(DateTime? fromDate = null, DateTime? toDate = null);
         Task<ProductStatsResponse> GetProductStatisticsAsync();
         Task<UserStatsResponse> GetUserStatisticsAsync();

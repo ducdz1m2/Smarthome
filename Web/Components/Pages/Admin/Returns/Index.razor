@@ -43,6 +43,7 @@
                 <HeaderContent>
                     <MudTh>Mã đơn</MudTh>
                     <MudTh>Đơn hàng</MudTh>
+                    <MudTh>PT trả</MudTh>
                     <MudTh>Loại</MudTh>
                     <MudTh>Lý do</MudTh>
                     <MudTh>Số tiền hoàn</MudTh>
@@ -56,6 +57,16 @@
                     </MudTd>
                     <MudTd>
                         <MudText Typo="Typo.body2">@context.OrderNumber</MudText>
+                    </MudTd>
+                    <MudTd>
+                        @if (context.ReturnMethod == "Shipping")
+                        {
+                            <MudChip T="string" Color="Color.Secondary" Size="Size.Small">Vận chuyển</MudChip>
+                        }
+                        else if (context.ReturnMethod == "Technician")
+                        {
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small">KTV</MudChip>
+                        }
                     </MudTd>
                     <MudTd>
                         @if (context.ReturnType == "Exchange")

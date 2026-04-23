@@ -1,6 +1,7 @@
 @using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Domain.Enums
 @inject IReturnOrderService ReturnOrderService
 @inject IOrderService OrderService
 @inject ISnackbar Snackbar
@@ -17,8 +18,21 @@
         {
             <MudForm @ref="_form" @bind-IsValid="_isValid">
                 <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
-                    <MudText Typo="Typo.body2">Vui lòng chọn số lượng sản phẩm cần hoàn trả. Nếu sản phẩm bị hư hỏng, vui lòng đánh dấu bên dưới.</MudText>
+                    <MudText Typo="Typo.body2">Vui lòng chọn số lượng sản phẩm cần hoàn trả. Phương thức trả hàng sẽ được tự động xác định theo loại sản phẩm.</MudText>
                 </MudAlert>
+                
+                @if (_hasInstallItems)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true" Color="Color.Primary">
+                        <MudText Typo="Typo.body2">Đơn hàng có sản phẩm cần lắp đặt → Sẽ trả qua kỹ thuật viên (tháo lắp)</MudText>
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true" Color="Color.Secondary">
+                        <MudText Typo="Typo.body2">Đơn hàng chỉ có sản phẩm thường → Sẽ trả qua bên vận chuyển</MudText>
+                    </MudAlert>
+                }
                 
                 <MudText Typo="Typo.subtitle1" Class="mb-2">Chọn sản phẩm hoàn trả:</MudText>
                 
@@ -30,6 +44,10 @@
                                 <div>
                                     <MudText Typo="Typo.body1" Class="fw-bold">@item.ProductName</MudText>
                                     <MudText Typo="Typo.caption">SKU: @item.Sku</MudText>
+                                    @if (item.RequiresInstallation)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2">Cần lắp đặt</MudChip>
+                                    }
                                 </div>
                                 <div class="d-flex align-center gap-3">
                                     <MudNumericField T="int" Value="_returnQuantities[item.Id]" 
@@ -105,12 +123,16 @@
     private bool _loading = true;
     private string _reason = "";
     private string _bankInfo = "";
+    private bool _hasInstallItems = false;
     private Dictionary<int, int> _returnQuantities = new();
     private Dictionary<int, int> _itemWarehouses = new(); // Kho từ phân bổ đơn hàng
     private Dictionary<int, bool> _isDamaged = new();
 
     protected override async Task OnInitializedAsync()
     {
+        // Check if order has installation items
+        _hasInstallItems = Items.Any(i => i.RequiresInstallation);
+
         // Load warehouse allocations from order
         try
         {
@@ -186,9 +208,19 @@
                 }
             }
 
+            // Determine return method based on returned items
+            // If any returned item requires installation, use Technician method
+            var hasInstallItemsInReturn = returnItems.Any(ri => 
+            {
+                var item = Items.FirstOrDefault(i => i.Id == ri.OrderItemId);
+                return item != null && item.RequiresInstallation;
+            });
+            var returnMethod = hasInstallItemsInReturn ? ReturnMethod.Technician : ReturnMethod.Shipping;
+
             var request = new CreateReturnOrderRequest
             {
                 OrderId = OrderId,
+                ReturnMethod = returnMethod,
                 Reason = _reason,
                 Items = returnItems
             };
