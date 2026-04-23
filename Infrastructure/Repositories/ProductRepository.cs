@@ -98,7 +98,7 @@ namespace Infrastructure.Repositories
         }
 
         public async Task<(List<Product> Items, int TotalCount)> GetPagedAsync(
-            int page, int pageSize, string? search = null, int? categoryId = null, int? brandId = null, bool? isActive = null)
+            int page, int pageSize, string? search = null, int? categoryId = null, int? brandId = null, bool? isActive = null, int? promotionId = null)
         {
             var query = _context.Products.AsNoTracking().AsQueryable();
 
@@ -113,6 +113,22 @@ namespace Infrastructure.Repositories
 
             if (isActive.HasValue)
                 query = query.Where(p => p.IsActive == isActive.Value);
+
+            if (promotionId.HasValue)
+            {
+                Console.WriteLine($"Filtering by promotion ID: {promotionId.Value}");
+                
+                var productIdsInPromotion = await _context.PromotionProducts
+                    .Where(pp => pp.PromotionId == promotionId.Value)
+                    .Select(pp => pp.ProductId)
+                    .Distinct()
+                    .ToListAsync();
+                
+                Console.WriteLine($"Found {productIdsInPromotion.Count} products in promotion {promotionId.Value}");
+                Console.WriteLine($"Product IDs: {string.Join(", ", productIdsInPromotion)}");
+                
+                query = query.Where(p => productIdsInPromotion.Contains(p.Id));
+            }
 
             var totalCount = await query.CountAsync();
 

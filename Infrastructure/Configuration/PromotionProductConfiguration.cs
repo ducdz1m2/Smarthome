@@ -1,3 +1,4 @@
+using Domain.Entities.Catalog;
 using Domain.Entities.Promotions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -15,6 +16,7 @@ namespace Infrastructure.Configuration
                 value => value.HasValue ? Domain.ValueObjects.Percentage.Create(value.Value) : null);
             builder.HasIndex(pp => new { pp.PromotionId, pp.ProductId }).IsUnique();
             builder.HasOne(pp => pp.Promotion).WithMany(p => p.PromotionProducts).HasForeignKey(pp => pp.PromotionId).OnDelete(DeleteBehavior.Cascade);
+            builder.HasOne<Product>().WithMany(p => p.PromotionProducts).HasForeignKey(pp => pp.ProductId).OnDelete(DeleteBehavior.Cascade);
             builder.Ignore(pp => pp.DomainEvents);
         }
     }

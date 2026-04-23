@@ -12,7 +12,7 @@ namespace Application.Interfaces.Repositories
         Task<List<Product>> GetAllAsync();
         Task<List<Product>> GetByCategoryAsync(int categoryId);
         Task<List<Product>> GetByBrandAsync(int brandId);
-        Task<(List<Product> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? search = null, int? categoryId = null, int? brandId = null, bool? isActive = null);
+        Task<(List<Product> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? search = null, int? categoryId = null, int? brandId = null, bool? isActive = null, int? promotionId = null);
         Task<bool> ExistsAsync(string sku, int? excludeId = null);
         Task<bool> ExistsAsync(int id);
         Task AddAsync(Product product);

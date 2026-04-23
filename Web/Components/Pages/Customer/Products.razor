@@ -322,6 +322,7 @@
 
     private string _searchQuery = "";
     private int? _selectedCategoryId;
+    private int? _selectedPromotionId;
     private string _sortOrder = "newest";
     private string _pageTitle = "Tất cả sản phẩm";
     private string _pageSubtitle = "";
@@ -330,7 +331,30 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _selectedCategoryId = CategoryId;
+        // Read query parameters from URL
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var queryParams = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        
+        Console.WriteLine($"Products page URL: {uri}");
+        Console.WriteLine($"Query string: {uri.Query}");
+        
+        if (queryParams.TryGetValue("category", out var categoryValue) && int.TryParse(categoryValue, out var catId))
+        {
+            _selectedCategoryId = catId;
+            Console.WriteLine($"Category ID from query: {catId}");
+        }
+        else
+        {
+            _selectedCategoryId = CategoryId;
+            Console.WriteLine($"Category ID from route: {CategoryId}");
+        }
+        
+        if (queryParams.TryGetValue("promotion", out var promotionValue) && int.TryParse(promotionValue, out var promoId))
+        {
+            _selectedPromotionId = promoId;
+            Console.WriteLine($"Promotion ID from query: {promoId}");
+        }
+
         await LoadCategoriesAsync();
         await LoadProductsAsync();
         UpdatePageTitle();
@@ -371,7 +395,8 @@
                 string.IsNullOrWhiteSpace(_searchQuery) ? null : _searchQuery,
                 _selectedCategoryId,
                 null,
-                true);
+                true,
+                _selectedPromotionId);
 
             _products = items;
             _totalCount = total;
@@ -400,7 +425,12 @@
 
     private void UpdatePageTitle()
     {
-        if (_selectedCategoryId.HasValue)
+        if (_selectedPromotionId.HasValue)
+        {
+            _pageTitle = "Sản phẩm khuyến mãi";
+            _pageSubtitle = "Đang hiển thị các sản phẩm có khuyến mãi";
+        }
+        else if (_selectedCategoryId.HasValue)
         {
             var category = _categories.FirstOrDefault(c => c.Id == _selectedCategoryId);
             if (category != null)

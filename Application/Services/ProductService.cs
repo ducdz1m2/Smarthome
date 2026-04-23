@@ -51,9 +51,9 @@ namespace Application.Services
         }
 
         public async Task<(List<ProductListResponse> Items, int TotalCount)> GetPagedAsync(
-            int page, int pageSize, string? search = null, int? categoryId = null, int? brandId = null, bool? isActive = null)
+            int page, int pageSize, string? search = null, int? categoryId = null, int? brandId = null, bool? isActive = null, int? promotionId = null)
         {
-            var (items, totalCount) = await _productRepository.GetPagedAsync(page, pageSize, search, categoryId, brandId, isActive);
+            var (items, totalCount) = await _productRepository.GetPagedAsync(page, pageSize, search, categoryId, brandId, isActive, promotionId);
             return (items.Select(MapToListResponse).ToList(), totalCount);
         }
 

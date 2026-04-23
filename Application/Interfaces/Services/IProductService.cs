@@ -8,7 +8,7 @@ namespace Application.Interfaces.Services
         Task<List<ProductListResponse>> GetAllAsync();
         Task<ProductResponse?> GetByIdAsync(int id);
         Task<ProductResponse?> GetBySkuAsync(string sku);
-        Task<(List<ProductListResponse> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? search = null, int? categoryId = null, int? brandId = null, bool? isActive = null);
+        Task<(List<ProductListResponse> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? search = null, int? categoryId = null, int? brandId = null, bool? isActive = null, int? promotionId = null);
         Task<List<ProductListResponse>> GetByCategoryAsync(int categoryId);
         Task<List<ProductListResponse>> SearchAsync(string keyword, string? filters);
         Task<int> CreateAsync(CreateProductRequest request);

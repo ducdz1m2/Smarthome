@@ -591,7 +591,7 @@
 
     private void NavigateToCategory(int categoryId)
     {
-        NavigationManager.NavigateTo($"/products?category={categoryId}");
+        NavigationManager.NavigateTo($"/products/category/{categoryId}");
     }
 
     private async Task AddToCart(int productId)

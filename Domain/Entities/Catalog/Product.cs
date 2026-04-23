@@ -31,6 +31,7 @@ public class Product : AggregateRoot
     public virtual ICollection<ProductVariant> Variants { get; private set; } = new List<ProductVariant>();
     public virtual ICollection<ProductImage> Images { get; private set; } = new List<ProductImage>();
     public virtual ICollection<ProductComment> Comments { get; private set; } = new List<ProductComment>();
+    public virtual ICollection<Domain.Entities.Promotions.PromotionProduct> PromotionProducts { get; private set; } = new List<Domain.Entities.Promotions.PromotionProduct>();
 
     private Product() { }
 

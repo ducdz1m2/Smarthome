@@ -41,12 +41,15 @@
         @* Giỏ hàng với số lượng động - chỉ hiển thị cho customer *@
         @if (!CurrentUserService.Roles.Contains("Admin") && !CurrentUserService.Roles.Contains("Technician"))
         {
-            <MudBadge Content="@_cartCount" Color="Color.Secondary" Overlap="true" Class="cart-badge mx-3" Visible="@(_cartCount > 0)">
-                <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" Class="nav-icon-btn" />
-            </MudBadge>
-            @if (_cartCount == 0)
+            @if (_cartCount > 0)
             {
-                <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" Class="nav-icon-btn" />
+                <MudBadge Content="@_cartCount" Color="Color.Secondary" Overlap="true" Class="cart-badge mx-3">
+                    <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" Class="nav-icon-btn" />
+                </MudBadge>
+            }
+            else
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" Class="nav-icon-btn mx-3" />
             }
         }
 
