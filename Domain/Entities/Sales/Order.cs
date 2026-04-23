@@ -35,6 +35,9 @@ public class Order : AggregateRoot
     public string StatusHistoryJson { get; private set; } = "[]";
     public string? CancelReason { get; private set; }
 
+    // Installation scheduling
+    public DateTime? InstallationDate { get; private set; }
+
     // Navigation properties
     public virtual ICollection<OrderItem> Items { get; private set; } = new List<OrderItem>();
     public virtual ICollection<OrderShipment> Shipments { get; private set; } = new List<OrderShipment>();
@@ -48,7 +51,8 @@ public class Order : AggregateRoot
         string receiverPhone,
         Address shippingAddress,
         decimal shippingFee = 0,
-        DateTime? createdAt = null)
+        DateTime? createdAt = null,
+        DateTime? installationDate = null)
     {
         if (string.IsNullOrWhiteSpace(receiverName))
             throw new ValidationException(nameof(receiverName), "Tên người nhận không được trống");
@@ -67,7 +71,8 @@ public class Order : AggregateRoot
             PaymentMethod = PaymentMethod.COD,
             ShippingMethod = ShippingMethod.Standard,
             StatusHistoryJson = "[]",
-            CreatedAt = createdAt ?? DateTime.UtcNow
+            CreatedAt = createdAt ?? DateTime.UtcNow,
+            InstallationDate = installationDate
         };
 
         // Note: OrderCreatedEvent will be dispatched in OrderService.CreateAsync after the order is saved to DB
@@ -85,7 +90,8 @@ public class Order : AggregateRoot
         string? shippingAddressWard,
         string shippingAddressDistrict,
         string shippingAddressCity,
-        decimal shippingFee = 0)
+        decimal shippingFee = 0,
+        DateTime? installationDate = null)
     {
         var address = Address.Create(
             shippingAddressStreet,
@@ -93,7 +99,7 @@ public class Order : AggregateRoot
             shippingAddressDistrict,
             shippingAddressCity);
 
-        return Create(userId, receiverName, receiverPhone, address, shippingFee);
+        return Create(userId, receiverName, receiverPhone, address, shippingFee, installationDate: installationDate);
     }
 
     public OrderItem AddItem(int productId, int? variantId, int quantity, Money unitPrice, bool requiresInstallation = false)

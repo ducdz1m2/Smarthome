@@ -220,7 +220,7 @@ else
                         ? _warehouses.FirstOrDefault(w => w.Id == item.WarehouseId.Value)?.Name ?? $"Kho {item.WarehouseId}"
                         : "Chưa phân bổ";
 
-                    Console.WriteLine($"[LoadDamagedProducts] Adding damaged return item: Item ID: {item.Id}, ProductId: {item.ProductId}");
+                    Console.WriteLine($"[LoadDamagedProducts] Adding damaged item from return: Item ID: {item.Id}, ProductId: {item.ProductId}, DamagedStatus: {item.DamagedStatus}");
                     _damagedProducts.Add(new DamagedProductResponse
                     {
                         Id = item.Id,
@@ -229,7 +229,7 @@ else
                         ProductName = product?.Name ?? $"Product #{item.ProductId}",
                         Quantity = item.Quantity,
                         ReturnedToInventory = item.ReturnedToInventory,
-                        DamagedStatus = DamagedProductStatus.Pending, // ReturnOrder doesn't have DamagedStatus yet
+                        DamagedStatus = item.DamagedStatus,
                         WarehouseId = item.WarehouseId,
                         WarehouseName = warehouseName,
                         CreatedAt = ro.CreatedAt,

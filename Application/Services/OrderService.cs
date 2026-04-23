@@ -138,7 +138,8 @@ namespace Application.Services
                 request.ShippingWard,
                 request.ShippingDistrict,
                 request.ShippingCity,
-                request.ShippingFee
+                request.ShippingFee,
+                installationDate: request.InstallationDate
             );
 
             // Set payment method
@@ -564,7 +565,7 @@ namespace Application.Services
                         {
                             ShippingDistrict = orderWithDetails.ShippingAddress?.District ?? "",
                             ShippingCity = orderWithDetails.ShippingAddress?.City ?? "",
-                            InstallationDate = DateTime.Today
+                            InstallationDate = orderWithDetails.InstallationDate ?? DateTime.Today.AddDays(1)
                         };
                         var bookingId = await CreateInstallationBookingAsync(orderWithDetails.Id, request);
                         
@@ -624,7 +625,7 @@ namespace Application.Services
                         {
                             ShippingDistrict = orderWithDetails.ShippingAddress?.District ?? "",
                             ShippingCity = orderWithDetails.ShippingAddress?.City ?? "",
-                            InstallationDate = DateTime.Today
+                            InstallationDate = orderWithDetails.InstallationDate ?? DateTime.Today.AddDays(1)
                         };
                         var bookingId = await CreateInstallationBookingAsync(orderWithDetails.Id, request);
 

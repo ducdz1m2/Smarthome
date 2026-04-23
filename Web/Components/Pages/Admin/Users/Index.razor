@@ -1,6 +1,7 @@
 @page "/admin/users"
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
+@using Microsoft.AspNetCore.Identity
 @using MudBlazor
 @layout AdminLayout
 @inject IIdentityService IdentityService
@@ -56,8 +57,13 @@
         <MudTd>
             <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" 
                            OnClick="@(() => OpenEditDialog(context))" Size="Size.Small" />
-            <MudIconButton Icon="@Icons.Material.Filled.Lock" Color="Color.Warning" 
-                           OnClick="@(() => OpenResetPasswordDialog(context))" Size="Size.Small" />
+            <MudIconButton Icon="@Icons.Material.Filled.LockReset" Color="Color.Warning" 
+                           OnClick="@(() => OpenResetPasswordDialog(context))" Size="Size.Small" 
+                           Title="Đặt lại mật khẩu" />
+            <MudIconButton Icon="@(context.IsActive ? Icons.Material.Filled.Lock : Icons.Material.Filled.LockOpen)" 
+                           Color="@(context.IsActive ? Color.Error : Color.Success)" 
+                           OnClick="@(() => ToggleUserStatus(context))" Size="Size.Small" 
+                           Title="@(context.IsActive ? "Khóa tài khoản" : "Mở khóa tài khoản")" />
             <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
                            OnClick="@(() => DeleteUser(context))" Size="Size.Small" />
         </MudTd>
@@ -167,6 +173,44 @@
                     throw new Exception(string.Join(", ", deleteResult.Errors.Select(e => e.Description)));
                 await LoadUsers();
                 Snackbar.Add("Đã xóa người dùng", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ToggleUserStatus(UserResponse user)
+    {
+        var action = user.IsActive ? "khóa" : "mở khóa";
+        var parameters = new DialogParameters<ConfirmDialog>();
+        parameters.Add(x => x.Title, $"Xác nhận {action} tài khoản");
+        parameters.Add(x => x.Content, $"Bạn có chắc muốn {action} người dùng '{user.UserName}'?");
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Xác nhận", parameters, options);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is not null && !dialogResult.Canceled && dialogResult.Data is true)
+        {
+            try
+            {
+                IdentityResult identityResult;
+                if (user.IsActive)
+                {
+                    identityResult = await IdentityService.DeactivateUserAsync(user.Id);
+                }
+                else
+                {
+                    identityResult = await IdentityService.ActivateUserAsync(user.Id);
+                }
+
+                if (!identityResult.Succeeded)
+                    throw new Exception(string.Join(", ", identityResult.Errors.Select(e => e.Description)));
+                
+                await LoadUsers();
+                Snackbar.Add($"Đã {action} tài khoản", Severity.Success);
             }
             catch (Exception ex)
             {

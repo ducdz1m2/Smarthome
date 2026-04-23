@@ -209,6 +209,15 @@ public class InstallationBooking : AggregateRoot
             // Otherwise keep as Assigned so technician can accept the new time
         }
 
+        public void AcceptRescheduled()
+        {
+            if (Status != InstallationStatus.Rescheduled)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể xác nhận lại lịch ở trạng thái đã đổi lịch");
+
+            Status = InstallationStatus.Confirmed;
+            AddDomainEvent(new InstallationBookingConfirmedEvent(Id, DateTime.UtcNow));
+        }
+
         public void Cancel(string reason)
         {
             if (Status == InstallationStatus.Completed)

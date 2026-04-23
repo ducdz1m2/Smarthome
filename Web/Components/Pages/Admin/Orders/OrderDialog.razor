@@ -286,16 +286,13 @@
                     <MudAlert Severity="Severity.Info" Class="mb-2">
                         <MudText Typo="Typo.body2">
                             <strong>Đơn ghép:</strong> Đơn hàng này có cả sản phẩm cần lắp đặt và cần giao hàng.
-                            Vui lòng tạo lịch lắp đặt cho kỹ thuật viên. Quản trị viên không thể xác nhận trực tiếp đơn ghép.
+                            Khi xác nhận, hệ thống sẽ tự động tạo lịch lắp đặt và đơn giao hàng.
                         </MudText>
                     </MudAlert>
                 }
-                else
-                {
-                    <MudButton Color="Color.Primary" OnClick="ConfirmOrder" StartIcon="@Icons.Material.Filled.CheckCircle">
-                        Xác nhận
-                    </MudButton>
-                }
+                <MudButton Color="Color.Primary" OnClick="ConfirmOrder" StartIcon="@Icons.Material.Filled.CheckCircle">
+                    Xác nhận
+                </MudButton>
             }
 
             @if (_order.Status == "AwaitingPickup" && !IsCombinedOrder())

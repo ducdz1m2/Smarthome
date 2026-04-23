@@ -7,7 +7,11 @@ using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Identity;
+using Domain.Entities.Sales;
+using Domain.Entities.Installation;
+using Domain.Enums;
 using Domain.Exceptions;
+using Domain.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -21,17 +25,26 @@ namespace Application.Services
         private readonly RoleManager<ApplicationRole> _roleManager;
         private readonly IConfiguration _configuration;
         private readonly ITechnicianProfileRepository _technicianProfileRepository;
+        private readonly ICurrentUserService _currentUserService;
+        private readonly IOrderRepository _orderRepository;
+        private readonly IInstallationBookingRepository _installationBookingRepository;
 
         public IdentityService(
             UserManager<ApplicationUser> userManager,
             RoleManager<ApplicationRole> roleManager,
             IConfiguration configuration,
-            ITechnicianProfileRepository technicianProfileRepository)
+            ITechnicianProfileRepository technicianProfileRepository,
+            ICurrentUserService currentUserService,
+            IOrderRepository orderRepository,
+            IInstallationBookingRepository installationBookingRepository)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _configuration = configuration;
             _technicianProfileRepository = technicianProfileRepository;
+            _currentUserService = currentUserService;
+            _orderRepository = orderRepository;
+            _installationBookingRepository = installationBookingRepository;
         }
 
         #region User Management
@@ -155,22 +168,88 @@ namespace Application.Services
 
         public async Task<IdentityResult> ActivateUserAsync(int id)
         {
+            Console.WriteLine($"[IdentityService.ActivateUserAsync] ========== STARTED for UserId: {id} ==========");
+
             var user = await _userManager.FindByIdAsync(id.ToString());
             if (user == null)
+            {
+                Console.WriteLine($"[IdentityService.ActivateUserAsync] ERROR: User not found");
                 return IdentityResult.Failed(new IdentityError { Description = "Không tìm thấy người dùng" });
+            }
+
+            Console.WriteLine($"[IdentityService.ActivateUserAsync] User found: {user.UserName}, Current IsActive: {user.IsActive}");
 
             user.IsActive = true;
-            return await _userManager.UpdateAsync(user);
+            var result = await _userManager.UpdateAsync(user);
+            
+            Console.WriteLine($"[IdentityService.ActivateUserAsync] Update result: {result.Succeeded}");
+            Console.WriteLine($"[IdentityService.ActivateUserAsync] ========== COMPLETED ==========");
+            
+            return result;
         }
 
         public async Task<IdentityResult> DeactivateUserAsync(int id)
         {
+            Console.WriteLine($"[IdentityService.DeactivateUserAsync] ========== STARTED for UserId: {id} ==========");
+
             var user = await _userManager.FindByIdAsync(id.ToString());
             if (user == null)
+            {
+                Console.WriteLine($"[IdentityService.DeactivateUserAsync] ERROR: User not found");
                 return IdentityResult.Failed(new IdentityError { Description = "Không tìm thấy người dùng" });
+            }
+
+            Console.WriteLine($"[IdentityService.DeactivateUserAsync] User found: {user.UserName}, Current IsActive: {user.IsActive}");
+
+            // Prevent deactivating self
+            var currentUser = _currentUserService.UserId;
+            if (currentUser == id)
+            {
+                Console.WriteLine($"[IdentityService.DeactivateUserAsync] ERROR: Cannot deactivate self");
+                return IdentityResult.Failed(new IdentityError { Description = "Không thể vô hiệu hóa tài khoản của chính mình" });
+            }
+
+            // Check if user has active orders
+            var userOrders = await _orderRepository.GetByUserIdAsync(id);
+            var activeOrders = userOrders.Where(o => o.Status.ToString() == "Pending" ||
+                                                      o.Status.ToString() == "Confirmed" ||
+                                                      o.Status.ToString() == "AwaitingPickup" ||
+                                                      o.Status.ToString() == "Shipping" ||
+                                                      o.Status.ToString() == "Installing").ToList();
+
+            if (activeOrders.Any())
+            {
+                Console.WriteLine($"[IdentityService.DeactivateUserAsync] ERROR: User has {activeOrders.Count} active orders");
+                return IdentityResult.Failed(new IdentityError { Description = $"Không thể vô hiệu hóa người dùng có {activeOrders.Count} đơn hàng đang xử lý" });
+            }
+
+            // Check if user has active installation bookings (if user is a technician)
+            if (await _userManager.IsInRoleAsync(user, "Technician"))
+            {
+                var technicianProfile = await _technicianProfileRepository.GetByUserIdAsync(id);
+                if (technicianProfile != null)
+                {
+                    var userBookings = await _installationBookingRepository.GetByTechnicianIdAsync(technicianProfile.Id);
+                    var activeBookings = userBookings.Where(b => b.Status.ToString() == "Assigned" ||
+                                                                 b.Status.ToString() == "Confirmed" ||
+                                                                 b.Status.ToString() == "Traveling" ||
+                                                                 b.Status.ToString() == "Installing").ToList();
+
+                    if (activeBookings.Any())
+                    {
+                        Console.WriteLine($"[IdentityService.DeactivateUserAsync] ERROR: User has {activeBookings.Count} active installation bookings");
+                        return IdentityResult.Failed(new IdentityError { Description = $"Không thể vô hiệu hóa người dùng có {activeBookings.Count} lịch lắp đặt đang thực hiện" });
+                    }
+                }
+            }
 
             user.IsActive = false;
-            return await _userManager.UpdateAsync(user);
+            var result = await _userManager.UpdateAsync(user);
+            
+            Console.WriteLine($"[IdentityService.DeactivateUserAsync] Update result: {result.Succeeded}");
+            Console.WriteLine($"[IdentityService.DeactivateUserAsync] ========== COMPLETED ==========");
+            
+            return result;
         }
 
         public async Task<IdentityResult> ResetPasswordAsync(int id, string newPassword)

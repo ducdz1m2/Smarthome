@@ -23,6 +23,7 @@ namespace Application.Interfaces.Services
         Task CompleteAsync(int id, CompleteInstallationRequest request);
         Task RescheduleAsync(int id, RescheduleInstallationRequest request);
         Task CustomerRescheduleAsync(int id, RescheduleInstallationRequest request);
+        Task AcceptRescheduledAsync(int id);
         Task CancelAsync(int id, CancelInstallationRequest request);
         Task AddMaterialAsync(int bookingId, AddInstallationMaterialRequest request);
         Task RecordMaterialUsageAsync(int bookingId, RecordMaterialUsageRequest request);

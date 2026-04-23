@@ -94,6 +94,9 @@ public class ReturnOrder : AggregateRoot
         public bool IsDamaged { get; private set; } = false;
         public bool ReturnedToInventory { get; private set; } = false;
         public int? WarehouseId { get; private set; }
+        public DamagedProductStatus DamagedStatus { get; private set; } = DamagedProductStatus.Pending;
+        public decimal? RepairCost { get; private set; }
+        public string? RepairNotes { get; private set; }
 
         private ReturnOrderItem() { }
 
@@ -109,7 +112,8 @@ public class ReturnOrder : AggregateRoot
                 Reason = reason,
                 IsDamaged = isDamaged,
                 WarehouseId = warehouseId,
-                ReturnedToInventory = false
+                ReturnedToInventory = false,
+                DamagedStatus = isDamaged ? DamagedProductStatus.Pending : DamagedProductStatus.Repaired
             };
         }
 
@@ -121,11 +125,27 @@ public class ReturnOrder : AggregateRoot
         public void MarkAsDamaged()
         {
             IsDamaged = true;
+            DamagedStatus = DamagedProductStatus.Pending;
         }
 
         public void SetWarehouseId(int warehouseId)
         {
             WarehouseId = warehouseId;
+        }
+
+        public void SetDamagedStatus(DamagedProductStatus status)
+        {
+            DamagedStatus = status;
+        }
+
+        public void SetRepairCost(decimal? cost)
+        {
+            RepairCost = cost;
+        }
+
+        public void SetRepairNotes(string? notes)
+        {
+            RepairNotes = notes;
         }
     }
 

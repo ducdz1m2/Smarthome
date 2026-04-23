@@ -1,6 +1,6 @@
-﻿namespace Application.DTOs.Responses
-{
+﻿namespace Application.DTOs.Responses;
 
+using Domain.Enums;
 
     public class ReturnOrderResponse
     {
@@ -33,5 +33,7 @@
         public bool ReturnedToInventory { get; set; }
         public int? WarehouseId { get; set; }
         public string WarehouseName { get; set; } = string.Empty;
+        public DamagedProductStatus DamagedStatus { get; set; }
+        public decimal? RepairCost { get; set; }
+        public string? RepairNotes { get; set; }
     }
-}

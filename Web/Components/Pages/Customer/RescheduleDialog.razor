@@ -30,7 +30,7 @@
             else
             {
                 <MudAlert Severity="Severity.Warning" Class="mt-4">
-                    <MudText Typo="Typo.body2">Không có khung giờ nào khả dụng</MudText>
+                    <MudText Typo="Typo.body2">Không có khung giờ nào khả dụng cho kỹ thuật viên vào ngày này</MudText>
                 </MudAlert>
             }
         }
@@ -62,18 +62,33 @@
 
     private DateTime? _newDate;
     private int? _newSlotId;
-    private List<InstallationSlotListResponse> _availableSlots = new();
+    private List<InstallationSlotResponse> _availableSlots = new();
     private bool _isLoadingSlots = false;
+    private int? _technicianId;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _newDate = CurrentDate;
         _newSlotId = CurrentSlotId;
+        
+        // Get current booking to find technician
+        try
+        {
+            var booking = await InstallationService.GetByIdAsync(BookingId);
+            if (booking != null)
+            {
+                _technicianId = booking.TechnicianId;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[RescheduleDialog] Error loading booking: {ex.Message}");
+        }
     }
 
     protected override async Task OnParametersSetAsync()
     {
-        if (_newDate.HasValue)
+        if (_newDate.HasValue && _technicianId.HasValue)
         {
             await LoadAvailableSlotsAsync(_newDate.Value);
         }
@@ -84,11 +99,17 @@
         _isLoadingSlots = true;
         try
         {
-            var allSlots = await SlotService.GetAllAsync();
-            _availableSlots = allSlots.Where(s => !s.IsBooked).ToList();
+            Console.WriteLine($"[RescheduleDialog] Loading slots for technician {_technicianId} on {date:dd/MM/yyyy}");
+            
+            // Get available slots for the specific technician on the selected date
+            var availableSlots = await SlotService.GetAvailableSlotsAsync(_technicianId ?? 0, date);
+            _availableSlots = availableSlots ?? new List<InstallationSlotResponse>();
+            
+            Console.WriteLine($"[RescheduleDialog] Found {_availableSlots.Count} available slots");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[RescheduleDialog] Error loading slots: {ex.Message}");
             Snackbar.Add($"Lỗi khi tải khung giờ: {ex.Message}", Severity.Error);
         }
         finally
@@ -105,6 +126,8 @@
 
         try
         {
+            Console.WriteLine($"[RescheduleDialog] Confirming reschedule: BookingId={BookingId}, NewSlotId={_newSlotId}, NewDate={_newDate:dd/MM/yyyy}");
+            
             var request = new RescheduleInstallationRequest
             {
                 NewSlotId = _newSlotId.Value,
@@ -116,6 +139,7 @@
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[RescheduleDialog] Error confirming reschedule: {ex.Message}");
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }

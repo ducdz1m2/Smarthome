@@ -396,7 +396,10 @@ public class ReturnOrderService : IReturnOrderService
                 Reason = i.Reason,
                 IsDamaged = i.IsDamaged,
                 ReturnedToInventory = i.ReturnedToInventory,
-                WarehouseId = i.WarehouseId
+                WarehouseId = i.WarehouseId,
+                DamagedStatus = i.DamagedStatus,
+                RepairCost = i.RepairCost,
+                RepairNotes = i.RepairNotes
             }).ToList()
         };
     }

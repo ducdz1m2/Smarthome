@@ -702,16 +702,39 @@ namespace Application.Services
 
         public async Task CustomerRescheduleAsync(int id, RescheduleInstallationRequest request)
         {
+            Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] ========== STARTED for BookingId: {id} ==========");
+            Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] NewSlotId: {request.NewSlotId}, NewDate: {request.NewDate:dd/MM/yyyy}");
+
             var booking = await _bookingRepository.GetByIdAsync(id);
             if (booking == null)
+            {
+                Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] ERROR: Booking not found");
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
+            }
+
+            Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] Booking found: ID={booking.Id}, TechnicianId={booking.TechnicianId}, CurrentStatus={booking.Status}, CurrentSlotId={booking.SlotId}, CurrentDate={booking.ScheduledDate:dd/MM/yyyy}");
 
             var newSlot = await _slotRepository.GetByIdAsync(request.NewSlotId);
             if (newSlot == null)
+            {
+                Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] ERROR: New slot not found");
                 throw new DomainException("Không tìm thấy slot mới");
+            }
+
+            Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] New slot found: ID={newSlot.Id}, TechnicianId={newSlot.TechnicianId}, IsBooked={newSlot.IsBooked}");
 
             if (newSlot.IsBooked)
+            {
+                Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] ERROR: New slot is already booked");
                 throw new DomainException("Slot mới đã được đặt");
+            }
+
+            // Validate that the new slot belongs to the same technician
+            if (newSlot.TechnicianId != booking.TechnicianId)
+            {
+                Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] ERROR: New slot belongs to different technician. Booking technician: {booking.TechnicianId}, Slot technician: {newSlot.TechnicianId}");
+                throw new DomainException("Slot mới không thuộc về kỹ thuật viên hiện tại");
+            }
 
             // Release old slot
             if (booking.SlotId.HasValue)
@@ -719,15 +742,19 @@ namespace Application.Services
                 var oldSlot = await _slotRepository.GetByIdAsync(booking.SlotId.Value);
                 if (oldSlot != null)
                 {
+                    Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] Releasing old slot: ID={oldSlot.Id}");
                     oldSlot.Release();
                 }
             }
 
             booking.CustomerReschedule(request.NewSlotId, request.NewDate);
+            Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] Booking rescheduled. New Status: {booking.Status}, RescheduleCount: {booking.CustomerRescheduleCount}");
 
             await _bookingRepository.SaveChangesAsync();
+            Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] Changes saved to database");
 
             // Notify technician about reschedule
+            Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] Sending notification to technician {booking.TechnicianId}");
             await _notificationService.CreateNotificationAsync(new CreateNotificationRequest
             {
                 UserId = booking.TechnicianId,
@@ -746,9 +773,46 @@ namespace Application.Services
                 var user = await _userRepository.GetByIdAsync(order.UserId);
                 if (user != null && !string.IsNullOrEmpty(user.Email))
                 {
+                    Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] Sending reschedule email to customer: {user.Email}");
                     await _emailService.SendRescheduleEmailAsync(user.Email, order.OrderNumber, request.NewDate);
                 }
             }
+
+            Console.WriteLine($"[InstallationService.CustomerRescheduleAsync] ========== COMPLETED ==========");
+        }
+
+        public async Task AcceptRescheduledAsync(int id)
+        {
+            Console.WriteLine($"[InstallationService.AcceptRescheduledAsync] ========== STARTED for BookingId: {id} ==========");
+
+            var booking = await _bookingRepository.GetByIdAsync(id);
+            if (booking == null)
+            {
+                Console.WriteLine($"[InstallationService.AcceptRescheduledAsync] ERROR: Booking not found");
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+            }
+
+            Console.WriteLine($"[InstallationService.AcceptRescheduledAsync] Booking found: ID={booking.Id}, Status={booking.Status}");
+
+            booking.AcceptRescheduled();
+            Console.WriteLine($"[InstallationService.AcceptRescheduledAsync] Booking accepted. New Status: {booking.Status}");
+
+            await _bookingRepository.SaveChangesAsync();
+            Console.WriteLine($"[InstallationService.AcceptRescheduledAsync] Changes saved to database");
+
+            // Notify customer about technician accepting the rescheduled booking
+            var order = await _orderRepository.GetByIdAsync(booking.OrderId);
+            if (order != null)
+            {
+                var user = await _userRepository.GetByIdAsync(order.UserId);
+                if (user != null && !string.IsNullOrEmpty(user.Email))
+                {
+                    Console.WriteLine($"[InstallationService.AcceptRescheduledAsync] Sending confirmation email to customer: {user.Email}");
+                    await _emailService.SendRescheduleConfirmedEmailAsync(user.Email, order.OrderNumber, booking.ScheduledDate);
+                }
+            }
+
+            Console.WriteLine($"[InstallationService.AcceptRescheduledAsync] ========== COMPLETED ==========");
         }
 
         public async Task CancelAsync(int id, CancelInstallationRequest request)
@@ -1134,15 +1198,38 @@ namespace Application.Services
 
         public async Task AcceptBookingAsync(int bookingId, int technicianId)
         {
+            Console.WriteLine($"[InstallationService.AcceptBookingAsync] ========== STARTED for BookingId: {bookingId}, TechnicianId: {technicianId} ==========");
+
             var booking = await _bookingRepository.GetByIdAsync(bookingId);
             if (booking == null)
+            {
+                Console.WriteLine($"[InstallationService.AcceptBookingAsync] ERROR: Booking not found");
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
+            }
 
             if (booking.TechnicianId != technicianId)
+            {
+                Console.WriteLine($"[InstallationService.AcceptBookingAsync] ERROR: Technician not assigned to this booking");
                 throw new DomainException("Bạn không được phân công cho lịch này");
+            }
 
-            booking.Accept();
+            Console.WriteLine($"[InstallationService.AcceptBookingAsync] Booking found: ID={booking.Id}, Status={booking.Status}");
+
+            // Use appropriate accept method based on status
+            if (booking.Status == InstallationStatus.Rescheduled)
+            {
+                Console.WriteLine($"[InstallationService.AcceptBookingAsync] Accepting rescheduled booking");
+                booking.AcceptRescheduled();
+            }
+            else
+            {
+                Console.WriteLine($"[InstallationService.AcceptBookingAsync] Accepting normal booking");
+                booking.Accept();
+            }
+
             await _bookingRepository.SaveChangesAsync();
+            Console.WriteLine($"[InstallationService.AcceptBookingAsync] Changes saved. New Status: {booking.Status}");
+            Console.WriteLine($"[InstallationService.AcceptBookingAsync] ========== COMPLETED ==========");
         }
 
         public async Task RejectBookingAsync(int bookingId, int technicianId, RejectBookingRequest request)
