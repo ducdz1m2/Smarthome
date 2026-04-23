@@ -1,4 +1,5 @@
-﻿using Domain.Entities;
+﻿using Domain.Abstractions;
+using Domain.Entities;
 using Domain.Entities.Catalog;
 using Domain.Entities.Content;
 using Domain.Entities.Identity;
@@ -7,6 +8,7 @@ using Domain.Entities.Inventory;
 using Domain.Entities.Promotions;
 using Domain.Entities.Sales;
 using Domain.Entities.Shipping;
+using Domain.Events;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +16,14 @@ namespace Infrastructure.Data
 {
     public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, int>
     {
+        private readonly IDomainEventDispatcher? _domainEventDispatcher;
+
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
+        public AppDbContext(DbContextOptions<AppDbContext> options, IDomainEventDispatcher domainEventDispatcher) : base(options)
+        {
+            _domainEventDispatcher = domainEventDispatcher;
+        }
 
         // Catalog
         public DbSet<Product> Products => Set<Product>();
@@ -98,6 +107,50 @@ namespace Infrastructure.Data
                 .OnDelete(DeleteBehavior.Restrict);
             
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        }
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            // Dispatch domain events before saving
+            await DispatchDomainEventsAsync();
+
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        public override int SaveChanges()
+        {
+            DispatchDomainEventsAsync().GetAwaiter().GetResult();
+            return base.SaveChanges();
+        }
+
+        private async Task DispatchDomainEventsAsync()
+        {
+            if (_domainEventDispatcher == null)
+                return;
+
+            // Get all entities that have domain events
+            var entities = ChangeTracker
+                .Entries<AggregateRoot>()
+                .Where(e => e.Entity.DomainEvents.Any())
+                .Select(e => e.Entity);
+
+            // Get all domain events
+            var domainEvents = entities
+                .SelectMany(e => e.DomainEvents)
+                .Cast<DomainEvent>()
+                .ToList();
+
+            // Clear domain events from entities
+            foreach (var entity in entities)
+            {
+                entity.ClearDomainEvents();
+            }
+
+            // Dispatch events
+            foreach (var domainEvent in domainEvents)
+            {
+                await _domainEventDispatcher.DispatchAsync(domainEvent);
+            }
         }
     }
 }

@@ -16,6 +16,7 @@
         Completed = 30,           // Hoàn tất
         Cancelled = 40,           // Đã hủy
         Refunded = 41,            // Đã hoàn tiền
-        ReturnRequested = 42      // Yêu cầu trả hàng
+        ReturnRequested = 42,     // Yêu cầu trả hàng
+        InstallationFailed = 43   // Lắp đặt thất bại
     }
 }

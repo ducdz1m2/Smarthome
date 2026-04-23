@@ -417,6 +417,29 @@ namespace Application.Services
                 Console.WriteLine($"[CompleteAsync] WARNING: Damaged products provided but booking is not warranty (IsWarranty: {booking.IsWarranty}). Skipping damaged products processing.");
             }
 
+            // If this is a warranty booking, update the warranty request status to Completed
+            if (booking.IsWarranty)
+            {
+                Console.WriteLine($"[CompleteAsync] Updating warranty request status to Completed for warranty booking {booking.Id}");
+                try
+                {
+                    var warrantyRequest = (await _warrantyRequestRepository.GetAllAsync())
+                        .FirstOrDefault(wr => wr.InstallationBookingId == booking.Id);
+                    if (warrantyRequest != null)
+                    {
+                        warrantyRequest.Complete(request.Notes);
+                        _warrantyRequestRepository.Update(warrantyRequest);
+                        await _warrantyRequestRepository.SaveChangesAsync();
+                        Console.WriteLine($"[CompleteAsync] Warranty request {warrantyRequest.Id} status updated to Completed");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[CompleteAsync] Error updating warranty request status: {ex.Message}");
+                    // Don't fail the installation if this fails
+                }
+            }
+
             // Update order status to Completed
             var order = await _orderRepository.GetByIdAsync(booking.OrderId);
             if (order != null)
@@ -1030,6 +1053,27 @@ namespace Application.Services
             await _bookingRepository.SaveChangesAsync();
         }
 
+        public async Task FailBookingAsync(int bookingId, string reason)
+        {
+            var booking = await _bookingRepository.GetByIdAsync(bookingId);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            booking.Fail(reason);
+
+            // Update order status to reflect installation failure
+            var order = await _orderRepository.GetByIdAsync(booking.OrderId);
+            if (order != null)
+            {
+                Console.WriteLine($"[FailBookingAsync] Before update order - Order ID: {order.Id}, Status: {order.Status}");
+                order.UpdateStatusFromInstallation(OrderStatus.InstallationFailed);
+                await _orderRepository.SaveChangesAsync();
+                Console.WriteLine($"[FailBookingAsync] After update order - Order ID: {order.Id}, Status: {order.Status}");
+            }
+
+            await _bookingRepository.SaveChangesAsync();
+        }
+
         public async Task<List<InstallationBookingListResponse>> GetPendingForTechnicianAsync(int technicianId)
         {
             var bookings = await _bookingRepository.GetByTechnicianIdAsync(technicianId);
@@ -1061,6 +1105,12 @@ namespace Application.Services
                 order?.ShippingAddress?.City
             }.Where(s => !string.IsNullOrWhiteSpace(s));
             
+            // Products needing installation (or warranty products)
+            var productsToLoad = booking.IsWarranty
+                ? order?.Items?.ToList() ?? new List<OrderItem>()
+                : order?.Items?.Where(i => i.RequiresInstallation).ToList() ?? new List<OrderItem>();
+            var products = await LoadProductDetailsAsync(productsToLoad);
+            
             var response = new InstallationBookingResponse
             {
                 Id = booking.Id,
@@ -1076,8 +1126,8 @@ namespace Application.Services
                 ShippingAddress = string.Join(", ", addressParts),
                 District = order?.ShippingAddress?.District,
                 
-                // Products needing installation
-                Products = await LoadProductDetailsAsync(order?.Items?.Where(i => i.RequiresInstallation).ToList() ?? new List<OrderItem>()),
+                // Products
+                Products = products,
                 
                 // Technician info
                 TechnicianId = booking.TechnicianId,
@@ -1106,6 +1156,9 @@ namespace Application.Services
                 IsUninstall = booking.IsUninstall,
                 IsWarranty = booking.IsWarranty,
                 CustomerRescheduleCount = booking.CustomerRescheduleCount,
+                WarrantyRequestDescription = booking.IsWarranty
+                    ? (await _warrantyRequestRepository.GetByBookingIdAsync(booking.Id))?.Description
+                    : null,
 
                 // Load technician rating content
                 CustomerRatingContent = null,

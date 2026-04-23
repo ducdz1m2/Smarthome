@@ -118,6 +118,16 @@ namespace Web.Services
         }
 
         /// <summary>
+        /// Mark booking as failed
+        /// </summary>
+        public async Task FailBookingAsync(int bookingId, string reason)
+        {
+            await AddAuthTokenAsync();
+            var response = await _httpClient.PostAsJsonAsync($"api/installation/{bookingId}/fail", new { Reason = reason });
+            response.EnsureSuccessStatusCode();
+        }
+
+        /// <summary>
         /// Start travel
         /// </summary>
         public async Task StartTravelAsync(int bookingId)

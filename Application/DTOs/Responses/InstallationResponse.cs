@@ -44,6 +44,7 @@ namespace Application.DTOs.Responses
         public bool IsUninstall { get; set; }
         public bool IsWarranty { get; set; }
         public int CustomerRescheduleCount { get; set; }
+        public string? WarrantyRequestDescription { get; set; } // Mô tả vấn đề của khách hàng cho bảo hành
         
         // Vật tư
         public List<InstallationMaterialResponse> Materials { get; set; } = new();

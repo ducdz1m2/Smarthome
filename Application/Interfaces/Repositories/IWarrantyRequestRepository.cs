@@ -9,6 +9,7 @@ public interface IWarrantyRequestRepository
     Task<WarrantyRequest?> GetByIdWithItemsAsync(int id);
     Task<List<WarrantyRequest>> GetAllAsync();
     Task<List<WarrantyRequest>> GetByOrderIdAsync(int orderId);
+    Task<WarrantyRequest?> GetByBookingIdAsync(int bookingId);
     Task<List<WarrantyRequest>> GetByStatusAsync(WarrantyRequestStatus status);
     Task<bool> ExistsPendingWarrantyForOrderAsync(int orderId);
     Task AddAsync(WarrantyRequest warrantyRequest);

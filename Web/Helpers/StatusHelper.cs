@@ -25,6 +25,7 @@ namespace Web.Helpers
                 "Cancelled" => Color.Error,
                 "Refunded" => Color.Warning,
                 "ReturnRequested" => Color.Warning,
+                "InstallationFailed" => Color.Error,
                 _ => Color.Default
             };
         }
@@ -49,6 +50,7 @@ namespace Web.Helpers
                 "Cancelled" => "Đã hủy",
                 "Refunded" => "Đã hoàn tiền",
                 "ReturnRequested" => "Yêu cầu trả hàng",
+                "InstallationFailed" => "Lắp đặt thất bại",
                 _ => status
             };
         }
@@ -68,6 +70,7 @@ namespace Web.Helpers
                 "Testing" => Color.Info,
                 "Completed" => Color.Success,
                 "Cancelled" => Color.Error,
+                "Failed" => Color.Error,
                 _ => Color.Default
             };
         }
@@ -86,6 +89,7 @@ namespace Web.Helpers
                 "Testing" => "Đang kiểm tra",
                 "Completed" => "Hoàn thành",
                 "Cancelled" => "Đã hủy",
+                "Failed" => "Thất bại",
                 _ => status
             };
         }
@@ -106,6 +110,7 @@ namespace Web.Helpers
                     "Testing" => Color.Info,
                     "Completed" => Color.Success,
                     "Cancelled" => Color.Error,
+                    "Failed" => Color.Error,
                     _ => Color.Default
                 };
             }
@@ -129,6 +134,7 @@ namespace Web.Helpers
                     "Testing" => "Đang kiểm tra",
                     "Completed" => "Hoàn thành",
                     "Cancelled" => "Đã hủy",
+                    "Failed" => "Thất bại",
                     _ => status
                 };
             }

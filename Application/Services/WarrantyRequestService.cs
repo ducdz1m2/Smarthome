@@ -32,8 +32,12 @@ public class WarrantyRequestService : IWarrantyRequestService
     public async Task<List<WarrantyRequestResponse>> GetAllAsync()
     {
         var warrantyRequests = await _warrantyRequestRepository.GetAllAsync();
-        var tasks = warrantyRequests.Select(MapToResponseAsync);
-        return (await Task.WhenAll(tasks)).ToList();
+        var responses = new List<WarrantyRequestResponse>();
+        foreach (var request in warrantyRequests)
+        {
+            responses.Add(await MapToResponseAsync(request));
+        }
+        return responses;
     }
 
     public async Task<WarrantyRequestResponse?> GetByIdAsync(int id)
@@ -46,8 +50,12 @@ public class WarrantyRequestService : IWarrantyRequestService
     public async Task<List<WarrantyRequestResponse>> GetByOrderIdAsync(int orderId)
     {
         var warrantyRequests = await _warrantyRequestRepository.GetByOrderIdAsync(orderId);
-        var tasks = warrantyRequests.Select(MapToResponseAsync);
-        return (await Task.WhenAll(tasks)).ToList();
+        var responses = new List<WarrantyRequestResponse>();
+        foreach (var request in warrantyRequests)
+        {
+            responses.Add(await MapToResponseAsync(request));
+        }
+        return responses;
     }
 
     public async Task<List<WarrantyRequestResponse>> GetByStatusAsync(string status)
@@ -56,8 +64,12 @@ public class WarrantyRequestService : IWarrantyRequestService
             throw new DomainException("Trạng thái không hợp lệ");
 
         var warrantyRequests = await _warrantyRequestRepository.GetByStatusAsync(warrantyStatus);
-        var tasks = warrantyRequests.Select(MapToResponseAsync);
-        return (await Task.WhenAll(tasks)).ToList();
+        var responses = new List<WarrantyRequestResponse>();
+        foreach (var request in warrantyRequests)
+        {
+            responses.Add(await MapToResponseAsync(request));
+        }
+        return responses;
     }
 
     public async Task<int> CreateAsync(CreateWarrantyRequestRequest request)
@@ -142,6 +154,8 @@ public class WarrantyRequestService : IWarrantyRequestService
         if (warrantyRequest == null)
             throw new DomainException("Không tìm thấy yêu cầu bảo hành");
 
+        Console.WriteLine($"[WarrantyRequestService.CompleteAsync] Before complete - ID: {id}, Status: {warrantyRequest.Status}");
+
         warrantyRequest.Complete(technicianNotes);
 
         // Note: Product-based warranty doesn't have Items collection
@@ -150,6 +164,8 @@ public class WarrantyRequestService : IWarrantyRequestService
 
         _warrantyRequestRepository.Update(warrantyRequest);
         await _warrantyRequestRepository.SaveChangesAsync();
+
+        Console.WriteLine($"[WarrantyRequestService.CompleteAsync] After complete - ID: {id}, Status: {warrantyRequest.Status}");
     }
 
     public async Task MarkItemAsReturnedAsync(int itemId)
@@ -196,7 +212,7 @@ public class WarrantyRequestService : IWarrantyRequestService
             StartedAt = warrantyRequest.StartedAt,
             CompletedAt = warrantyRequest.CompletedAt,
             TechnicianNotes = warrantyRequest.TechnicianNotes,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = warrantyRequest.CreatedAt,
             Items = warrantyRequest.Items.Select(item => new WarrantyRequestItemResponseDto
             {
                 Id = item.Id,

@@ -30,6 +30,7 @@ namespace Application.Interfaces.Services
         // Technician acceptance flow
         Task AcceptBookingAsync(int bookingId, int technicianId);
         Task RejectBookingAsync(int bookingId, int technicianId, RejectBookingRequest request);
+        Task FailBookingAsync(int bookingId, string reason);
         Task<List<InstallationBookingListResponse>> GetPendingForTechnicianAsync(int technicianId);
 
         // Warehouse material preparation flow

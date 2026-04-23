@@ -261,4 +261,21 @@ public class InstallationBooking : AggregateRoot
         {
             IsWarranty = isWarranty;
         }
+
+        public void Fail(string reason)
+        {
+            if (Status == InstallationStatus.Completed)
+                throw new BusinessRuleViolationException("BookingCompleted", "Không thể đánh dấu thất bại khi đã hoàn thành");
+
+            if (Status == InstallationStatus.Cancelled)
+                throw new BusinessRuleViolationException("BookingCancelled", "Không thể đánh dấu thất bại khi đã hủy");
+
+            if (string.IsNullOrWhiteSpace(reason))
+                throw new ValidationException(nameof(reason), "Vui lòng nhập lý do thất bại");
+
+            Status = InstallationStatus.Failed;
+            Notes = reason;
+
+            AddDomainEvent(new InstallationCancelledEvent(Id, reason));
+        }
     }

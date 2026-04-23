@@ -29,7 +29,7 @@ else
             <MudPaper Class="pa-4 mb-4" Elevation="2">
                 <div class="d-flex justify-space-between align-center">
                     <div>
-                        <MudText Typo="Typo.h5">Lịch lắp đặt #@_booking.Id</MudText>
+                        <MudText Typo="Typo.h5">@(_booking.IsWarranty ? "Lịch bảo hành" : _booking.IsUninstall ? "Lịch tháo lắp" : "Lịch lắp đặt") #@_booking.Id</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">@_booking.OrderNumber</MudText>
                     </div>
                     <MudChip T="string" Color="StatusHelper.GetInstallationStatusColor(_booking.Status)" Size="Size.Large">@StatusHelper.GetInstallationStatusText(_booking.Status)</MudChip>
@@ -64,6 +64,68 @@ else
                 </MudCardContent>
             </MudCard>
         </MudItem>
+
+        <!-- Customer Problem Description (for warranty bookings) -->
+        @if (_booking.IsWarranty && !string.IsNullOrEmpty(_booking.WarrantyRequestDescription))
+        {
+            <MudItem xs="12">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.ReportProblem" Class="mr-2" Size="Size.Small" />
+                            Mô tả vấn đề của khách hàng
+                        </MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-warning-light);">
+                            <MudText Typo="Typo.body2">@_booking.WarrantyRequestDescription</MudText>
+                        </MudPaper>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+
+        <!-- Status Information -->
+        @if (!string.IsNullOrEmpty(_booking.Notes))
+        {
+            <MudItem xs="12">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">Thông tin trạng thái</MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (_booking.Status == "Failed")
+                        {
+                            <MudAlert Severity="Severity.Error" Class="mb-2">
+                                <MudText Typo="Typo.body1"><b>Lý do thất bại:</b></MudText>
+                                <MudText Typo="Typo.body2">@_booking.Notes</MudText>
+                            </MudAlert>
+                        }
+                        else if (_booking.Status == "Cancelled")
+                        {
+                            <MudAlert Severity="Severity.Warning" Class="mb-2">
+                                <MudText Typo="Typo.body1"><b>Lý do hủy:</b></MudText>
+                                <MudText Typo="Typo.body2">@_booking.Notes</MudText>
+                            </MudAlert>
+                        }
+                        else if (_booking.Status == "Completed")
+                        {
+                            <MudAlert Severity="Severity.Success" Class="mb-2">
+                                <MudText Typo="Typo.body1"><b>Ghi chú hoàn thành:</b></MudText>
+                                <MudText Typo="Typo.body2">@_booking.Notes</MudText>
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info" Class="mb-2">
+                                <MudText Typo="Typo.body1"><b>Ghi chú:</b></MudText>
+                                <MudText Typo="Typo.body2">@_booking.Notes</MudText>
+                            </MudAlert>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
 
         <!-- Products -->
         <MudItem xs="12">
@@ -143,17 +205,19 @@ else
                             <MudAlert Severity="Severity.Info" Class="mb-3">
                                 Đã chuẩn bị sản phẩm thay thế xong. Sẵn sàng bắt đầu bảo hành!
                             </MudAlert>
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.BuildCircle"
-                                       OnClick="StartWarranty">Bắt đầu bảo hành</MudButton>
                         }
                         else
                         {
-                            <MudAlert Severity="Severity.Warning" Class="mb-3">
-                                Vui lòng chuẩn bị sản phẩm thay thế trước khi bắt đầu bảo hành.
+                            <MudAlert Severity="Severity.Info" Class="mb-3">
+                                Bạn có thể chuẩn bị sản phẩm thay thế hoặc bắt đầu bảo hành ngay.
                             </MudAlert>
                             <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
-                                       OnClick="OpenPrepareReplacementDialog">Chuẩn bị sản phẩm thay thế</MudButton>
+                                       OnClick="OpenPrepareReplacementDialog" Class="mr-2">Chuẩn bị sản phẩm thay thế</MudButton>
                         }
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.BuildCircle"
+                                   OnClick="StartWarranty" Class="mr-2">Bắt đầu bảo hành</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel"
+                                   OnClick="OpenFailDialog">Đánh dấu thất bại</MudButton>
                     }
                     else
                     {
@@ -182,7 +246,7 @@ else
                                 Đã chuẩn bị sản phẩm thay thế xong. Sẵn sàng di chuyển!
                             </MudAlert>
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
-                                       OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                                       OnClick="StartTravel" Class="mr-2">Bắt đầu di chuyển</MudButton>
                         }
                         else
                         {
@@ -190,8 +254,10 @@ else
                                 Vui lòng chuẩn bị sản phẩm thay thế trước khi di chuyển.
                             </MudAlert>
                             <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
-                                       OnClick="OpenPrepareReplacementDialog">Chuẩn bị sản phẩm thay thế</MudButton>
+                                       OnClick="OpenPrepareReplacementDialog" Class="mr-2">Chuẩn bị sản phẩm thay thế</MudButton>
                         }
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel"
+                                   OnClick="OpenFailDialog">Đánh dấu thất bại</MudButton>
                     }
                     else
                     {
@@ -245,7 +311,9 @@ else
                     @if (_booking.IsWarranty)
                     {
                         <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.BuildCircle"
-                                   OnClick="StartWarranty">Bắt đầu bảo hành</MudButton>
+                                   OnClick="StartWarranty" Class="mr-2">Bắt đầu bảo hành</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel"
+                                   OnClick="OpenFailDialog">Đánh dấu thất bại</MudButton>
                     }
                     else
                     {
@@ -259,9 +327,11 @@ else
                     {
                         <MudAlert Severity="Severity.Info" Class="mb-3">
                             Đang thực hiện bảo hành. Hoàn thành khi xong.
-                            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Done"
-                                       OnClick="OpenCompleteDialog">Hoàn thành bảo hành</MudButton>
                         </MudAlert>
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Done"
+                                   OnClick="OpenCompleteDialog" Class="mr-2">Hoàn thành bảo hành</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel"
+                                   OnClick="OpenFailDialog">Đánh dấu thất bại</MudButton>
                     }
                     else
                     {
@@ -316,6 +386,28 @@ else
     </DialogActions>
 </MudDialog>
 
+<!-- Fail Dialog - CSS Overlay -->
+@if (_showFailDialog)
+{
+    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center;">
+        <MudPaper Class="pa-4" Style="max-width: 500px; width: 90%;">
+            <MudText Typo="Typo.h6" Class="mb-4">Đánh dấu thất bại</MudText>
+            <MudAlert Severity="Severity.Warning" Class="mb-3">
+                Sử dụng tính năng này khi: khách hàng không có nhà, sản phẩm bị hỏng nhưng không có sản phẩm thay thế, hoặc các vấn đề khác không thể hoàn thành.
+            </MudAlert>
+            <MudForm @ref="_failForm" @bind-IsValid="_isFailFormValid">
+                <MudTextField @bind-Value="_failReason" Label="Lý do thất bại *"
+                              Required="true" RequiredError="Vui lòng nhập lý do"
+                              Variant="Variant.Outlined" Lines="3" />
+            </MudForm>
+            <div class="d-flex justify-end mt-4">
+                <MudButton OnClick="() => _showFailDialog = false" Variant="Variant.Outlined" Class="mr-2">Hủy</MudButton>
+                <MudButton Color="Color.Error" OnClick="ConfirmFail" Disabled="!_isFailFormValid">Đánh dấu thất bại</MudButton>
+            </div>
+        </MudPaper>
+    </div>
+}
+
 <!-- Complete Dialog - CSS Overlay -->
 @if (_showCompleteDialog)
 {
@@ -347,45 +439,34 @@ else
 
             @if (_booking?.IsWarranty == true)
             {
-                <MudText Typo="Typo.subtitle2" Class="mb-2 mt-3">Sản phẩm hỏng</MudText>
-                <MudCard Elevation="0" Outlined="true" Class="mb-3">
-                    <MudCardContent>
-                        <MudCheckBox T="bool" @bind-Checked="_warrantyProductDamaged" Label="Sản phẩm bảo hành bị hỏng" Color="Color.Error" />
-                        <MudTextField @bind-Value="_warrantyDamageReason" Label="Lý do hỏng" Variant="Variant.Outlined" Lines="2" Class="mt-2" />
-                    </MudCardContent>
-                </MudCard>
-
-                <MudText Typo="Typo.subtitle2" Class="mb-2 mt-3">Thay thế</MudText>
-                <MudCard Elevation="0" Outlined="true" Class="mb-3">
-                    <MudCardContent>
-                        @if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
-                        {
-                            @foreach (var replacement in _selectedReplacementProducts.Where(rp => rp.Selected))
+                @if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mb-2 mt-3">Sản phẩm hỏng</MudText>
+                    <MudCard Elevation="0" Outlined="true" Class="mb-3">
+                        <MudCardContent>
+                            <MudCheckBox T="bool" @bind-Checked="_warrantyProductDamaged" Label="Sản phẩm bảo hành bị hỏng (đã thay thế)" Color="Color.Error" />
+                            @if (_warrantyProductDamaged)
                             {
-                                var productInfo = _booking?.Products?.FirstOrDefault(p => p.ProductId == replacement.ProductId);
-                                <div class="d-flex align-center justify-space-between p-2" style="border: 1px solid #ddd; border-radius: 4px;">
-                                    <div>
-                                        <MudText Typo="Typo.body1" Class="fw-bold">@(productInfo?.ProductName ?? $"Sản phẩm #{replacement.ProductId}")</MudText>
-                                        @if (productInfo?.VariantName != null)
-                                        {
-                                            <MudText Typo="Typo.caption">@productInfo.VariantName</MudText>
-                                        }
-                                        <MudText Typo="Typo.caption">SL: 1</MudText>
-                                    </div>
-                                    <div class="d-flex align-center gap-2">
-                                        <MudCheckBox T="bool" Checked="@GetReplacementUsed(replacement.ProductId, replacement.VariantId)"
-                                                    CheckedChanged="(bool value) => SetReplacementUsed(replacement.ProductId, replacement.VariantId, value)"
-                                                    Label="Đã thay thế (sản phẩm cũ hư hỏng)" Color="Color.Primary" />
-                                    </div>
-                                </div>
+                                <MudAlert Severity="Severity.Warning" Class="mt-2">
+                                    Nếu tích vào: Sản phẩm hỏng sẽ được thay thế bằng sản phẩm chuẩn bị và trả về kho hư hỏng
+                                </MudAlert>
+                                <MudTextField @bind-Value="_warrantyDamageReason" Label="Lý do hỏng" Variant="Variant.Outlined" Lines="2" Class="mt-2" />
                             }
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Chưa chuẩn bị sản phẩm thay thế</MudText>
-                        }
-                    </MudCardContent>
-                </MudCard>
+                            else
+                            {
+                                <MudAlert Severity="Severity.Info" Class="mt-2">
+                                    Nếu không tích: Sản phẩm không hỏng, sẽ trả về kho cũ sau khi sửa chữa
+                                </MudAlert>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-3">
+                        Bảo hành: Sửa chữa hoặc thay thế linh kiện tại chỗ
+                    </MudAlert>
+                }
             }
             else
             {
@@ -605,6 +686,11 @@ else
     private bool _isRejectFormValid = false;
     private string _rejectReason = "";
 
+    private bool _showFailDialog = false;
+    private MudForm _failForm = null!;
+    private bool _isFailFormValid = false;
+    private string _failReason = "";
+
     private bool _showCompleteDialog = false;
     private MudForm _completeForm = null!;
     private bool _isCompleteFormValid = false;
@@ -617,7 +703,6 @@ else
     private string _newDamagedReason = "";
     private string _warrantyDamageReason = "";
     private bool _warrantyProductDamaged = false;
-    private Dictionary<string, bool> _replacementUsed = new();
     private HashSet<string> _selectedReplacementKeys = new();
 
     // Prepare Materials Dialog fields
@@ -742,6 +827,29 @@ else
             await InstallationApiService.RejectBookingAsync(Id, technicianId, request);
             _showRejectDialog = false;
             Snackbar.Add("Đã từ chối lịch lắp đặt", Severity.Info);
+            await LoadBooking();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenFailDialog()
+    {
+        Console.WriteLine($"[OpenFailDialog] Opening fail dialog for booking {Id}");
+        _failReason = "";
+        _showFailDialog = true;
+        Console.WriteLine($"[OpenFailDialog] _showFailDialog set to {_showFailDialog}");
+    }
+
+    private async Task ConfirmFail()
+    {
+        try
+        {
+            await InstallationApiService.FailBookingAsync(Id, _failReason);
+            _showFailDialog = false;
+            Snackbar.Add("Đã đánh dấu lịch là thất bại", Severity.Warning);
             await LoadBooking();
         }
         catch (Exception ex)
@@ -926,70 +1034,55 @@ else
             var damagedProducts = new List<DamagedProductItem>();
             bool replacementWasUsed = false;
 
-            // Mark warranty product as damaged if user checked the checkbox OR replacement was used
-            if (_warrantyProductDamaged)
+            // If replacement products were prepared, handle damage/replacement logic
+            if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
             {
-                if (_booking?.Products?.Any() == true)
+                if (_warrantyProductDamaged)
                 {
-                    foreach (var product in _booking.Products)
+                    // Product is damaged - mark all replacement products as used
+                    replacementWasUsed = true;
+
+                    // Add damaged product entry
+                    if (_booking?.Products?.Any() == true)
                     {
-                        damagedProducts.Add(new DamagedProductItem
+                        foreach (var product in _booking.Products)
                         {
-                            ProductId = product.ProductId,
-                            VariantId = product.VariantId,
-                            Quantity = product.Quantity,
-                            Reason = string.IsNullOrEmpty(_warrantyDamageReason) ? "Sản phẩm hư hỏng" : _warrantyDamageReason,
-                            IsDamaged = true
-                        });
-                    }
-                }
-            }
-            else if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
-            {
-                // Old logic: mark as damaged only if replacement was used
-                foreach (var replacement in _selectedReplacementProducts.Where(rp => rp.Selected))
-                {
-                    var key = $"{replacement.ProductId}_{replacement.VariantId ?? 0}";
-                    if (_replacementUsed.ContainsKey(key) && _replacementUsed[key])
-                    {
-                        replacementWasUsed = true;
-                        if (_booking?.Products?.Any() == true)
-                        {
-                            foreach (var product in _booking.Products)
+                            damagedProducts.Add(new DamagedProductItem
                             {
-                                damagedProducts.Add(new DamagedProductItem
-                                {
-                                    ProductId = product.ProductId,
-                                    VariantId = product.VariantId,
-                                    Quantity = product.Quantity,
-                                    Reason = "Sản phẩm hư hỏng, đã thay thế",
-                                    IsDamaged = true
-                                });
-                            }
+                                ProductId = product.ProductId,
+                                VariantId = product.VariantId,
+                                Quantity = product.Quantity,
+                                Reason = string.IsNullOrEmpty(_warrantyDamageReason) ? "Sản phẩm hư hỏng, đã thay thế" : _warrantyDamageReason,
+                                IsDamaged = true
+                            });
                         }
                     }
                 }
+                else
+                {
+                    // Product is NOT damaged - mark all replacement products as returned (not used)
+                    replacementWasUsed = false;
+                }
             }
 
-            // Handle replacement products - if marked as used, they stay with customer
-            // If not marked as used, they are returned to warehouse (not included in MaterialUsages)
+            // Handle replacement products - if marked as damaged, all are used to replace
+            // If not damaged, all are returned to warehouse (not included in MaterialUsages)
             var materialUsages = new List<MaterialUsageItem>();
             if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
             {
-                foreach (var replacement in _selectedReplacementProducts.Where(rp => rp.Selected))
+                if (_warrantyProductDamaged)
                 {
-                    var key = $"{replacement.ProductId}_{replacement.VariantId ?? 0}";
-                    if (_replacementUsed.ContainsKey(key) && _replacementUsed[key])
+                    // Damaged - all replacement products are used
+                    foreach (var replacement in _selectedReplacementProducts.Where(rp => rp.Selected))
                     {
-                        // Replacement was used - mark it as material usage
                         materialUsages.Add(new MaterialUsageItem
                         {
                             MaterialId = replacement.ProductId,
                             QuantityUsed = 1
                         });
                     }
-                    // If not used, it will be returned to warehouse automatically
                 }
+                // If not damaged, no material usages - all replacements returned to warehouse
             }
 
             // Include warranty damage reason in completion notes
@@ -999,9 +1092,8 @@ else
                 notes += $". Lý do: {_warrantyDamageReason}";
             }
 
-            await WarrantyRequestService.CompleteAsync(warrantyRequest.Id, notes);
-
-            // Also complete the installation booking to mark it as completed
+            // Complete the installation booking - this will raise InstallationCompletedEvent
+            // The handler will update the warranty request status to Completed
             await InstallationApiService.CompleteAsync(Id, new CompleteInstallationRequest
             {
                 CustomerSignature = "Bảo hành hoàn thành",
@@ -1018,22 +1110,6 @@ else
         {
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
-    }
-
-    private bool GetReplacementUsed(int productId, int? variantId)
-    {
-        var key = $"{productId}_{variantId ?? 0}";
-        if (!_replacementUsed.ContainsKey(key))
-        {
-            _replacementUsed[key] = false; // Default to not used
-        }
-        return _replacementUsed[key];
-    }
-
-    private void SetReplacementUsed(int productId, int? variantId, bool value)
-    {
-        var key = $"{productId}_{variantId ?? 0}";
-        _replacementUsed[key] = value;
     }
 
     private bool GetReplacementItemSelected(int productId, int? variantId)
@@ -1120,9 +1196,26 @@ else
             _selectedReplacementKeys.Clear();
 
             // Load warehouses with available products for warranty replacement
-            if (_booking?.Products?.Any() == true)
+            var productIds = new List<int>();
+
+            if (_booking?.IsWarranty == true)
             {
-                var productIds = _booking.Products.Select(p => p.ProductId).ToList();
+                // For warranty bookings, load products from warranty request
+                var allRequests = await WarrantyRequestService.GetAllAsync();
+                var warrantyRequest = allRequests.FirstOrDefault(r => r.InstallationBookingId == Id);
+                if (warrantyRequest != null)
+                {
+                    productIds.Add(warrantyRequest.ProductId);
+                }
+            }
+            else if (_booking?.Products?.Any() == true)
+            {
+                // For regular installation bookings, load from booking products
+                productIds = _booking.Products.Select(p => p.ProductId).ToList();
+            }
+
+            if (productIds.Any())
+            {
                 _replacementWarehouses = await InstallationApiService.GetWarehousesForProductsAsync(productIds);
             }
 
@@ -1191,9 +1284,11 @@ else
                 };
             }).ToList();
 
+            // Allow skipping replacement preparation if no products selected
             if (!items.Any())
             {
-                Snackbar.Add("Vui lòng chọn ít nhất một sản phẩm thay thế", Severity.Warning);
+                Snackbar.Add("Đã bỏ qua chuẩn bị sản phẩm thay thế", Severity.Info);
+                _showPrepareReplacementDialog = false;
                 return;
             }
 

@@ -89,6 +89,11 @@ namespace Application
             services.AddScoped<IDomainEventHandler<ChatMessageSentEvent>, ChatNotificationHandler>();
             services.AddScoped<IDomainEventHandler<ChatRoomCreatedEvent>, ChatNotificationHandler>();
 
+            // Register Domain Event Handlers - Installation Status Sync
+            services.AddScoped<IDomainEventHandler<InstallationBookingConfirmedEvent>, InstallationStatusSyncHandler>();
+            services.AddScoped<IDomainEventHandler<InstallationCancelledEvent>, InstallationStatusSyncHandler>();
+            services.AddScoped<IDomainEventHandler<InstallationCompletedEvent>, InstallationStatusSyncHandler>();
+
             return services;
         }
     }

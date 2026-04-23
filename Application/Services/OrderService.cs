@@ -236,9 +236,9 @@ namespace Application.Services
                 if (productWarehouse.GetAvailableStock() < allocation.Quantity)
                     throw new DomainException($"Kho ID {allocation.WarehouseId} không đủ hàng. Cần {allocation.Quantity}, có sẵn {productWarehouse.GetAvailableStock()}");
 
-                // Dispatch stock in warehouse (deduct from actual quantity)
-                productWarehouse.Dispatch(allocation.Quantity);
-                Console.WriteLine($"[ApplyManualWarehouseAllocationsAsync] After Dispatch: Quantity={productWarehouse.Quantity}, ReservedQuantity={productWarehouse.ReservedQuantity}, AvailableStock={productWarehouse.GetAvailableStock()}");
+                // Reserve stock in warehouse (don't deduct yet, only reserve)
+                productWarehouse.Reserve(allocation.Quantity);
+                Console.WriteLine($"[ApplyManualWarehouseAllocationsAsync] After Reserve: Quantity={productWarehouse.Quantity}, ReservedQuantity={productWarehouse.ReservedQuantity}, AvailableStock={productWarehouse.GetAvailableStock()}");
 
                 var allocationEntity = Domain.Entities.Sales.OrderWarehouseAllocation.Create(
                     orderItem.Id,
@@ -620,8 +620,8 @@ namespace Application.Services
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
-            // Note: Stock is already dispatched during confirmation (ApplyManualWarehouseAllocationsAsync)
-            // No need to dispatch again here
+            // Note: Stock is reserved during confirmation (ApplyManualWarehouseAllocationsAsync)
+            // Actual dispatch happens via OrderShippingStartedEvent in OrderInventoryHandler
 
             order.StartShipping();
             await _orderRepository.SaveChangesAsync();

@@ -1511,14 +1511,17 @@ namespace Infrastructure.Data
 
                     // Get order item to find order id
                     var orderItem = context.OrderItems.FirstOrDefault(oi => oi.Id == warranty.OrderItemId);
-                    var orderId = orderItem?.OrderId ?? 0;
+                    if (orderItem == null || orderItem.OrderId == 0)
+                    {
+                        continue; // Skip if order item not found or has invalid order id
+                    }
 
                     var request = WarrantyRequest.Create(
                         warranty.Id,
                         warranty.ProductId,
                         warranty.VariantId,
                         warranty.OrderItemId,
-                        orderId,
+                        orderItem.OrderId,
                         WarrantyType.Repair,
                         descriptions[random.Next(descriptions.Length)]
                     );

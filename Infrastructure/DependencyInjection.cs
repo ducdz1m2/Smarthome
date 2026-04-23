@@ -15,14 +15,14 @@ namespace Infrastructure
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
-            // Cấu hình DbContext for Blazor Server (transient to avoid concurrency issues)
+            // Cấu hình DbContext for Blazor Server (scoped per circuit to avoid concurrency issues)
             // Enable sensitive data logging and detailed errors for debugging
             services.AddDbContext<AppDbContext>(options =>
             {
                 options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
                 options.EnableSensitiveDataLogging();
                 options.EnableDetailedErrors();
-            }, ServiceLifetime.Transient);
+            }, ServiceLifetime.Scoped);
 
             // Đăng ký Domain Event Dispatcher
             services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();

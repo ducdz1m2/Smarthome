@@ -204,7 +204,7 @@ namespace Web.Controllers
         }
 
         /// <summary>
-        /// Reject booking as technician
+        /// Reject booking
         /// </summary>
         [HttpPost("{bookingId}/reject")]
         [Authorize(Roles = "Technician,Admin")]
@@ -214,6 +214,24 @@ namespace Web.Controllers
             {
                 await _installationService.RejectBookingAsync(bookingId, technicianId, request);
                 return Ok(new { message = "Đã từ chối lịch lắp đặt" });
+            }
+            catch (DomainException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Mark booking as failed
+        /// </summary>
+        [HttpPost("{bookingId}/fail")]
+        [Authorize(Roles = "Technician,Admin")]
+        public async Task<ActionResult> FailBooking(int bookingId, [FromBody] FailBookingRequest request)
+        {
+            try
+            {
+                await _installationService.FailBookingAsync(bookingId, request.Reason);
+                return Ok(new { message = "Đã đánh dấu lịch là thất bại" });
             }
             catch (DomainException ex)
             {
