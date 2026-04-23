@@ -14,7 +14,8 @@ public class WarrantyRequest : AggregateRoot
     public int ProductId { get; private set; }
     public int? VariantId { get; private set; }
     public int OrderItemId { get; private set; } // Link to OrderItem instead of serial number
-    public int? InstallationBookingId { get; set; }
+    public int OrderId { get; private set; } // Direct link to Order for easier lookup
+    public int? InstallationBookingId { get; private set; }
     public int? AssignedTechnicianId { get; private set; }
     public WarrantyType WarrantyType { get; private set; }
     public string Description { get; private set; } = string.Empty;
@@ -29,7 +30,7 @@ public class WarrantyRequest : AggregateRoot
 
     private WarrantyRequest() { }
 
-    public static WarrantyRequest Create(int? warrantyId, int productId, int? variantId, int orderItemId, WarrantyType warrantyType, string description)
+    public static WarrantyRequest Create(int? warrantyId, int productId, int? variantId, int orderItemId, int orderId, WarrantyType warrantyType, string description)
     {
         if (string.IsNullOrWhiteSpace(description))
             throw new ValidationException(nameof(description), "Mô tả yêu cầu bảo hành không được trống");
@@ -40,6 +41,7 @@ public class WarrantyRequest : AggregateRoot
             ProductId = productId,
             VariantId = variantId,
             OrderItemId = orderItemId,
+            OrderId = orderId,
             WarrantyType = warrantyType,
             Description = description.Trim(),
             Status = WarrantyRequestStatus.Pending

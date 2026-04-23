@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260422145944_AddInstallationDateColumn")]
-    partial class AddInstallationDateColumn
+    [Migration("20260423062241_AddOrderIdToWarrantyRequest")]
+    partial class AddOrderIdToWarrantyRequest
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1860,6 +1860,8 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ProductId");
+
                     b.HasIndex("PromotionId", "ProductId")
                         .IsUnique();
 
@@ -1925,9 +1927,6 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<string>("CouponCode")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1937,9 +1936,6 @@ namespace Infrastructure.Migrations
 
                     b.Property<decimal>("DiscountAmount")
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime?>("InstallationDate")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("OrderNumber")
                         .IsRequired()
@@ -2567,6 +2563,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("nvarchar(500)");
 
                     b.Property<int?>("InstallationBookingId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OrderId")
                         .HasColumnType("int");
 
                     b.Property<int>("OrderItemId")
@@ -3301,8 +3300,33 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Domain.Entities.Inventory.WarehouseTransfer", b =>
+                {
+                    b.HasOne("Domain.Entities.Inventory.Warehouse", "FromWarehouse")
+                        .WithMany()
+                        .HasForeignKey("FromWarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Inventory.Warehouse", "ToWarehouse")
+                        .WithMany()
+                        .HasForeignKey("ToWarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FromWarehouse");
+
+                    b.Navigation("ToWarehouse");
+                });
+
             modelBuilder.Entity("Domain.Entities.Promotions.PromotionProduct", b =>
                 {
+                    b.HasOne("Domain.Entities.Catalog.Product", null)
+                        .WithMany("PromotionProducts")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Domain.Entities.Promotions.Promotion", "Promotion")
                         .WithMany("PromotionProducts")
                         .HasForeignKey("PromotionId")
@@ -3428,18 +3452,10 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Entities.Sales.WarrantyRequest", b =>
                 {
-                    b.HasOne("Domain.Entities.Sales.OrderItem", "OrderItem")
-                        .WithMany()
-                        .HasForeignKey("OrderItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("Domain.Entities.Sales.Warranty", "Warranty")
                         .WithMany()
                         .HasForeignKey("WarrantyId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("OrderItem");
 
                     b.Navigation("Warranty");
                 });
@@ -3534,6 +3550,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Comments");
 
                     b.Navigation("Images");
+
+                    b.Navigation("PromotionProducts");
 
                     b.Navigation("Variants");
                 });

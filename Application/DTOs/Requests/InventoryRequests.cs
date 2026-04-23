@@ -22,6 +22,25 @@ namespace Application.DTOs.Requests
         public string? Note { get; set; }
     }
 
+    public class InitiateTransferRequest
+    {
+        public int FromWarehouseId { get; set; }
+        public int ToWarehouseId { get; set; }
+        public Dictionary<int, int> ProductQuantities { get; set; } = new();
+        public string? Reason { get; set; }
+    }
+
+    public class ExecuteTransferRequest
+    {
+        public int TransferId { get; set; }
+    }
+
+    public class CancelTransferRequest
+    {
+        public int TransferId { get; set; }
+        public string Reason { get; set; } = string.Empty;
+    }
+
     public class InventoryFilterRequest
     {
         public int? WarehouseId { get; set; }

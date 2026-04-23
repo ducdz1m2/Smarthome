@@ -32,15 +32,29 @@ namespace Infrastructure.Repositories
 
         public async Task<ProductWarehouse?> GetByProductVariantAndWarehouseAsync(int productId, int? variantId, int warehouseId)
         {
-            return await _context.ProductWarehouses
+            var query = _context.ProductWarehouses
                 .AsNoTracking()
-                .FirstOrDefaultAsync(pw => pw.ProductId == productId && pw.VariantId == variantId && pw.WarehouseId == warehouseId);
+                .Where(pw => pw.ProductId == productId && pw.WarehouseId == warehouseId);
+            
+            if (variantId.HasValue)
+            {
+                query = query.Where(pw => pw.VariantId == variantId.Value);
+            }
+            
+            return await query.FirstOrDefaultAsync();
         }
 
         public async Task<ProductWarehouse?> GetByProductVariantAndWarehouseForUpdateAsync(int productId, int? variantId, int warehouseId)
         {
-            return await _context.ProductWarehouses
-                .FirstOrDefaultAsync(pw => pw.ProductId == productId && pw.VariantId == variantId && pw.WarehouseId == warehouseId);
+            var query = _context.ProductWarehouses
+                .Where(pw => pw.ProductId == productId && pw.WarehouseId == warehouseId);
+            
+            if (variantId.HasValue)
+            {
+                query = query.Where(pw => pw.VariantId == variantId.Value);
+            }
+            
+            return await query.FirstOrDefaultAsync();
         }
 
         public async Task<List<ProductWarehouse>> GetByProductAsync(int productId)

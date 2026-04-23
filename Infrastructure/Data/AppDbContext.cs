@@ -84,6 +84,19 @@ namespace Infrastructure.Data
             // Ignore DomainEvent - it's not an entity to be persisted
             modelBuilder.Ignore<Domain.Events.DomainEvent>();
             
+            // Configure WarehouseTransfer to avoid cascade delete cycles
+            modelBuilder.Entity<WarehouseTransfer>()
+                .HasOne(wt => wt.FromWarehouse)
+                .WithMany()
+                .HasForeignKey(wt => wt.FromWarehouseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            modelBuilder.Entity<WarehouseTransfer>()
+                .HasOne(wt => wt.ToWarehouse)
+                .WithMany()
+                .HasForeignKey(wt => wt.ToWarehouseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
         }
     }

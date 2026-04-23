@@ -376,6 +376,7 @@
         var parameters = new DialogParameters();
         parameters.Add("ProductName", product.ProductName);
         parameters.Add("Sku", product.Sku);
+        parameters.Add("ProductId", product.ProductId);
         parameters.Add("WarehouseStocks", product.WarehouseStocks);
 
         await DialogService.ShowAsync<WarehouseStockDetailsDialog>("Chi tiết tồn kho", parameters);

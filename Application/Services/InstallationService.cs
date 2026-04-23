@@ -206,6 +206,28 @@ namespace Application.Services
                 }
             }
 
+            // Link warranty request to installation booking if applicable
+            if (request.IsWarranty && request.WarrantyRequestId.HasValue)
+            {
+                try
+                {
+                    var warrantyRequest = await _warrantyRequestRepository.GetByIdAsync(request.WarrantyRequestId.Value);
+                    if (warrantyRequest != null)
+                    {
+                        warrantyRequest.LinkToInstallationBooking(booking.Id);
+                        warrantyRequest.AssignTechnician(request.TechnicianId);
+                        _warrantyRequestRepository.Update(warrantyRequest);
+                        await _warrantyRequestRepository.SaveChangesAsync();
+                        Console.WriteLine($"[InstallationService.CreateAsync] Linked warranty request {request.WarrantyRequestId} to booking {booking.Id}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[InstallationService.CreateAsync] Failed to link warranty request: {ex.Message}");
+                    // Don't fail the booking creation if linking fails
+                }
+            }
+
             Console.WriteLine($"[InstallationService.CreateAsync] Returning booking ID: {booking.Id}");
             return booking.Id;
         }

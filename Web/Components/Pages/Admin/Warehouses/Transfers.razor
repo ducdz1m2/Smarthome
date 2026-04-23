@@ -1,0 +1,215 @@
+@page "/admin/warehouses/transfers"
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Enums
+@using MudBlazor
+@layout AdminLayout
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h4" Class="mb-4">Lịch sử Chuyển Kho</MudText>
+
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="4">
+        <MudSelect T="int?" Label="Kho" @bind-Value="_selectedWarehouseId" Clearable="true">
+            <MudSelectItem T="int?" Value="@null">Tất cả</MudSelectItem>
+            @foreach (var warehouse in _warehouses)
+            {
+                <MudSelectItem T="int?" Value="@warehouse.Id">@warehouse.Name (@warehouse.Code)</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudSelect T="WarehouseTransferStatus?" Label="Trạng thái" @bind-Value="_selectedStatus" Clearable="true">
+            <MudSelectItem T="WarehouseTransferStatus?" Value="@null">Tất cả</MudSelectItem>
+            <MudSelectItem T="WarehouseTransferStatus?" Value="@WarehouseTransferStatus.Pending">Đang chờ</MudSelectItem>
+            <MudSelectItem T="WarehouseTransferStatus?" Value="@WarehouseTransferStatus.Completed">Hoàn thành</MudSelectItem>
+            <MudSelectItem T="WarehouseTransferStatus?" Value="@WarehouseTransferStatus.Cancelled">Đã hủy</MudSelectItem>
+        </MudSelect>
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadTransfers" Class="mt-3">
+            <Icons.Material.Filled.Search />
+            Tìm kiếm
+        </MudButton>
+    </MudItem>
+</MudGrid>
+
+<MudTable Items="_transfers" Dense="true" Hover="true" Loading="_loading" 
+          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true">
+    <HeaderContent>
+        <MudTh width="80px"><MudTableSortLabel T="WarehouseTransferResponse" SortBy="@(t => t.Id)">ID</MudTableSortLabel></MudTh>
+        <MudTh width="150px">Kho nguồn</MudTh>
+        <MudTh width="150px">Kho đích</MudTh>
+        <MudTh width="120px">Sản phẩm</MudTh>
+        <MudTh width="80px">Số lượng</MudTh>
+        <MudTh width="100px">Trạng thái</MudTh>
+        <MudTh width="150px">Ngày tạo</MudTh>
+        <MudTh width="150px">Ngày thực hiện</MudTh>
+        <MudTh width="120px">Thao tác</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.Id</MudTd>
+        <MudTd DataLabel="Kho nguồn">@context.FromWarehouseName (@context.FromWarehouseCode)</MudTd>
+        <MudTd DataLabel="Kho đích">@context.ToWarehouseName (@context.ToWarehouseCode)</MudTd>
+        <MudTd DataLabel="Sản phẩm">@context.ProductName (@context.ProductSku)</MudTd>
+        <MudTd DataLabel="Số lượng">@context.Quantity</MudTd>
+        <MudTd DataLabel="Trạng thái">
+            <MudChip Color="@GetStatusColor(context.Status)" Size="Size.Small" T="string">@GetStatusText(context.Status)</MudChip>
+        </MudTd>
+        <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+        <MudTd DataLabel="Ngày thực hiện">
+            @(context.ExecutedAt?.ToString("dd/MM/yyyy HH:mm") ?? "-")
+        </MudTd>
+        <MudTd>
+            @if (context.Status == "Pending")
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Success" 
+                               OnClick="@(() => ExecuteTransfer(context))" Size="Size.Small" 
+                               Title="Thực hiện chuyển kho" />
+                <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" 
+                               OnClick="@(() => CancelTransfer(context))" Size="Size.Small" 
+                               Title="Hủy phiếu chuyển" />
+            }
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                       InfoFormat="{first_item}-{last_item} / {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private List<WarehouseTransferResponse> _transfers = new();
+    private List<WarehouseResponse> _warehouses = new();
+    private bool _loading = true;
+    private int? _selectedWarehouseId = null;
+    private WarehouseTransferStatus? _selectedStatus = null;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWarehouses();
+        await LoadTransfers();
+    }
+    
+    private async Task LoadWarehouses()
+    {
+        try
+        {
+            var url = $"{NavigationManager.BaseUri}api/warehouse";
+            _warehouses = (await Http.GetFromJsonAsync<List<WarehouseResponse>>(url)) ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách kho: {ex.Message}", Severity.Error);
+        }
+    }
+    
+    private async Task LoadTransfers()
+    {
+        _loading = true;
+        try
+        {
+            var url = $"{NavigationManager.BaseUri}api/warehouse/transfer";
+            var queryParams = new List<string>();
+            
+            if (_selectedWarehouseId.HasValue)
+                queryParams.Add($"warehouseId={_selectedWarehouseId}");
+            if (_selectedStatus.HasValue)
+                queryParams.Add($"status={_selectedStatus.Value}");
+            
+            if (queryParams.Any())
+                url += "?" + string.Join("&", queryParams);
+            
+            _transfers = await Http.GetFromJsonAsync<List<WarehouseTransferResponse>>(url) ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải danh sách chuyển kho: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+    
+    private async Task ExecuteTransfer(WarehouseTransferResponse transfer)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Xác nhận chuyển kho" },
+            { "Content", $"Bạn có chắc muốn thực hiện chuyển kho ID {transfer.Id} từ {transfer.FromWarehouseName} sang {transfer.ToWarehouseName}?" },
+            { "ConfirmText", "Thực hiện" },
+            { "CancelText", "Hủy" }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<Web.Components.Shared.ConfirmDialog>("", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            try
+            {
+                var request = new { TransferId = transfer.Id };
+                var url = $"{NavigationManager.BaseUri}api/warehouse/transfer/execute";
+                var response = await Http.PostAsJsonAsync(url, request);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Đã thực hiện chuyển kho thành công", Severity.Success);
+                    await LoadTransfers();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Lỗi: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi khi thực hiện chuyển kho: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+    
+    private async Task CancelTransfer(WarehouseTransferResponse transfer)
+    {
+        var parameters = new DialogParameters<Web.Components.Dialogs.CancelTransferDialog>
+        {
+            { x => x.TransferId, transfer.Id }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Web.Components.Dialogs.CancelTransferDialog>("Hủy phiếu chuyển kho", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            Snackbar.Add("Đã hủy phiếu chuyển kho", Severity.Success);
+            await LoadTransfers();
+        }
+    }
+    
+    private Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => Color.Warning,
+            "Completed" => Color.Success,
+            "Cancelled" => Color.Error,
+            _ => Color.Default
+        };
+    }
+    
+    private string GetStatusText(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Đang chờ",
+            "Completed" => "Hoàn thành",
+            "Cancelled" => "Đã hủy",
+            _ => status
+        };
+    }
+}

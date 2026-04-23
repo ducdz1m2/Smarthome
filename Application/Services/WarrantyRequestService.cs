@@ -15,61 +15,39 @@ public class WarrantyRequestService : IWarrantyRequestService
     private readonly IWarrantyRequestRepository _warrantyRequestRepository;
     private readonly IWarrantyRepository _warrantyRepository;
     private readonly IOrderRepository _orderRepository;
-    private readonly IInstallationService _installationService;
-    private readonly IInstallationSlotService _slotService;
-    private readonly ITechnicianProfileService _technicianProfileService;
-    private readonly IProductVariantRepository _productVariantRepository;
-    private readonly IInventoryService _inventoryService;
-    private readonly IProductWarehouseRepository _productWarehouseRepository;
-    private readonly IOrderWarehouseAllocationRepository _orderWarehouseAllocationRepository;
     private readonly IProductRepository _productRepository;
-    private readonly IInstallationBookingRepository _installationBookingRepository;
 
     public WarrantyRequestService(
         IWarrantyRequestRepository warrantyRequestRepository,
         IWarrantyRepository warrantyRepository,
         IOrderRepository orderRepository,
-        IInstallationService installationService,
-        IInstallationSlotService slotService,
-        ITechnicianProfileService technicianProfileService,
-        IProductVariantRepository productVariantRepository,
-        IInventoryService inventoryService,
-        IProductWarehouseRepository productWarehouseRepository,
-        IOrderWarehouseAllocationRepository orderWarehouseAllocationRepository,
-        IProductRepository productRepository,
-        IInstallationBookingRepository installationBookingRepository)
+        IProductRepository productRepository)
     {
         _warrantyRequestRepository = warrantyRequestRepository;
         _warrantyRepository = warrantyRepository;
         _orderRepository = orderRepository;
-        _installationService = installationService;
-        _slotService = slotService;
-        _technicianProfileService = technicianProfileService;
-        _productVariantRepository = productVariantRepository;
-        _inventoryService = inventoryService;
-        _productWarehouseRepository = productWarehouseRepository;
-        _orderWarehouseAllocationRepository = orderWarehouseAllocationRepository;
         _productRepository = productRepository;
-        _installationBookingRepository = installationBookingRepository;
     }
 
     public async Task<List<WarrantyRequestResponse>> GetAllAsync()
     {
         var warrantyRequests = await _warrantyRequestRepository.GetAllAsync();
-        return warrantyRequests.Select(MapToResponse).ToList();
+        var tasks = warrantyRequests.Select(MapToResponseAsync);
+        return (await Task.WhenAll(tasks)).ToList();
     }
 
     public async Task<WarrantyRequestResponse?> GetByIdAsync(int id)
     {
         var warrantyRequest = await _warrantyRequestRepository.GetByIdWithItemsAsync(id);
         if (warrantyRequest == null) return null;
-        return MapToResponse(warrantyRequest);
+        return await MapToResponseAsync(warrantyRequest);
     }
 
     public async Task<List<WarrantyRequestResponse>> GetByOrderIdAsync(int orderId)
     {
         var warrantyRequests = await _warrantyRequestRepository.GetByOrderIdAsync(orderId);
-        return warrantyRequests.Select(MapToResponse).ToList();
+        var tasks = warrantyRequests.Select(MapToResponseAsync);
+        return (await Task.WhenAll(tasks)).ToList();
     }
 
     public async Task<List<WarrantyRequestResponse>> GetByStatusAsync(string status)
@@ -78,7 +56,8 @@ public class WarrantyRequestService : IWarrantyRequestService
             throw new DomainException("Trạng thái không hợp lệ");
 
         var warrantyRequests = await _warrantyRequestRepository.GetByStatusAsync(warrantyStatus);
-        return warrantyRequests.Select(MapToResponse).ToList();
+        var tasks = warrantyRequests.Select(MapToResponseAsync);
+        return (await Task.WhenAll(tasks)).ToList();
     }
 
     public async Task<int> CreateAsync(CreateWarrantyRequestRequest request)
@@ -102,12 +81,18 @@ public class WarrantyRequestService : IWarrantyRequestService
             }
         }
 
+        // Get order item to find order id
+        var orderItem = await _orderRepository.GetOrderItemByIdAsync(request.OrderItemId);
+        if (orderItem == null)
+            throw new DomainException("Không tìm thấy sản phẩm trong đơn hàng");
+
         // Create warranty request
         var warrantyRequest = WarrantyRequest.Create(
             warrantyId,
             request.ProductId,
             request.VariantId,
             request.OrderItemId,
+            orderItem.OrderId,
             WarrantyType.Repair,
             request.Issue
         );
@@ -127,119 +112,6 @@ public class WarrantyRequestService : IWarrantyRequestService
         warrantyRequest.Approve();
         _warrantyRequestRepository.Update(warrantyRequest);
         await _warrantyRequestRepository.SaveChangesAsync();
-
-        Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Warranty request {id} approved. Assigning technician...");
-
-        int installingTechnicianId;
-
-        // Get the warranty associated with this request
-        if (!warrantyRequest.WarrantyId.HasValue)
-        {
-            Console.WriteLine($"[WarrantyRequestService.ApproveAsync] No warranty linked to request {id}, assigning to any available technician");
-
-            // Fallback: assign to any available technician
-            var technicians = await _technicianProfileService.GetAllAsync();
-            var availableTechnician = technicians.FirstOrDefault(t => t.IsAvailable);
-            if (availableTechnician == null)
-            {
-                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] No available technician found");
-                return;
-            }
-            installingTechnicianId = availableTechnician.Id;
-            Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Assigned to available technician: {installingTechnicianId}");
-        }
-        else
-        {
-            var warranty = await _warrantyRepository.GetByIdAsync(warrantyRequest.WarrantyId.Value);
-            if (warranty == null)
-            {
-                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Warranty not found for request {id}");
-                return;
-            }
-
-            // Get the technician who installed the product
-            if (!warranty.InstalledByTechnicianId.HasValue)
-            {
-                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] No installing technician recorded for warranty {warranty.Id}, assigning to any available technician");
-
-                // Fallback: assign to any available technician
-                var technicians = await _technicianProfileService.GetAllAsync();
-                var availableTechnician = technicians.FirstOrDefault(t => t.IsAvailable);
-                if (availableTechnician == null)
-                {
-                    Console.WriteLine($"[WarrantyRequestService.ApproveAsync] No available technician found");
-                    return;
-                }
-                installingTechnicianId = availableTechnician.Id;
-                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Assigned to available technician: {installingTechnicianId}");
-            }
-            else
-            {
-                installingTechnicianId = warranty.InstalledByTechnicianId.Value;
-                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Original installing technician: {installingTechnicianId}");
-            }
-        }
-
-        // Assign the technician directly to the warranty request
-        warrantyRequest.AssignTechnician(installingTechnicianId);
-        _warrantyRequestRepository.Update(warrantyRequest);
-        await _warrantyRequestRepository.SaveChangesAsync();
-
-        Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Assigned technician {installingTechnicianId} to warranty request {id}");
-
-        // Create installation booking for warranty service
-        try
-        {
-            // Get the order item to find the order
-            var orderItem = await _orderRepository.GetOrderItemByIdAsync(warrantyRequest.OrderItemId);
-            if (orderItem != null)
-            {
-                var orderId = orderItem.OrderId;
-                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Creating installation booking for warranty service, OrderId: {orderId}, TechnicianId: {installingTechnicianId}");
-
-                // Create installation booking for warranty service
-                var createRequest = new CreateInstallationBookingRequest
-                {
-                    OrderId = orderId,
-                    TechnicianId = installingTechnicianId,
-                    IsWarranty = true,
-                    WarrantyRequestId = warrantyRequest.Id
-                };
-
-                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] CreateRequest.IsWarranty: {createRequest.IsWarranty}");
-
-                var bookingId = await _installationService.CreateAsync(createRequest);
-                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Installation booking created with ID: {bookingId}");
-
-                // Verify the booking was created with IsWarranty = true using repository directly
-                try
-                {
-                    var createdBooking = await _installationBookingRepository.GetByIdAsync(bookingId);
-                    Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Verified booking IsWarranty: {createdBooking?.IsWarranty}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Failed to verify booking: {ex.Message}");
-                }
-
-                // Link warranty request to installation booking
-                warrantyRequest.LinkToInstallationBooking(bookingId);
-                _warrantyRequestRepository.Update(warrantyRequest);
-                await _warrantyRequestRepository.SaveChangesAsync();
-
-                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Linked warranty request {id} to booking {bookingId}");
-            }
-            else
-            {
-                Console.WriteLine($"[WarrantyRequestService.ApproveAsync] OrderItem not found for OrderItemId: {warrantyRequest.OrderItemId}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Failed to create installation booking: {ex.Message}");
-            Console.WriteLine($"[WarrantyRequestService.ApproveAsync] Stack trace: {ex.StackTrace}");
-            // Don't fail the approval if booking creation fails
-        }
     }
 
     public async Task RejectAsync(int id, string reason)
@@ -298,19 +170,25 @@ public class WarrantyRequestService : IWarrantyRequestService
         await _warrantyRequestRepository.SaveChangesAsync();
     }
 
-    private WarrantyRequestResponse MapToResponse(WarrantyRequest warrantyRequest)
+    private async Task<WarrantyRequestResponse> MapToResponseAsync(WarrantyRequest warrantyRequest)
     {
+        // Get product info
+        var product = await _productRepository.GetByIdAsync(warrantyRequest.ProductId);
+
         return new WarrantyRequestResponse
         {
             Id = warrantyRequest.Id,
-            OrderId = 0, // Removed - product-based warranty
+            OrderId = warrantyRequest.OrderId,
             WarrantyId = warrantyRequest.WarrantyId,
             ProductId = warrantyRequest.ProductId,
             VariantId = warrantyRequest.VariantId,
             OrderItemId = warrantyRequest.OrderItemId,
             InstallationBookingId = warrantyRequest.InstallationBookingId,
             AssignedTechnicianId = warrantyRequest.AssignedTechnicianId,
-            OrderNumber = $"WRT{warrantyRequest.Id:D8}",
+            OrderNumber = warrantyRequest.OrderId > 0 ? $"ORD{warrantyRequest.OrderId:D8}" : $"WRT{warrantyRequest.Id:D8}",
+            ProductName = product?.Name ?? "Unknown",
+            CustomerName = "", // Will be loaded from order if needed
+            CustomerPhone = "", // Will be loaded from order if needed
             WarrantyType = warrantyRequest.WarrantyType.ToString(),
             Description = warrantyRequest.Description,
             Status = warrantyRequest.Status.ToString(),

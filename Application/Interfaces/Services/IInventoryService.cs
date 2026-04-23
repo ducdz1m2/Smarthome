@@ -1,5 +1,6 @@
 using Application.DTOs.Requests;
 using Application.DTOs.Responses;
+using Domain.Entities.Inventory;
 
 namespace Application.Interfaces.Services
 {
@@ -29,6 +30,12 @@ namespace Application.Interfaces.Services
         // Điều chỉnh tồn kho
         Task AdjustStockAsync(AdjustStockRequest request);
         Task TransferStockAsync(TransferStockRequest request);
+
+        // Chuyển kho (Warehouse Transfer)
+        Task<WarehouseTransfer> InitiateTransferAsync(int fromWarehouseId, int toWarehouseId, Dictionary<int, int> productQuantities, string? reason = null);
+        Task ExecuteTransferAsync(int transferId);
+        Task CancelTransferAsync(int transferId, string reason);
+        Task<List<WarehouseTransfer>> GetTransfersAsync(int? warehouseId = null, Domain.Enums.WarehouseTransferStatus? status = null);
 
         // Quản lý tồn kho đơn hàng
         Task ReserveStockForOrderAsync(int productId, int quantity, int orderId, int? warehouseId = null);

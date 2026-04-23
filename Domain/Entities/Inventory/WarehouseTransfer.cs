@@ -17,6 +17,10 @@ public class WarehouseTransfer : AggregateRoot
         public WarehouseTransferStatus Status { get; private set; } = WarehouseTransferStatus.Pending;
         public DateTime? ExecutedAt { get; private set; }
 
+        // Navigation properties
+        public Warehouse? FromWarehouse { get; private set; }
+        public Warehouse? ToWarehouse { get; private set; }
+
         private WarehouseTransfer() { } // EF Core
 
         public static WarehouseTransfer Create(int fromWarehouseId, int toWarehouseId, int productId, int quantity, string? reason = null)

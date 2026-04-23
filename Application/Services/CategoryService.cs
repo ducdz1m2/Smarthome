@@ -14,6 +14,7 @@ namespace Application.Services
         private readonly ICategoryRepository _categoryRepository;
         private readonly IMemoryCache _cache;
         private const string CategoriesCacheKey = "AllCategories";
+        private const string CategoriesWithProductsCacheKey = "CategoriesWithProducts";
         private readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(30);
 
         public CategoryService(ICategoryRepository categoryRepository, IMemoryCache cache)
@@ -33,6 +34,23 @@ namespace Application.Services
             var result = categories.Select(MapToResponse).ToList();
             
             _cache.Set(CategoriesCacheKey, result, _cacheDuration);
+            return result;
+        }
+
+        public async Task<List<CategoryResponse>> GetCategoriesWithProductsAsync()
+        {
+            if (_cache.TryGetValue(CategoriesWithProductsCacheKey, out List<CategoryResponse>? cachedCategories))
+            {
+                return cachedCategories ?? new List<CategoryResponse>();
+            }
+
+            var categories = await _categoryRepository.GetAllAsync();
+            var result = categories
+                .Where(c => c.Products != null && c.Products.Any())
+                .Select(MapToResponse)
+                .ToList();
+            
+            _cache.Set(CategoriesWithProductsCacheKey, result, _cacheDuration);
             return result;
         }
 
@@ -66,6 +84,7 @@ namespace Application.Services
             await _categoryRepository.SaveChangesAsync();
             
             _cache.Remove(CategoriesCacheKey);
+            _cache.Remove(CategoriesWithProductsCacheKey);
             return category.Id;
         }
 
@@ -89,6 +108,7 @@ namespace Application.Services
             await _categoryRepository.SaveChangesAsync();
             
             _cache.Remove(CategoriesCacheKey);
+            _cache.Remove(CategoriesWithProductsCacheKey);
         }
 
         public async Task DeleteAsync(int id)
@@ -107,6 +127,7 @@ namespace Application.Services
             await _categoryRepository.SaveChangesAsync();
             
             _cache.Remove(CategoriesCacheKey);
+            _cache.Remove(CategoriesWithProductsCacheKey);
         }
 
         public async Task<bool> ActivateAsync(int id)
@@ -119,6 +140,7 @@ namespace Application.Services
             await _categoryRepository.SaveChangesAsync();
             
             _cache.Remove(CategoriesCacheKey);
+            _cache.Remove(CategoriesWithProductsCacheKey);
             return true;
         }
 
@@ -132,6 +154,7 @@ namespace Application.Services
             await _categoryRepository.SaveChangesAsync();
             
             _cache.Remove(CategoriesCacheKey);
+            _cache.Remove(CategoriesWithProductsCacheKey);
             return true;
         }
 

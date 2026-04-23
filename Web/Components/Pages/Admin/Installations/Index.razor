@@ -14,89 +14,196 @@
 
 <PageHeader Title="Quản lý Lịch Lắp đặt" AddButtonText="Thêm lịch lắp đặt" OnAddClick="@(() => OpenDialog(null))" />
 
-<FilterBar>
-    <MudItem xs="12" sm="6" md="3">
-        <MudSelect T="string" @bind-Value="_statusFilter" Label="Trạng thái" 
-                   Clearable="true" Dense="true" Variant="Variant.Outlined"
-                   AnchorOrigin="Origin.BottomCenter">
-            <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
-            <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
-            <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
-            <MudSelectItem T="string" Value="@("Installing")">Đang lắp</MudSelectItem>
-            <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
-            <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
-        </MudSelect>
-    </MudItem>
-    <MudItem xs="12" sm="6" md="3">
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadData">
-            Lọc
-        </MudButton>
-    </MudItem>
-</FilterBar>
+<MudTabs Elevation="2" Rounded="true" ApplyEffects="true">
+    <MudTabPanel Text="Lắp đặt">
+        <FilterBar>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string" @bind-Value="_statusFilter" Label="Trạng thái"
+                           Clearable="true" Dense="true" Variant="Variant.Outlined"
+                           AnchorOrigin="Origin.BottomCenter">
+                    <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Installing")">Đang lắp</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadData">
+                    Lọc
+                </MudButton>
+            </MudItem>
+        </FilterBar>
 
-<DataTable Items="_bookings" Title="Danh sách lịch lắp đặt" Loading="_loading"
-           FilterFunc="@FilterItems">
-    <HeaderContent>
-        <MudTh>ID</MudTh>
-        <MudTh>Loại</MudTh>
-        <MudTh>Đơn hàng</MudTh>
-        <MudTh>Kỹ thuật viên</MudTh>
-        <MudTh><MudTableSortLabel T="InstallationBookingListResponse" SortBy="@(b => b.ScheduledDate)">Ngày lắp</MudTableSortLabel></MudTh>
-        <MudTh>Khung giờ</MudTh>
-        <MudTh>Trạng thái</MudTh>
-        <MudTh>Đánh giá</MudTh>
-        <MudTh>Thao tác</MudTh>
-    </HeaderContent>
-    <RowTemplate Context="booking">
-        <MudTd DataLabel="ID">@booking.Id</MudTd>
-        <MudTd DataLabel="Loại">
-            @if (booking.IsUninstall)
-            {
-                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Tháo dỡ</MudChip>
-            }
-            else
-            {
-                <MudChip T="string" Color="Color.Primary" Size="Size.Small">Lắp đặt</MudChip>
-            }
-        </MudTd>
-        <MudTd DataLabel="Đơn hàng">#@booking.OrderId</MudTd>
-        <MudTd DataLabel="Kỹ thuật viên">@(booking.TechnicianName ?? "Chưa phân công")</MudTd>
-        <MudTd DataLabel="Ngày lắp">@booking.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
-        <MudTd DataLabel="Khung giờ">
-            @if (booking.StartTime.HasValue && booking.EndTime.HasValue)
-            {
-                <span>@booking.StartTime.Value.ToString("hh\\:mm") - @booking.EndTime.Value.ToString("hh\\:mm")</span>
-            }
-            else
-            {
-                <span>--:--</span>
-            }
-        </MudTd>
-        <MudTd DataLabel="Trạng thái">
-            <MudChip T="string" Color="@StatusHelper.GetInstallationStatusColor(booking.Status, booking.IsUninstall)" Size="Size.Small">
-                @StatusHelper.GetInstallationStatusText(booking.Status, booking.IsUninstall)
-            </MudChip>
-        </MudTd>
-        <MudTd DataLabel="Đánh giá">
-            @if (booking.CustomerRating.HasValue)
-            {
-                <MudRating value="@booking.CustomerRating.Value" ReadOnly="true" Size="Size.Small" />
-            }
-            else
-            {
-                <MudText Color="Color.Surface">--</MudText>
-            }
-        </MudTd>
-        <MudTd>
-            <ActionButtons ShowView="false" ShowAdd="false"
-                          OnEdit="@(() => OpenDialog(booking))" 
-                          OnDelete="@(() => DeleteItem(booking))" />
-        </MudTd>
-    </RowTemplate>
-</DataTable>
+        <DataTable Items="_installBookings" Title="Danh sách lịch lắp đặt" Loading="_loading"
+                   FilterFunc="@FilterItems">
+            <HeaderContent>
+                <MudTh>ID</MudTh>
+                <MudTh>Đơn hàng</MudTh>
+                <MudTh>Kỹ thuật viên</MudTh>
+                <MudTh><MudTableSortLabel T="InstallationBookingListResponse" SortBy="@(b => b.ScheduledDate)">Ngày lắp</MudTableSortLabel></MudTh>
+                <MudTh>Khung giờ</MudTh>
+                <MudTh>Trạng thái</MudTh>
+                <MudTh>Thao tác</MudTh>
+            </HeaderContent>
+            <RowTemplate Context="booking">
+                <MudTd DataLabel="ID">@booking.Id</MudTd>
+                <MudTd DataLabel="Đơn hàng">#@booking.OrderId</MudTd>
+                <MudTd DataLabel="Kỹ thuật viên">@(booking.TechnicianName ?? "Chưa phân công")</MudTd>
+                <MudTd DataLabel="Ngày lắp">@booking.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Khung giờ">
+                    @if (booking.StartTime.HasValue && booking.EndTime.HasValue)
+                    {
+                        <span>@booking.StartTime.Value.ToString("hh\\:mm") - @booking.EndTime.Value.ToString("hh\\:mm")</span>
+                    }
+                    else
+                    {
+                        <span>--:--</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Trạng thái">
+                    <MudChip T="string" Color="@StatusHelper.GetInstallationStatusColor(booking.Status, booking.IsUninstall)" Size="Size.Small">
+                        @StatusHelper.GetInstallationStatusText(booking.Status, booking.IsUninstall)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <ActionButtons ShowView="false" ShowAdd="false"
+                                  OnEdit="@(() => OpenDialog(booking))"
+                                  OnDelete="@(() => DeleteItem(booking))" />
+                </MudTd>
+            </RowTemplate>
+        </DataTable>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Bảo hành">
+        <FilterBar>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string" @bind-Value="_statusFilter" Label="Trạng thái"
+                           Clearable="true" Dense="true" Variant="Variant.Outlined"
+                           AnchorOrigin="Origin.BottomCenter">
+                    <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Installing")">Đang bảo hành</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadData">
+                    Lọc
+                </MudButton>
+            </MudItem>
+        </FilterBar>
+
+        <DataTable Items="_warrantyBookings" Title="Danh sách lịch bảo hành" Loading="_loading"
+                   FilterFunc="@FilterItems">
+            <HeaderContent>
+                <MudTh>ID</MudTh>
+                <MudTh>Đơn hàng</MudTh>
+                <MudTh>Kỹ thuật viên</MudTh>
+                <MudTh><MudTableSortLabel T="InstallationBookingListResponse" SortBy="@(b => b.ScheduledDate)">Ngày bảo hành</MudTableSortLabel></MudTh>
+                <MudTh>Khung giờ</MudTh>
+                <MudTh>Trạng thái</MudTh>
+                <MudTh>Thao tác</MudTh>
+            </HeaderContent>
+            <RowTemplate Context="booking">
+                <MudTd DataLabel="ID">@booking.Id</MudTd>
+                <MudTd DataLabel="Đơn hàng">#@booking.OrderId</MudTd>
+                <MudTd DataLabel="Kỹ thuật viên">@(booking.TechnicianName ?? "Chưa phân công")</MudTd>
+                <MudTd DataLabel="Ngày bảo hành">@booking.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Khung giờ">
+                    @if (booking.StartTime.HasValue && booking.EndTime.HasValue)
+                    {
+                        <span>@booking.StartTime.Value.ToString("hh\\:mm") - @booking.EndTime.Value.ToString("hh\\:mm")</span>
+                    }
+                    else
+                    {
+                        <span>--:--</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Trạng thái">
+                    <MudChip T="string" Color="@StatusHelper.GetInstallationStatusColor(booking.Status, booking.IsUninstall)" Size="Size.Small">
+                        @StatusHelper.GetInstallationStatusText(booking.Status, booking.IsUninstall)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <ActionButtons ShowView="false" ShowAdd="false"
+                                  OnEdit="@(() => OpenDialog(booking))"
+                                  OnDelete="@(() => DeleteItem(booking))" />
+                </MudTd>
+            </RowTemplate>
+        </DataTable>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Tháo dỡ">
+        <FilterBar>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string" @bind-Value="_statusFilter" Label="Trạng thái"
+                           Clearable="true" Dense="true" Variant="Variant.Outlined"
+                           AnchorOrigin="Origin.BottomCenter">
+                    <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Installing")">Đang tháo dỡ</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadData">
+                    Lọc
+                </MudButton>
+            </MudItem>
+        </FilterBar>
+
+        <DataTable Items="_uninstallBookings" Title="Danh sách lịch tháo dỡ" Loading="_loading"
+                   FilterFunc="@FilterItems">
+            <HeaderContent>
+                <MudTh>ID</MudTh>
+                <MudTh>Đơn hàng</MudTh>
+                <MudTh>Kỹ thuật viên</MudTh>
+                <MudTh><MudTableSortLabel T="InstallationBookingListResponse" SortBy="@(b => b.ScheduledDate)">Ngày tháo dỡ</MudTableSortLabel></MudTh>
+                <MudTh>Khung giờ</MudTh>
+                <MudTh>Trạng thái</MudTh>
+                <MudTh>Thao tác</MudTh>
+            </HeaderContent>
+            <RowTemplate Context="booking">
+                <MudTd DataLabel="ID">@booking.Id</MudTd>
+                <MudTd DataLabel="Đơn hàng">#@booking.OrderId</MudTd>
+                <MudTd DataLabel="Kỹ thuật viên">@(booking.TechnicianName ?? "Chưa phân công")</MudTd>
+                <MudTd DataLabel="Ngày tháo dỡ">@booking.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Khung giờ">
+                    @if (booking.StartTime.HasValue && booking.EndTime.HasValue)
+                    {
+                        <span>@booking.StartTime.Value.ToString("hh\\:mm") - @booking.EndTime.Value.ToString("hh\\:mm")</span>
+                    }
+                    else
+                    {
+                        <span>--:--</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Trạng thái">
+                    <MudChip T="string" Color="@StatusHelper.GetInstallationStatusColor(booking.Status, booking.IsUninstall)" Size="Size.Small">
+                        @StatusHelper.GetInstallationStatusText(booking.Status, booking.IsUninstall)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <ActionButtons ShowView="false" ShowAdd="false"
+                                  OnEdit="@(() => OpenDialog(booking))"
+                                  OnDelete="@(() => DeleteItem(booking))" />
+                </MudTd>
+            </RowTemplate>
+        </DataTable>
+    </MudTabPanel>
+</MudTabs>
 
 @code {
     private List<InstallationBookingListResponse> _bookings = new();
+    private List<InstallationBookingListResponse> _installBookings = new();
+    private List<InstallationBookingListResponse> _warrantyBookings = new();
+    private List<InstallationBookingListResponse> _uninstallBookings = new();
     private List<TechnicianResponse> _technicians = new();
     private bool _loading = true;
     private string _searchString = "";
@@ -126,6 +233,11 @@
         try
         {
             _bookings = await InstallationService.GetAllAsync();
+
+            // Filter into 3 categories
+            _installBookings = _bookings.Where(b => !b.IsWarranty && !b.IsUninstall).ToList();
+            _warrantyBookings = _bookings.Where(b => b.IsWarranty && !b.IsUninstall).ToList();
+            _uninstallBookings = _bookings.Where(b => b.IsUninstall).ToList();
         }
         catch (Exception ex)
         {

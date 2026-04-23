@@ -102,9 +102,6 @@ namespace Infrastructure.Repositories
         {
             var query = _context.Products.AsNoTracking().AsQueryable();
 
-            if (!string.IsNullOrWhiteSpace(search))
-                query = query.Where(p => p.Name.Contains(search) || EF.Functions.Like(p.Sku.ToString(), $"%{search}%"));
-
             if (categoryId.HasValue)
                 query = query.Where(p => p.CategoryId == categoryId.Value);
 
@@ -130,19 +127,47 @@ namespace Infrastructure.Repositories
                 query = query.Where(p => productIdsInPromotion.Contains(p.Id));
             }
 
-            var totalCount = await query.CountAsync();
+            // Apply search filter in memory (client-side evaluation)
+            List<Product> filteredProducts;
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var allProducts = await query
+                    .Include(p => p.Category)
+                    .Include(p => p.Brand)
+                    .Include(p => p.Variants)
+                    .Include(p => p.Images)
+                    .OrderByDescending(p => p.Id)
+                    .ToListAsync();
 
-            var items = await query
-                .Include(p => p.Category)
-                .Include(p => p.Brand)
-                .Include(p => p.Variants)
-                .Include(p => p.Images)
-                .OrderByDescending(p => p.Id)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+                filteredProducts = allProducts
+                    .Where(p => p.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                                p.Sku.Value.Contains(search, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
 
-            return (items, totalCount);
+                var totalCount = filteredProducts.Count;
+                var items = filteredProducts
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+
+                return (items, totalCount);
+            }
+            else
+            {
+                var totalCount = await query.CountAsync();
+
+                var items = await query
+                    .Include(p => p.Category)
+                    .Include(p => p.Brand)
+                    .Include(p => p.Variants)
+                    .Include(p => p.Images)
+                    .OrderByDescending(p => p.Id)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                return (items, totalCount);
+            }
         }
 
         public async Task<bool> ExistsAsync(string sku, int? excludeId = null)
@@ -213,18 +238,26 @@ namespace Infrastructure.Repositories
         {
             var query = _context.Products.AsNoTracking().AsQueryable();
 
-            if (!string.IsNullOrWhiteSpace(keyword))
-                query = query.Where(p => p.Name.Contains(keyword) || EF.Functions.Like(p.Sku.ToString(), $"%{keyword}%"));
-
             if (categoryId.HasValue)
                 query = query.Where(p => p.CategoryId == categoryId.Value);
 
             // For search results, only include Category and Brand, not Variants and Images
-            return await query
+            var products = await query
                 .Include(p => p.Category)
                 .Include(p => p.Brand)
                 .Include(p => p.Images.Where(i => i.IsMain)) // Only load main image
                 .ToListAsync();
+
+            // Apply search filter in memory (client-side evaluation)
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                products = products
+                    .Where(p => p.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                                p.Sku.Value.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            return products;
         }
     }
 }

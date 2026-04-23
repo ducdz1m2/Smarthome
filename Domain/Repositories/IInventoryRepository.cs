@@ -57,6 +57,7 @@ public interface IWarehouseTransferRepository : IRepository<WarehouseTransfer>
     Task<IReadOnlyList<WarehouseTransfer>> GetByFromWarehouseAsync(int warehouseId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<WarehouseTransfer>> GetByToWarehouseAsync(int warehouseId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<WarehouseTransfer>> GetByStatusAsync(WarehouseTransferStatus status, CancellationToken cancellationToken = default);
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>

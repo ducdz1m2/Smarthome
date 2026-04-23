@@ -51,8 +51,7 @@ public class ProductSearchSpecification : BaseSpecification<Product>
         Criteria = p =>
             p.IsActive &&
             (p.Name.Contains(searchTerm) ||
-             p.Description != null && p.Description.Contains(searchTerm) ||
-             p.Sku.ToString().Contains(searchTerm));
+             p.Description != null && p.Description.Contains(searchTerm));
         AddInclude(p => p.Category);
         AddInclude(p => p.Brand);
     }

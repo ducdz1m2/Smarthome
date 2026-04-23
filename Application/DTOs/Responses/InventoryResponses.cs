@@ -182,4 +182,53 @@ namespace Application.DTOs.Responses
         public string? Note { get; set; }
         public string? CategoryName { get; set; }
     }
+
+    // Chuyển kho
+    public class WarehouseTransferResponse
+    {
+        public int Id { get; set; }
+        public int FromWarehouseId { get; set; }
+        public string FromWarehouseName { get; set; } = string.Empty;
+        public string FromWarehouseCode { get; set; } = string.Empty;
+        public int ToWarehouseId { get; set; }
+        public string ToWarehouseName { get; set; } = string.Empty;
+        public string ToWarehouseCode { get; set; } = string.Empty;
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public string ProductSku { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public string? Reason { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public DateTime? ExecutedAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class WarehouseTransferDetailResponse
+    {
+        public int Id { get; set; }
+        public int FromWarehouseId { get; set; }
+        public string FromWarehouseName { get; set; } = string.Empty;
+        public string FromWarehouseCode { get; set; } = string.Empty;
+        public int ToWarehouseId { get; set; }
+        public string ToWarehouseName { get; set; } = string.Empty;
+        public string ToWarehouseCode { get; set; } = string.Empty;
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public string ProductSku { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public string? Reason { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public DateTime? ExecutedAt { get; set; }
+        public DateTime CreatedAt { get; set;
+        }
+        public List<TransferProductDetail> ProductDetails { get; set; } = new();
+    }
+
+    public class TransferProductDetail
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public string ProductSku { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+    }
 }

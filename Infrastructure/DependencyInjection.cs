@@ -54,6 +54,7 @@ namespace Infrastructure
             services.AddScoped<Application.Interfaces.Repositories.IStockEntryRepository, StockEntryRepository>();
             services.AddScoped<Domain.Repositories.IStockIssueRepository, StockIssueRepository>();
             services.AddScoped<Application.Interfaces.Repositories.IProductWarehouseRepository, ProductWarehouseRepository>();
+            services.AddScoped<Domain.Repositories.IWarehouseTransferRepository, WarehouseTransferRepository>();
 
             // Installation repositories
             services.AddScoped<Infrastructure.Repositories.Interfaces.IInstallationBookingRepository, InstallationBookingRepository>();

@@ -160,14 +160,14 @@ namespace Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Title = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Title = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Type = table.Column<int>(type: "int", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    ClosedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     RelatedOrderId = table.Column<int>(type: "int", nullable: true),
                     RelatedInstallationId = table.Column<int>(type: "int", nullable: true),
                     RelatedWarrantyClaimId = table.Column<int>(type: "int", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ClosedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
@@ -267,18 +267,19 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "PaymentTransactions",
+                name: "ProductRatings",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    OrderId = table.Column<int>(type: "int", nullable: false),
-                    Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    Method = table.Column<int>(type: "int", nullable: false),
+                    ProductId = table.Column<int>(type: "int", nullable: false),
+                    VariantId = table.Column<int>(type: "int", nullable: true),
+                    OrderItemId = table.Column<int>(type: "int", nullable: false),
+                    CustomerId = table.Column<int>(type: "int", nullable: false),
+                    Rating = table.Column<int>(type: "int", nullable: false),
+                    Comment = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    RatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
-                    TransactionCode = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    GatewayResponse = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    PaidAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -286,7 +287,7 @@ namespace Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_PaymentTransactions", x => x.Id);
+                    table.PrimaryKey("PK_ProductRatings", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -379,6 +380,48 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "StockIssueDetails",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    StockIssueId = table.Column<int>(type: "int", nullable: false),
+                    ProductId = table.Column<int>(type: "int", nullable: false),
+                    Quantity = table.Column<int>(type: "int", nullable: false),
+                    VariantId = table.Column<int>(type: "int", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StockIssueDetails", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "StockIssues",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    IssueDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    WarehouseId = table.Column<int>(type: "int", nullable: false),
+                    BookingId = table.Column<int>(type: "int", nullable: true),
+                    IssueType = table.Column<int>(type: "int", nullable: false),
+                    Note = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IssuedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StockIssues", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Suppliers",
                 columns: table => new
                 {
@@ -406,42 +449,6 @@ namespace Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Suppliers", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "TechnicianProfiles",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    UserId = table.Column<int>(type: "int", nullable: true),
-                    FullName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    IdentityCard = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    AddressStreet = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
-                    AddressWard = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    AddressDistrict = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    AddressCity = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    DateOfBirth = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    EmployeeCode = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    HireDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    BaseSalary = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    City = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Districts = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    SkillsJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsAvailable = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
-                    Rating = table.Column<double>(type: "float", nullable: false),
-                    CompletedJobs = table.Column<int>(type: "int", nullable: false),
-                    CancelledJobs = table.Column<int>(type: "int", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TechnicianProfiles", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -499,39 +506,20 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "WarehouseTransfers",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    FromWarehouseId = table.Column<int>(type: "int", nullable: false),
-                    ToWarehouseId = table.Column<int>(type: "int", nullable: false),
-                    ProductId = table.Column<int>(type: "int", nullable: false),
-                    Quantity = table.Column<int>(type: "int", nullable: false),
-                    Reason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    Status = table.Column<int>(type: "int", nullable: false),
-                    ExecutedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_WarehouseTransfers", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Warranties",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    OrderItemId = table.Column<int>(type: "int", nullable: false),
                     ProductId = table.Column<int>(type: "int", nullable: false),
+                    VariantId = table.Column<int>(type: "int", nullable: true),
+                    OrderItemId = table.Column<int>(type: "int", nullable: false),
                     StartDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     EndDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
+                    DurationMonths = table.Column<int>(type: "int", nullable: false),
+                    InstalledByTechnicianId = table.Column<int>(type: "int", nullable: true),
+                    ClaimsCount = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -649,6 +637,47 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "TechnicianProfiles",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<int>(type: "int", nullable: true),
+                    FullName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Email = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IdentityCard = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AddressStreet = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    AddressWard = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    AddressDistrict = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    AddressCity = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    DateOfBirth = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    EmployeeCode = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    HireDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    BaseSalary = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    City = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Districts = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    SkillsJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsAvailable = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
+                    Rating = table.Column<double>(type: "float", nullable: false),
+                    CompletedJobs = table.Column<int>(type: "int", nullable: false),
+                    CancelledJobs = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TechnicianProfiles", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_TechnicianProfiles_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ChatMessages",
                 columns: table => new
                 {
@@ -688,14 +717,14 @@ namespace Infrastructure.Migrations
                     ChatRoomId = table.Column<int>(type: "int", nullable: false),
                     UserId = table.Column<int>(type: "int", nullable: false),
                     UserType = table.Column<int>(type: "int", nullable: false),
-                    JoinedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    LeftAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     IsBlocked = table.Column<bool>(type: "bit", nullable: false),
                     BlockReason = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    UnreadCount = table.Column<int>(type: "int", nullable: false),
-                    LastReadAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    JoinedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    LeftAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     LastActivityAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    LastReadAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UnreadCount = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -713,18 +742,54 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "OrderItems",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    OrderId = table.Column<int>(type: "int", nullable: false),
+                    ProductId = table.Column<int>(type: "int", nullable: false),
+                    VariantId = table.Column<int>(type: "int", nullable: true),
+                    Quantity = table.Column<int>(type: "int", nullable: false),
+                    UnitPrice = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    IsShipped = table.Column<bool>(type: "bit", nullable: false),
+                    IsInstalled = table.Column<bool>(type: "bit", nullable: false),
+                    IsReserved = table.Column<bool>(type: "bit", nullable: false),
+                    RequiresInstallation = table.Column<bool>(type: "bit", nullable: false),
+                    WarehouseId = table.Column<int>(type: "int", nullable: true),
+                    InstallationBookingId = table.Column<int>(type: "int", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OrderItems", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_OrderItems_Orders_OrderId",
+                        column: x => x.OrderId,
+                        principalTable: "Orders",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "OrderShipments",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     OrderId = table.Column<int>(type: "int", nullable: false),
+                    ShipperId = table.Column<int>(type: "int", nullable: true),
                     Carrier = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     TrackingNumber = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
                     PickedUpAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     DeliveredAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     Notes = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    ApprovedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ApprovedBy = table.Column<int>(type: "int", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -742,14 +807,18 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "PromotionProducts",
+                name: "PaymentTransactions",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    PromotionId = table.Column<int>(type: "int", nullable: false),
-                    ProductId = table.Column<int>(type: "int", nullable: false),
-                    CustomDiscountPercent = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
+                    OrderId = table.Column<int>(type: "int", nullable: false),
+                    Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    Method = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    TransactionCode = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    GatewayResponse = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PaidAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -757,11 +826,11 @@ namespace Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_PromotionProducts", x => x.Id);
+                    table.PrimaryKey("PK_PaymentTransactions", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_PromotionProducts_Promotions_PromotionId",
-                        column: x => x.PromotionId,
-                        principalTable: "Promotions",
+                        name: "FK_PaymentTransactions_Orders_OrderId",
+                        column: x => x.OrderId,
+                        principalTable: "Orders",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -774,8 +843,13 @@ namespace Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ReturnOrderId = table.Column<int>(type: "int", nullable: false),
                     OrderItemId = table.Column<int>(type: "int", nullable: false),
+                    ProductId = table.Column<int>(type: "int", nullable: false),
+                    VariantId = table.Column<int>(type: "int", nullable: true),
                     Quantity = table.Column<int>(type: "int", nullable: false),
                     Reason = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsDamaged = table.Column<bool>(type: "bit", nullable: false),
+                    ReturnedToInventory = table.Column<bool>(type: "bit", nullable: false),
+                    WarehouseId = table.Column<int>(type: "int", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -827,7 +901,6 @@ namespace Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Sku = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    BasePrice = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     StockQuantity = table.Column<int>(type: "int", nullable: false),
                     FrozenStockQuantity = table.Column<int>(type: "int", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: true),
@@ -865,40 +938,13 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "InstallationSlots",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    TechnicianId = table.Column<int>(type: "int", nullable: false),
-                    Date = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    StartTime = table.Column<TimeSpan>(type: "time", nullable: false),
-                    EndTime = table.Column<TimeSpan>(type: "time", nullable: false),
-                    IsBooked = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
-                    BookingId = table.Column<int>(type: "int", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_InstallationSlots", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_InstallationSlots_TechnicianProfiles_TechnicianId",
-                        column: x => x.TechnicianId,
-                        principalTable: "TechnicianProfiles",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "ProductWarehouses",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ProductId = table.Column<int>(type: "int", nullable: false),
+                    VariantId = table.Column<int>(type: "int", nullable: true),
                     WarehouseId = table.Column<int>(type: "int", nullable: false),
                     Quantity = table.Column<int>(type: "int", nullable: false),
                     ReservedQuantity = table.Column<int>(type: "int", nullable: false),
@@ -953,17 +999,56 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "WarehouseTransfers",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    FromWarehouseId = table.Column<int>(type: "int", nullable: false),
+                    ToWarehouseId = table.Column<int>(type: "int", nullable: false),
+                    ProductId = table.Column<int>(type: "int", nullable: false),
+                    Quantity = table.Column<int>(type: "int", nullable: false),
+                    Reason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    ExecutedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_WarehouseTransfers", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_WarehouseTransfers_Warehouses_FromWarehouseId",
+                        column: x => x.FromWarehouseId,
+                        principalTable: "Warehouses",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_WarehouseTransfers_Warehouses_ToWarehouseId",
+                        column: x => x.ToWarehouseId,
+                        principalTable: "Warehouses",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "WarrantyClaims",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     WarrantyId = table.Column<int>(type: "int", nullable: false),
+                    ProductId = table.Column<int>(type: "int", nullable: false),
+                    VariantId = table.Column<int>(type: "int", nullable: true),
+                    OrderItemId = table.Column<int>(type: "int", nullable: false),
                     ClaimDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     Issue = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
                     Resolution = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     Status = table.Column<int>(type: "int", nullable: false),
                     TechnicianId = table.Column<int>(type: "int", nullable: true),
+                    WarrantyRequestId = table.Column<int>(type: "int", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -981,13 +1066,76 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "WarrantyRequests",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    WarrantyId = table.Column<int>(type: "int", nullable: true),
+                    ProductId = table.Column<int>(type: "int", nullable: false),
+                    VariantId = table.Column<int>(type: "int", nullable: true),
+                    OrderItemId = table.Column<int>(type: "int", nullable: false),
+                    InstallationBookingId = table.Column<int>(type: "int", nullable: true),
+                    AssignedTechnicianId = table.Column<int>(type: "int", nullable: true),
+                    WarrantyType = table.Column<int>(type: "int", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    ApprovedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    StartedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    TechnicianNotes = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_WarrantyRequests", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_WarrantyRequests_Warranties_WarrantyId",
+                        column: x => x.WarrantyId,
+                        principalTable: "Warranties",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "InstallationSlots",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    TechnicianId = table.Column<int>(type: "int", nullable: false),
+                    Date = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    StartTime = table.Column<TimeSpan>(type: "time", nullable: false),
+                    EndTime = table.Column<TimeSpan>(type: "time", nullable: false),
+                    IsBooked = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
+                    BookingId = table.Column<int>(type: "int", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_InstallationSlots", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_InstallationSlots_TechnicianProfiles_TechnicianId",
+                        column: x => x.TechnicianId,
+                        principalTable: "TechnicianProfiles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ChatAttachment",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ChatMessageId = table.Column<int>(type: "int", nullable: false),
-                    FileName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FileName = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     FileUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     FileType = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     FileSize = table.Column<long>(type: "bigint", nullable: true),
@@ -1009,22 +1157,16 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "OrderItems",
+                name: "OrderWarehouseAllocations",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    OrderId = table.Column<int>(type: "int", nullable: false),
-                    ProductId = table.Column<int>(type: "int", nullable: false),
-                    VariantId = table.Column<int>(type: "int", nullable: true),
-                    Quantity = table.Column<int>(type: "int", nullable: false),
-                    UnitPrice = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    IsShipped = table.Column<bool>(type: "bit", nullable: false),
-                    IsInstalled = table.Column<bool>(type: "bit", nullable: false),
-                    IsReserved = table.Column<bool>(type: "bit", nullable: false),
-                    RequiresInstallation = table.Column<bool>(type: "bit", nullable: false),
-                    WarehouseId = table.Column<int>(type: "int", nullable: true),
-                    InstallationBookingId = table.Column<int>(type: "int", nullable: true),
+                    OrderItemId = table.Column<int>(type: "int", nullable: false),
+                    WarehouseId = table.Column<int>(type: "int", nullable: false),
+                    AllocatedQuantity = table.Column<int>(type: "int", nullable: false),
+                    IsConfirmed = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
+                    ConfirmedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -1032,19 +1174,13 @@ namespace Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_OrderItems", x => x.Id);
+                    table.PrimaryKey("PK_OrderWarehouseAllocations", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_OrderItems_Orders_OrderId",
-                        column: x => x.OrderId,
-                        principalTable: "Orders",
+                        name: "FK_OrderWarehouseAllocations_OrderItems_OrderItemId",
+                        column: x => x.OrderItemId,
+                        principalTable: "OrderItems",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_OrderItems_Products_ProductId",
-                        column: x => x.ProductId,
-                        principalTable: "Products",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -1055,6 +1191,7 @@ namespace Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ProductId = table.Column<int>(type: "int", nullable: false),
                     UserId = table.Column<int>(type: "int", nullable: false),
+                    OrderId = table.Column<int>(type: "int", nullable: false),
                     Content = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
                     Rating = table.Column<int>(type: "int", nullable: false),
                     IsApproved = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
@@ -1120,6 +1257,7 @@ namespace Infrastructure.Migrations
                     Price = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     StockQuantity = table.Column<int>(type: "int", nullable: false),
                     FrozenStockQuantity = table.Column<int>(type: "int", nullable: false),
+                    WarrantyPeriod = table.Column<int>(type: "int", nullable: false, defaultValue: 12),
                     AttributesJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -1139,6 +1277,99 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PromotionProducts",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    PromotionId = table.Column<int>(type: "int", nullable: false),
+                    ProductId = table.Column<int>(type: "int", nullable: false),
+                    CustomDiscountPercent = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PromotionProducts", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PromotionProducts_Products_ProductId",
+                        column: x => x.ProductId,
+                        principalTable: "Products",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PromotionProducts_Promotions_PromotionId",
+                        column: x => x.PromotionId,
+                        principalTable: "Promotions",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "StockEntryDetails",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    StockEntryId = table.Column<int>(type: "int", nullable: false),
+                    ProductId = table.Column<int>(type: "int", nullable: false),
+                    VariantId = table.Column<int>(type: "int", nullable: true),
+                    Quantity = table.Column<int>(type: "int", nullable: false),
+                    UnitCost = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StockEntryDetails", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_StockEntryDetails_Products_ProductId",
+                        column: x => x.ProductId,
+                        principalTable: "Products",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_StockEntryDetails_StockEntries_StockEntryId",
+                        column: x => x.StockEntryId,
+                        principalTable: "StockEntries",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "WarrantyRequestItems",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    WarrantyRequestId = table.Column<int>(type: "int", nullable: false),
+                    OrderItemId = table.Column<int>(type: "int", nullable: false),
+                    Quantity = table.Column<int>(type: "int", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    IsDamaged = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
+                    ReturnedToInventory = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_WarrantyRequestItems", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_WarrantyRequestItems_WarrantyRequests_WarrantyRequestId",
+                        column: x => x.WarrantyRequestId,
+                        principalTable: "WarrantyRequests",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "InstallationBookings",
                 columns: table => new
                 {
@@ -1146,7 +1377,7 @@ namespace Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     OrderId = table.Column<int>(type: "int", nullable: false),
                     TechnicianId = table.Column<int>(type: "int", nullable: false),
-                    SlotId = table.Column<int>(type: "int", nullable: false),
+                    SlotId = table.Column<int>(type: "int", nullable: true),
                     Status = table.Column<int>(type: "int", nullable: false),
                     ScheduledDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     EstimatedDuration = table.Column<TimeSpan>(type: "time", nullable: false),
@@ -1157,6 +1388,9 @@ namespace Infrastructure.Migrations
                     CustomerRating = table.Column<int>(type: "int", nullable: true),
                     CustomerSignature = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
                     Notes = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    IsUninstall = table.Column<bool>(type: "bit", nullable: false),
+                    IsWarranty = table.Column<bool>(type: "bit", nullable: false),
+                    CustomerRescheduleCount = table.Column<int>(type: "int", nullable: false),
                     TechnicianProfileId = table.Column<int>(type: "int", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -1192,39 +1426,6 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "StockEntryDetails",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    StockEntryId = table.Column<int>(type: "int", nullable: false),
-                    ProductId = table.Column<int>(type: "int", nullable: false),
-                    Quantity = table.Column<int>(type: "int", nullable: false),
-                    UnitCost = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_StockEntryDetails", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_StockEntryDetails_Products_ProductId",
-                        column: x => x.ProductId,
-                        principalTable: "Products",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_StockEntryDetails_StockEntries_StockEntryId",
-                        column: x => x.StockEntryId,
-                        principalTable: "StockEntries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "InstallationMaterials",
                 columns: table => new
                 {
@@ -1232,9 +1433,12 @@ namespace Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     BookingId = table.Column<int>(type: "int", nullable: false),
                     ProductId = table.Column<int>(type: "int", nullable: false),
+                    VariantId = table.Column<int>(type: "int", nullable: true),
                     QuantityTaken = table.Column<int>(type: "int", nullable: false),
                     QuantityUsed = table.Column<int>(type: "int", nullable: true),
                     QuantityReturned = table.Column<int>(type: "int", nullable: true),
+                    WarehouseId = table.Column<int>(type: "int", nullable: true),
+                    PickedUpAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -1247,6 +1451,47 @@ namespace Infrastructure.Migrations
                         name: "FK_InstallationMaterials_InstallationBookings_BookingId",
                         column: x => x.BookingId,
                         principalTable: "InstallationBookings",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_InstallationMaterials_Warehouses_WarehouseId",
+                        column: x => x.WarehouseId,
+                        principalTable: "Warehouses",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TechnicianRatings",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    TechnicianId = table.Column<int>(type: "int", nullable: false),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    BookingId = table.Column<int>(type: "int", nullable: false),
+                    Content = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Rating = table.Column<int>(type: "int", nullable: false),
+                    IsApproved = table.Column<bool>(type: "bit", nullable: false),
+                    IsVerifiedService = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TechnicianRatings", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_TechnicianRatings_InstallationBookings_BookingId",
+                        column: x => x.BookingId,
+                        principalTable: "InstallationBookings",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_TechnicianRatings_TechnicianProfiles_TechnicianId",
+                        column: x => x.TechnicianId,
+                        principalTable: "TechnicianProfiles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -1377,8 +1622,7 @@ namespace Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_InstallationBookings_SlotId",
                 table: "InstallationBookings",
-                column: "SlotId",
-                unique: true);
+                column: "SlotId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_InstallationBookings_TechnicianId",
@@ -1399,6 +1643,11 @@ namespace Infrastructure.Migrations
                 name: "IX_InstallationMaterials_ProductId",
                 table: "InstallationMaterials",
                 column: "ProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_InstallationMaterials_WarehouseId",
+                table: "InstallationMaterials",
+                column: "WarehouseId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_InstallationSlots_Date",
@@ -1458,9 +1707,20 @@ namespace Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_OrderWarehouseAllocations_OrderItemId",
+                table: "OrderWarehouseAllocations",
+                column: "OrderItemId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OrderWarehouseAllocations_WarehouseId",
+                table: "OrderWarehouseAllocations",
+                column: "WarehouseId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_PaymentTransactions_OrderId",
                 table: "PaymentTransactions",
-                column: "OrderId");
+                column: "OrderId",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_PaymentTransactions_TransactionCode",
@@ -1498,6 +1758,33 @@ namespace Infrastructure.Migrations
                 name: "IX_ProductImages_ProductId_IsMain",
                 table: "ProductImages",
                 columns: new[] { "ProductId", "IsMain" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProductRatings_CustomerId",
+                table: "ProductRatings",
+                column: "CustomerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProductRatings_OrderItemId",
+                table: "ProductRatings",
+                column: "OrderItemId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProductRatings_ProductId",
+                table: "ProductRatings",
+                column: "ProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProductRatings_ProductId_VariantId_OrderItemId_CustomerId",
+                table: "ProductRatings",
+                columns: new[] { "ProductId", "VariantId", "OrderItemId", "CustomerId" },
+                unique: true,
+                filter: "[VariantId] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProductRatings_Status",
+                table: "ProductRatings",
+                column: "Status");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ProductReservations_ExpiresAt",
@@ -1552,15 +1839,21 @@ namespace Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_ProductWarehouses_ProductId_WarehouseId",
+                name: "IX_ProductWarehouses_ProductId_VariantId_WarehouseId",
                 table: "ProductWarehouses",
-                columns: new[] { "ProductId", "WarehouseId" },
-                unique: true);
+                columns: new[] { "ProductId", "VariantId", "WarehouseId" },
+                unique: true,
+                filter: "[VariantId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ProductWarehouses_WarehouseId",
                 table: "ProductWarehouses",
                 column: "WarehouseId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PromotionProducts_ProductId",
+                table: "PromotionProducts",
+                column: "ProductId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PromotionProducts_PromotionId_ProductId",
@@ -1645,6 +1938,26 @@ namespace Infrastructure.Migrations
                 column: "StockEntryId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_StockIssueDetails_ProductId",
+                table: "StockIssueDetails",
+                column: "ProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StockIssueDetails_StockIssueId",
+                table: "StockIssueDetails",
+                column: "StockIssueId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StockIssues_BookingId",
+                table: "StockIssues",
+                column: "BookingId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StockIssues_WarehouseId",
+                table: "StockIssues",
+                column: "WarehouseId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Suppliers_IsActive",
                 table: "Suppliers",
                 column: "IsActive");
@@ -1666,6 +1979,16 @@ namespace Infrastructure.Migrations
                 column: "UserId",
                 unique: true,
                 filter: "[UserId] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TechnicianRatings_BookingId",
+                table: "TechnicianRatings",
+                column: "BookingId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TechnicianRatings_TechnicianId",
+                table: "TechnicianRatings",
+                column: "TechnicianId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserAddresses_UserId",
@@ -1706,12 +2029,28 @@ namespace Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_Warranties_OrderItemId",
                 table: "Warranties",
-                column: "OrderItemId",
-                unique: true);
+                column: "OrderItemId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Warranties_ProductId",
                 table: "Warranties",
+                column: "ProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Warranties_ProductId_VariantId_OrderItemId",
+                table: "Warranties",
+                columns: new[] { "ProductId", "VariantId", "OrderItemId" },
+                unique: true,
+                filter: "[VariantId] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WarrantyClaims_OrderItemId",
+                table: "WarrantyClaims",
+                column: "OrderItemId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WarrantyClaims_ProductId",
+                table: "WarrantyClaims",
                 column: "ProductId");
 
             migrationBuilder.CreateIndex(
@@ -1722,6 +2061,46 @@ namespace Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_WarrantyClaims_WarrantyId",
                 table: "WarrantyClaims",
+                column: "WarrantyId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WarrantyClaims_WarrantyRequestId",
+                table: "WarrantyClaims",
+                column: "WarrantyRequestId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WarrantyRequestItems_OrderItemId",
+                table: "WarrantyRequestItems",
+                column: "OrderItemId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WarrantyRequestItems_WarrantyRequestId",
+                table: "WarrantyRequestItems",
+                column: "WarrantyRequestId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WarrantyRequests_InstallationBookingId",
+                table: "WarrantyRequests",
+                column: "InstallationBookingId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WarrantyRequests_OrderItemId",
+                table: "WarrantyRequests",
+                column: "OrderItemId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WarrantyRequests_ProductId",
+                table: "WarrantyRequests",
+                column: "ProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WarrantyRequests_Status",
+                table: "WarrantyRequests",
+                column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WarrantyRequests_WarrantyId",
+                table: "WarrantyRequests",
                 column: "WarrantyId");
         }
 
@@ -1765,10 +2144,10 @@ namespace Infrastructure.Migrations
                 name: "Notifications");
 
             migrationBuilder.DropTable(
-                name: "OrderItems");
+                name: "OrderShipments");
 
             migrationBuilder.DropTable(
-                name: "OrderShipments");
+                name: "OrderWarehouseAllocations");
 
             migrationBuilder.DropTable(
                 name: "PaymentTransactions");
@@ -1778,6 +2157,9 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "ProductImages");
+
+            migrationBuilder.DropTable(
+                name: "ProductRatings");
 
             migrationBuilder.DropTable(
                 name: "ProductReservations");
@@ -1801,6 +2183,15 @@ namespace Infrastructure.Migrations
                 name: "StockEntryDetails");
 
             migrationBuilder.DropTable(
+                name: "StockIssueDetails");
+
+            migrationBuilder.DropTable(
+                name: "StockIssues");
+
+            migrationBuilder.DropTable(
+                name: "TechnicianRatings");
+
+            migrationBuilder.DropTable(
                 name: "UserAddresses");
 
             migrationBuilder.DropTable(
@@ -1810,16 +2201,16 @@ namespace Infrastructure.Migrations
                 name: "WarrantyClaims");
 
             migrationBuilder.DropTable(
-                name: "AspNetRoles");
+                name: "WarrantyRequestItems");
 
             migrationBuilder.DropTable(
-                name: "AspNetUsers");
+                name: "AspNetRoles");
 
             migrationBuilder.DropTable(
                 name: "ChatMessages");
 
             migrationBuilder.DropTable(
-                name: "InstallationBookings");
+                name: "OrderItems");
 
             migrationBuilder.DropTable(
                 name: "Promotions");
@@ -1837,16 +2228,13 @@ namespace Infrastructure.Migrations
                 name: "StockEntries");
 
             migrationBuilder.DropTable(
-                name: "Warranties");
+                name: "InstallationBookings");
+
+            migrationBuilder.DropTable(
+                name: "WarrantyRequests");
 
             migrationBuilder.DropTable(
                 name: "ChatRooms");
-
-            migrationBuilder.DropTable(
-                name: "InstallationSlots");
-
-            migrationBuilder.DropTable(
-                name: "Orders");
 
             migrationBuilder.DropTable(
                 name: "Brands");
@@ -1861,7 +2249,19 @@ namespace Infrastructure.Migrations
                 name: "Warehouses");
 
             migrationBuilder.DropTable(
+                name: "InstallationSlots");
+
+            migrationBuilder.DropTable(
+                name: "Orders");
+
+            migrationBuilder.DropTable(
+                name: "Warranties");
+
+            migrationBuilder.DropTable(
                 name: "TechnicianProfiles");
+
+            migrationBuilder.DropTable(
+                name: "AspNetUsers");
         }
     }
 }

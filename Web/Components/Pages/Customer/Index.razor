@@ -555,8 +555,8 @@
                 .OrderBy(b => b.SortOrder)
                 .ToList();
 
-            // Load categories
-            _categories = await CategoryService.GetAllAsync();
+            // Load categories - only show categories that have products
+            _categories = await CategoryService.GetCategoriesWithProductsAsync();
 
             // Load active promotions
             var allPromotions = await PromotionService.GetAllAsync();

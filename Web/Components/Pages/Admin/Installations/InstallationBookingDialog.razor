@@ -17,7 +17,7 @@
                              Label="Đơn hàng *"
                              Required="true" RequiredError="Chọn đơn hàng"
                              Variant="Variant.Outlined" Class="mb-3"
-                             Disabled="_isEdit">
+                             Disabled="_isEdit || _isWarrantyMode">
                         @foreach (var order in _orders)
                         {
                             <MudSelectItem T="int" Value="@order.Id">
@@ -25,6 +25,12 @@
                             </MudSelectItem>
                         }
                     </MudSelect>
+                    @if (_isWarrantyMode)
+                    {
+                        <MudText Color="Color.Info" Typo="Typo.caption">
+                            Đơn hàng bảo hành (không thể thay đổi)
+                        </MudText>
+                    }
                 </MudItem>
                 
                 <MudItem xs="12" md="6">
@@ -98,9 +104,19 @@
     [Parameter]
     public int? BookingId { get; set; }
 
+    [Parameter]
+    public int? OrderId { get; set; }
+
+    [Parameter]
+    public int? WarrantyRequestId { get; set; }
+
+    [Parameter]
+    public bool IsWarranty { get; set; } = false;
+
     private MudForm _form = null!;
     private bool _isValid;
     private bool _isEdit => BookingId.HasValue;
+    private bool _isWarrantyMode => IsWarranty && !BookingId.HasValue;
     
     private List<TechnicianResponse> _technicians = new();
     private List<InstallationSlotResponse> _availableSlots = new();
@@ -112,7 +128,9 @@
         OrderId = 0,
         TechnicianId = 0,
         SlotId = 0,
-        ScheduledDate = DateTime.Today
+        ScheduledDate = DateTime.Today,
+        IsWarranty = false,
+        WarrantyRequestId = null
     };
 
     private DateTime? _scheduledDate = DateTime.Today;
@@ -122,6 +140,15 @@
     {
         await LoadTechnicians();
         await LoadOrders();
+
+        // Set warranty mode parameters
+        if (_isWarrantyMode)
+        {
+            _request.OrderId = OrderId ?? 0;
+            _request.IsWarranty = true;
+            _request.WarrantyRequestId = WarrantyRequestId;
+        }
+
         if (_isEdit)
         {
             await LoadBooking();

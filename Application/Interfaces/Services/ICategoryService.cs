@@ -8,6 +8,7 @@ namespace Application.Interfaces.Services
     {
         //Queries
         Task<List<CategoryResponse>> GetAllAsync();
+        Task<List<CategoryResponse>> GetCategoriesWithProductsAsync();
         Task<CategoryResponse?> GetByIdAsync(int id);
         Task<List<CategoryTreeResponse>> GetTreeAsync();
         

@@ -169,4 +169,16 @@
             }
         }
     }
+
+    private async Task OpenTransferDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Web.Components.Dialogs.WarehouseTransferDialog>("Chuyển kho", options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            Snackbar.Add("Đã tạo phiếu chuyển kho thành công", Severity.Success);
+        }
+    }
 }

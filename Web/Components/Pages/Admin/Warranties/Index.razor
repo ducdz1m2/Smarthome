@@ -1,11 +1,14 @@
 @page "/admin/warranty-requests"
+@using Application.DTOs.Requests
 @using Application.DTOs.Responses
 @using Application.Interfaces.Services
 @using Domain.Enums
 @using Microsoft.AspNetCore.Authorization
 @using Web.Helpers
+@using Web.Components.Pages.Admin.Installations
 
 @inject IWarrantyRequestService WarrantyRequestService
+@inject IInstallationService InstallationService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
@@ -24,8 +27,9 @@
     </ToolBarContent>
     <HeaderContent>
         <MudTh width="60px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Id)">ID</MudTableSortLabel></MudTh>
-        <MudTh width="100px">Order Item</MudTh>
-        <MudTh width="200px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Description)">Mô tả</MudTableSortLabel></MudTh>
+        <MudTh width="120px">Mã đơn hàng</MudTh>
+        <MudTh width="200px">Sản phẩm</MudTh>
+        <MudTh width="150px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Description)">Mô tả</MudTableSortLabel></MudTh>
         <MudTh width="120px">Kỹ thuật viên</MudTh>
         <MudTh width="100px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Status)">Trạng thái</MudTableSortLabel></MudTh>
         <MudTh width="150px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.CreatedAt)">Ngày tạo</MudTableSortLabel></MudTh>
@@ -33,7 +37,8 @@
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="ID">@context.Id</MudTd>
-        <MudTd DataLabel="Order Item">#@context.OrderItemId</MudTd>
+        <MudTd DataLabel="Mã đơn hàng">@context.OrderNumber</MudTd>
+        <MudTd DataLabel="Sản phẩm">@context.ProductName</MudTd>
         <MudTd DataLabel="Mô tả">@context.Description</MudTd>
         <MudTd DataLabel="Kỹ thuật viên">
             @(context.AssignedTechnicianId.HasValue ? $"KTV #{context.AssignedTechnicianId}" : "Chưa gán")
@@ -62,6 +67,14 @@
                                  OnClick="() => Reject(context.Id)"
                                  Title="Từ chối" />
                 }
+                @if (context.Status == "Approved" && !context.InstallationBookingId.HasValue)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Event"
+                                 Color="Color.Info"
+                                 Size="Size.Small"
+                                 OnClick="() => CreateWarrantyBooking(context.Id, context.OrderId)"
+                                 Title="Tạo lịch bảo hành" />
+                }
             </div>
         </MudTd>
     </RowTemplate>
@@ -83,7 +96,8 @@
 
         return warrantyRequest.OrderNumber.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
                warrantyRequest.Id.ToString().Contains(_searchString) ||
-               warrantyRequest.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+               warrantyRequest.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               warrantyRequest.ProductName.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
     }
 
     protected override async Task OnInitializedAsync()
@@ -157,6 +171,33 @@
             };
 
             await DialogService.ShowAsync<WarrantyRequestDetailDialog>("Chi tiết yêu cầu bảo hành", parameters);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CreateWarrantyBooking(int warrantyRequestId, int orderId)
+    {
+        try
+        {
+            var parameters = new DialogParameters
+            {
+                { "OrderId", orderId },
+                { "WarrantyRequestId", warrantyRequestId },
+                { "IsWarranty", true }
+            };
+
+            var dialog = await DialogService.ShowAsync<InstallationBookingDialog>("Tạo lịch bảo hành", parameters);
+            var result = await dialog.Result;
+
+            if (result.Canceled)
+                return;
+
+            Snackbar.Add("Đã tạo lịch bảo hành thành công", Severity.Success);
+            await LoadWarrantyRequests();
+            StateHasChanged();
         }
         catch (Exception ex)
         {

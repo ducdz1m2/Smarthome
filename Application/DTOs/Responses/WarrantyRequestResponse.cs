@@ -11,6 +11,9 @@ public class WarrantyRequestResponse
     public int? InstallationBookingId { get; set; }
     public int? AssignedTechnicianId { get; set; }
     public string OrderNumber { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public string CustomerName { get; set; } = string.Empty;
+    public string CustomerPhone { get; set; } = string.Empty;
     public string WarrantyType { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;

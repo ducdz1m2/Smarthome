@@ -205,33 +205,55 @@ namespace Infrastructure.Data
         {
             if (!context.Categories.Any())
             {
-                var refrigerator = Category.Create("Tủ lạnh", null, 0, "Tủ lạnh gia dụng, tủ lạnh âm tủ, tủ lạnh mini");
-                var airConditioner = Category.Create("Máy lạnh", null, 1, "Máy lạnh 1 chiều, máy lạnh 2 chiều, máy lạnh inverter");
-                var washingMachine = Category.Create("Máy giặt", null, 2, "Máy giặt cửa trên, máy giặt cửa trước, máy giặt sấy");
-                var dryer = Category.Create("Máy sấy", null, 3, "Máy sấy quần áo, máy sấy tích hợp");
-                var tv = Category.Create("Tivi", null, 4, "Tivi LED, Tivi OLED, Tivi QLED, Tivi Smart TV");
-                var audio = Category.Create("Âm thanh", null, 5, "Loa Bluetooth, soundbar, hệ thống âm thanh home theater");
-                var riceCooker = Category.Create("Nồi cơm", null, 6, "Nồi cơm điện, nồi cơm từ, nồi cơm nắp gài");
-                var inductionCooker = Category.Create("Bếp từ", null, 7, "Bếp từ đơn, bếp từ đôi, bếp từ ba");
-                var oven = Category.Create("Lò nướng", null, 8, "Lò nướng điện, lò nướng vi sóng, lò nướng đối lưu");
-                var hood = Category.Create("Máy hút mùi", null, 9, "Máy hút mùi kính, máy hút mùi ống, máy hút mùi âm tủ");
-                var waterHeater = Category.Create("Máy nước nóng", null, 10, "Máy nước nóng trực tiếp, máy nước nóng gián tiếp, máy nước nóng năng lượng mặt trời");
-                var robot = Category.Create("Robot hút bụi", null, 11, "Robot hút bụi tự động, robot lau nhà");
-                var airPurifier = Category.Create("Máy lọc không khí", null, 12, "Máy lọc không khí gia đình, máy lọc không khí công nghiệp");
+                var refrigerator = Category.Create("Tủ lạnh", null, 0, "Tủ lạnh");
+                var airConditioner = Category.Create("Máy lạnh", null, 1, "Máy lạnh");
+                var washingMachine = Category.Create("Máy giặt", null, 2, "Máy giặt");
+                var dryer = Category.Create("Máy sấy", null, 3, "Máy sấy");
+                var tv = Category.Create("Tivi", null, 4, "Tivi");
+                var audio = Category.Create("Âm thanh", null, 5, "Âm thanh");
+                var riceCooker = Category.Create("Nồi cơm", null, 6, "Nồi cơm");
+                var inductionCooker = Category.Create("Bếp từ", null, 7, "Bếp từ");
+                var oven = Category.Create("Lò nướng", null, 8, "Lò nướng");
+                var hood = Category.Create("Máy hút mùi", null, 9, "Máy hút mùi");
+                var waterHeater = Category.Create("Máy nước nóng", null, 10, "Máy nước nóng");
+                var robot = Category.Create("Robot hút bụi", null, 11, "Robot hút bụi");
+                var airPurifier = Category.Create("Máy lọc không khí", null, 12, "Máy lọc không khí");
+                var smartLight = Category.Create("Đèn thông minh", null, 13, "Đèn thông minh");
+                var camera = Category.Create("Camera an ninh", null, 14, "Camera an ninh");
+                var smartLock = Category.Create("Khóa thông minh", null, 15, "Khóa thông minh");
+                var doorbell = Category.Create("Chuông cửa", null, 16, "Chuông cửa");
+                var smartPlug = Category.Create("Ổ cắm thông minh", null, 17, "Ổ cắm thông minh");
+                var smartSwitch = Category.Create("Công tắc thông minh", null, 18, "Công tắc thông minh");
+                var waterFilter = Category.Create("Máy lọc nước", null, 19, "Máy lọc nước");
+                var fan = Category.Create("Quạt điện", null, 20, "Quạt điện");
+                var coffeeMaker = Category.Create("Máy pha cà phê", null, 21, "Máy pha cà phê");
+                var juicer = Category.Create("Máy ép", null, 22, "Máy ép");
+                var vacuum = Category.Create("Máy hút bụi", null, 23, "Máy hút bụi");
+                var dishwasher = Category.Create("Máy rửa bát", null, 24, "Máy rửa bát");
+                var microwave = Category.Create("Lò vi sóng", null, 25, "Lò vi sóng");
+                var blender = Category.Create("Máy xay", null, 26, "Máy xay");
+                var kettle = Category.Create("Ấm đun nước", null, 27, "Ấm đun nước");
+                var iron = Category.Create("Bàn là", null, 28, "Bàn là");
 
-                var categories = new List<Category> { refrigerator, airConditioner, washingMachine, dryer, tv, audio, riceCooker, inductionCooker, oven, hood, waterHeater, robot, airPurifier };
+                var categories = new List<Category> { refrigerator, airConditioner, washingMachine, dryer, tv, audio, riceCooker, inductionCooker, oven, hood, waterHeater, robot, airPurifier, smartLight, camera, smartLock, doorbell, smartPlug, smartSwitch, waterFilter, fan, coffeeMaker, juicer, vacuum, dishwasher, microwave, blender, kettle, iron };
                 await context.Categories.AddRangeAsync(categories);
                 await context.SaveChangesAsync();
 
                 // Thêm subcategories
                 var subCategories = new[]
                 {
-                    Category.Create("Tủ lạnh Side-by-Side", refrigerator.Id, 0, "Tủ lạnh dung tích lớn 2 cửa"),
-                    Category.Create("Tủ lạnh Inverter", refrigerator.Id, 1, "Tủ lạnh tiết kiệm điện"),
-                    Category.Create("Máy lạnh Inverter", airConditioner.Id, 0, "Máy lạnh tiết kiệm điện năng"),
-                    Category.Create("Máy giặt cửa trước", washingMachine.Id, 0, "Máy giặt lồng ngang chuyên nghiệp"),
-                    Category.Create("Tivi OLED", tv.Id, 0, "Tivi công nghệ màn hình OLED cao cấp"),
-                    Category.Create("Loa Soundbar", audio.Id, 0, "Hệ thống loa thanh cho tivi")
+                    Category.Create("Tủ lạnh Side-by-Side", refrigerator.Id, 0, "Tủ lạnh lớn"),
+                    Category.Create("Tủ lạnh Inverter", refrigerator.Id, 1, "Tủ lạnh Inverter"),
+                    Category.Create("Máy lạnh Inverter", airConditioner.Id, 0, "Máy lạnh Inverter"),
+                    Category.Create("Máy giặt cửa trước", washingMachine.Id, 0, "Máy giặt cửa trước"),
+                    Category.Create("Tivi OLED", tv.Id, 0, "Tivi OLED"),
+                    Category.Create("Loa Soundbar", audio.Id, 0, "Loa Soundbar"),
+                    Category.Create("Đèn LED", smartLight.Id, 0, "Đèn LED"),
+                    Category.Create("Camera WiFi", camera.Id, 0, "Camera WiFi"),
+                    Category.Create("Khóa vân tay", smartLock.Id, 0, "Khóa vân tay"),
+                    Category.Create("Chuông WiFi", doorbell.Id, 0, "Chuông WiFi"),
+                    Category.Create("Quạt đứng", fan.Id, 0, "Quạt đứng"),
+                    Category.Create("Quạt treo", fan.Id, 1, "Quạt treo")
                 };
 
                 await context.Categories.AddRangeAsync(subCategories);
@@ -312,45 +334,90 @@ namespace Infrastructure.Data
         {
             if (!context.ProductWarehouses.Any())
             {
-                var products = await context.Products.ToListAsync();
+                var products = await context.Products.Include(p => p.Variants).ToListAsync();
                 var warehouses = await context.Warehouses.ToListAsync();
 
                 var productWarehouses = new List<ProductWarehouse>();
+                var variantStockTotals = new Dictionary<int, int>();
                 var productStockTotals = new Dictionary<int, int>();
 
-                // Phân phối sản phẩm vào các kho với số lượng thực tế
+                // Phân phối sản phẩm vào các kho với số lượng thực tế cho từng variant
                 foreach (var product in products)
                 {
-                    // Mỗi sản phẩm có trong 1-3 kho khác nhau
-                    var warehouseCount = random.Next(1, 4);
-                    var selectedWarehouses = warehouses.OrderBy(x => random.Next()).Take(warehouseCount).ToList();
-
-                    var totalStock = 0;
-
-                    foreach (var warehouse in selectedWarehouses)
+                    if (!product.Variants.Any())
                     {
-                        // Số lượng ngẫu nhiên từ 0-100 cho mỗi kho
-                        // Một số sản phẩm có thể hết hàng (0) để test trường hợp out of stock
-                        var quantity = random.Next(0, 101);
-                        
-                        // Ưu tiên kho chính Hà Nội (ID=1) có nhiều hàng hơn
-                        if (warehouse.Id == 1)
+                        // Nếu sản phẩm không có variant, tạo ProductWarehouse cho product (VariantId = null)
+                        var warehouseCount = random.Next(1, 4);
+                        var selectedWarehouses = warehouses.OrderBy(x => random.Next()).Take(warehouseCount).ToList();
+
+                        var totalStock = 0;
+
+                        foreach (var warehouse in selectedWarehouses)
                         {
-                            quantity = random.Next(20, 101); // 20-100
+                            var quantity = random.Next(0, 101);
+                            if (warehouse.Id == 1)
+                            {
+                                quantity = random.Next(20, 101);
+                            }
+
+                            var productWarehouse = ProductWarehouse.Create(product.Id, null, warehouse.Id, quantity);
+                            productWarehouses.Add(productWarehouse);
+                            totalStock += quantity;
                         }
 
-                        var productWarehouse = ProductWarehouse.Create(product.Id, warehouse.Id, quantity);
-                        productWarehouses.Add(productWarehouse);
-                        totalStock += quantity;
+                        productStockTotals[product.Id] = totalStock;
                     }
+                    else
+                    {
+                        // Nếu sản phẩm có variants, phân phối cho từng variant
+                        foreach (var variant in product.Variants)
+                        {
+                            var warehouseCount = random.Next(1, 4);
+                            var selectedWarehouses = warehouses.OrderBy(x => random.Next()).Take(warehouseCount).ToList();
 
-                    productStockTotals[product.Id] = totalStock;
+                            var totalStock = 0;
+
+                            foreach (var warehouse in selectedWarehouses)
+                            {
+                                var quantity = random.Next(0, 101);
+                                if (warehouse.Id == 1)
+                                {
+                                    quantity = random.Next(20, 101);
+                                }
+
+                                var productWarehouse = ProductWarehouse.Create(product.Id, variant.Id, warehouse.Id, quantity);
+                                productWarehouses.Add(productWarehouse);
+                                totalStock += quantity;
+                            }
+
+                            variantStockTotals[variant.Id] = totalStock;
+                        }
+
+                        // Tổng stock của product = tổng stock của tất cả variants
+                        productStockTotals[product.Id] = variantStockTotals
+                            .Where(kvp => product.Variants.Any(v => v.Id == kvp.Key))
+                            .Sum(kvp => kvp.Value);
+                    }
                 }
 
                 await context.ProductWarehouses.AddRangeAsync(productWarehouses);
                 await context.SaveChangesAsync();
 
-                // Đồng bộ Product.StockQuantity từ tổng tồn kho
+                // Đồng bộ ProductVariant.StockQuantity từ tổng tồn kho của variant
+                foreach (var product in products)
+                {
+                    foreach (var variant in product.Variants)
+                    {
+                        if (variantStockTotals.TryGetValue(variant.Id, out var totalStock) && totalStock > 0)
+                        {
+                            variant.AddStock(totalStock);
+                        }
+                    }
+                }
+
+                await context.SaveChangesAsync();
+
+                // Đồng bộ Product.StockQuantity từ tổng StockQuantity của các variants
                 foreach (var product in products)
                 {
                     if (productStockTotals.TryGetValue(product.Id, out var totalStock))
@@ -361,6 +428,60 @@ namespace Infrastructure.Data
 
                 await context.SaveChangesAsync();
             }
+        }
+
+        private static List<(string Sku, int Price, Dictionary<string, string> Attributes)> GetProductVariants(string baseSku, int basePrice, string categoryName)
+        {
+            var variants = new List<(string, int, Dictionary<string, string>)>();
+            
+            switch (categoryName)
+            {
+                case "Tủ lạnh":
+                    variants.Add(($"{baseSku}-TRANG", basePrice, new Dictionary<string, string> { { "Màu", "Trắng" } }));
+                    variants.Add(($"{baseSku}-XAM", basePrice + 500000, new Dictionary<string, string> { { "Màu", "Xám" } }));
+                    variants.Add(($"{baseSku}-DEN", basePrice + 500000, new Dictionary<string, string> { { "Màu", "Đen" } }));
+                    break;
+                    
+                case "Máy lạnh":
+                    variants.Add(($"{baseSku}-1HP", basePrice, new Dictionary<string, string> { { "Công suất", "1HP" } }));
+                    variants.Add(($"{baseSku}-15HP", (int)(basePrice * 1.3), new Dictionary<string, string> { { "Công suất", "1.5HP" } }));
+                    variants.Add(($"{baseSku}-2HP", (int)(basePrice * 1.8), new Dictionary<string, string> { { "Công suất", "2HP" } }));
+                    break;
+                    
+                case "Máy giặt":
+                    variants.Add(($"{baseSku}-7KG", basePrice, new Dictionary<string, string> { { "Khối lượng", "7kg" } }));
+                    variants.Add(($"{baseSku}-8KG", (int)(basePrice * 1.1), new Dictionary<string, string> { { "Khối lượng", "8kg" } }));
+                    variants.Add(($"{baseSku}-9KG", (int)(basePrice * 1.2), new Dictionary<string, string> { { "Khối lượng", "9kg" } }));
+                    break;
+                    
+                case "Tivi":
+                    variants.Add(($"{baseSku}-43", basePrice, new Dictionary<string, string> { { "Kích thước", "43\"" } }));
+                    variants.Add(($"{baseSku}-55", (int)(basePrice * 1.8), new Dictionary<string, string> { { "Kích thước", "55\"" } }));
+                    variants.Add(($"{baseSku}-65", (int)(basePrice * 2.5), new Dictionary<string, string> { { "Kích thước", "65\"" } }));
+                    break;
+                    
+                case "Âm thanh":
+                    variants.Add(($"{baseSku}-DEN", basePrice, new Dictionary<string, string> { { "Màu", "Đen" } }));
+                    variants.Add(($"{baseSku}-TRANG", basePrice + 300000, new Dictionary<string, string> { { "Màu", "Trắng" } }));
+                    break;
+                    
+                case "Nồi cơm":
+                    variants.Add(($"{baseSku}-10L", basePrice, new Dictionary<string, string> { { "Dung tích", "1.0L" } }));
+                    variants.Add(($"{baseSku}-18L", (int)(basePrice * 1.2), new Dictionary<string, string> { { "Dung tích", "1.8L" } }));
+                    break;
+                    
+                case "Bếp từ":
+                    variants.Add(($"{baseSku}-DON", basePrice, new Dictionary<string, string> { { "Loại", "Đơn" } }));
+                    variants.Add(($"{baseSku}-DOI", (int)(basePrice * 1.3), new Dictionary<string, string> { { "Loại", "Đôi" } }));
+                    break;
+                    
+                default:
+                    // Default single variant
+                    variants.Add(($"{baseSku}-DEFAULT", basePrice, new Dictionary<string, string>()));
+                    break;
+            }
+            
+            return variants;
         }
 
         private static Dictionary<string, string> GetProductAttributes(string categoryName, string productName)
@@ -790,14 +911,17 @@ namespace Infrastructure.Data
                         usedSkus.Add(sku);
 
                         var product = Product.Create(name, sku, category.Id, brand.Id, null, requiresInstallation);
-                        
+
                         // Cập nhật SpecsJson cho Product
                         var attributes = GetProductAttributes(categoryName, name);
                         product.UpdateSpecs(attributes);
 
-                        // Thêm variant mặc định
-                        var variantSku = $"{sku}-DEFAULT";
-                        product.AddVariant(variantSku, Money.Vnd(price), attributes);
+                        // Thêm variants với phân loại ngắn gọn
+                        var variants = GetProductVariants(sku, price, categoryName);
+                        foreach (var (vSku, vPrice, vAttrs) in variants)
+                        {
+                            product.AddVariant(vSku, Money.Vnd(vPrice), vAttrs);
+                        }
 
                         products.Add(product);
                     }
@@ -903,90 +1027,89 @@ namespace Infrastructure.Data
                 var cities = new[] { "Hà Nội", "TP.HCM", "Đà Nẵng", "Hải Phòng", "Cần Thơ", "Nha Trang", "Huế", "Quảng Ninh" };
                 var districts = new[] { "Quận 1", "Quận 2", "Quận 3", "Quận Thanh Xuân", "Quận Cầu Giấy", "Quận Hai Bà Trưng", "Quận Ba Đình", "Quận Hoàn Kiếm" };
 
-                foreach (var customer in customerList)
+                // Giảm xuống còn 10 đơn hàng tổng cộng
+                var totalOrders = 10;
+                var baseDate = DateTime.UtcNow.AddDays(-365);
+
+                for (int i = 0; i < totalOrders; i++)
                 {
-                    var orderCount = random.Next(5, 16);
-                    var baseDate = DateTime.UtcNow.AddDays(-365);
+                    var customer = customerList[random.Next(customerList.Count)];
+                    var orderDate = baseDate.AddDays(random.Next(0, 365));
+                    var selectedProducts = products.OrderBy(x => random.Next()).Take(random.Next(1, 4)).ToList();
 
-                    for (int i = 0; i < orderCount; i++)
+                    var city = cities[random.Next(cities.Length)];
+                    var district = districts[random.Next(districts.Length)];
+
+                    var order = Order.Create(
+                        customer.Id,
+                        customer.FullName ?? $"Customer {customer.Id}",
+                        $"09{random.Next(10000000, 99999999)}",
+                        Address.Create($"{random.Next(1, 200)} Đường {vietnameseNames[random.Next(vietnameseNames.Length)]}",
+                            $"Phường {random.Next(1, 20)}", district, city),
+                        random.Next(0, 50000),
+                        orderDate
+                    );
+
+                    // 30% dùng VNPay
+                    if (random.Next(100) < 30)
                     {
-                        var orderDate = baseDate.AddDays(random.Next(0, 365));
-                        var selectedProducts = products.OrderBy(x => random.Next()).Take(random.Next(1, 4)).ToList();
-
-                        var city = cities[random.Next(cities.Length)];
-                        var district = districts[random.Next(districts.Length)];
-
-                        var order = Order.Create(
-                            customer.Id,
-                            customer.FullName ?? $"Customer {customer.Id}",
-                            $"09{random.Next(10000000, 99999999)}",
-                            Address.Create($"{random.Next(1, 200)} Đường {vietnameseNames[random.Next(vietnameseNames.Length)]}",
-                                $"Phường {random.Next(1, 20)}", district, city),
-                            random.Next(0, 50000),
-                            orderDate
-                        );
-
-                        // 30% dùng VNPay
-                        if (random.Next(100) < 30)
-                        {
-                            order.SetPaymentMethod(PaymentMethod.VNPay);
-                        }
-
-                        foreach (var product in selectedProducts)
-                        {
-                            var variant = product.Variants.FirstOrDefault();
-                            var unitPrice = variant != null ? variant.Price : Money.Vnd(random.Next(1000000, 50000000));
-                            order.AddItem(product.Id, variant?.Id, random.Next(1, 3), unitPrice, product.RequiresInstallation);
-                        }
-
-                        var hasInstall = selectedProducts.Any(p => p.RequiresInstallation);
-                        var hasShip = selectedProducts.Any(p => !p.RequiresInstallation);
-                        order.Confirm(hasInstall, hasShip);
-
-                        // Phân bổ trạng thái đa dạng
-                        var statusRoll = random.Next(100);
-
-                        if (hasShip && !hasInstall)
-                        {
-                            if (statusRoll < 60) // Tăng tỷ lệ hoàn thành
-                            {
-                                order.StartShipping();
-                                order.MarkDelivered(customer.Id);
-                            }
-                            else if (statusRoll < 80)
-                            {
-                                order.StartShipping();
-                            }
-                            else if (statusRoll < 90)
-                            {
-                                order.Cancel("Khách hàng hủy đơn", customer.Id);
-                            }
-                        }
-                        else if (hasInstall && !hasShip)
-                        {
-                            // Đơn chỉ có lắp đặt sẽ được xử lý trong SeedInstallationBookingsAsync
-                            if (statusRoll < 10)
-                            {
-                                order.Cancel("Khách hàng hủy đơn", customer.Id);
-                            }
-                        }
-                        else if (hasInstall && hasShip)
-                        {
-                            if (statusRoll < 40) // 40% đã giao hàng, chờ lắp đặt
-                            {
-                                order.StartShipping();
-                                order.MarkDelivered(customer.Id);
-                            }
-                            else if (statusRoll < 10)
-                            {
-                                order.Cancel("Khách hàng hủy đơn", customer.Id);
-                            }
-                        }
-
-                        context.Orders.Add(order);
+                        order.SetPaymentMethod(PaymentMethod.VNPay);
                     }
-                    await context.SaveChangesAsync(); // Lưu theo từng khách hàng để tránh quá tải transaction
+
+                    foreach (var product in selectedProducts)
+                    {
+                        var variant = product.Variants.FirstOrDefault();
+                        var unitPrice = variant != null ? variant.Price : Money.Vnd(random.Next(1000000, 50000000));
+                        order.AddItem(product.Id, variant?.Id, random.Next(1, 3), unitPrice, product.RequiresInstallation);
+                    }
+
+                    var hasInstall = selectedProducts.Any(p => p.RequiresInstallation);
+                    var hasShip = selectedProducts.Any(p => !p.RequiresInstallation);
+                    order.Confirm(hasInstall, hasShip);
+
+                    // Phân bổ trạng thái đa dạng
+                    var statusRoll = random.Next(100);
+
+                    if (hasShip && !hasInstall)
+                    {
+                        if (statusRoll < 60) // Tăng tỷ lệ hoàn thành
+                        {
+                            order.StartShipping();
+                            order.MarkDelivered(customer.Id);
+                        }
+                        else if (statusRoll < 80)
+                        {
+                            order.StartShipping();
+                        }
+                        else if (statusRoll < 90)
+                        {
+                            order.Cancel("Khách hàng hủy đơn", customer.Id);
+                        }
+                    }
+                    else if (hasInstall && !hasShip)
+                    {
+                        // Đơn chỉ có lắp đặt sẽ được xử lý trong SeedInstallationBookingsAsync
+                        if (statusRoll < 10)
+                        {
+                            order.Cancel("Khách hàng hủy đơn", customer.Id);
+                        }
+                    }
+                    else if (hasInstall && hasShip)
+                    {
+                        if (statusRoll < 40) // 40% đã giao hàng, chờ lắp đặt
+                        {
+                            order.StartShipping();
+                            order.MarkDelivered(customer.Id);
+                        }
+                        else if (statusRoll < 10)
+                        {
+                            order.Cancel("Khách hàng hủy đơn", customer.Id);
+                        }
+                    }
+
+                    context.Orders.Add(order);
                 }
+                await context.SaveChangesAsync();
             }
         }
 
@@ -1386,11 +1509,16 @@ namespace Infrastructure.Data
                         "Yêu cầu sửa chữa tại nhà"
                     };
 
+                    // Get order item to find order id
+                    var orderItem = context.OrderItems.FirstOrDefault(oi => oi.Id == warranty.OrderItemId);
+                    var orderId = orderItem?.OrderId ?? 0;
+
                     var request = WarrantyRequest.Create(
                         warranty.Id,
                         warranty.ProductId,
                         warranty.VariantId,
                         warranty.OrderItemId,
+                        orderId,
                         WarrantyType.Repair,
                         descriptions[random.Next(descriptions.Length)]
                     );

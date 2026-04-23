@@ -4,6 +4,7 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Catalog;
 using Domain.Entities.Inventory;
+using Domain.Enums;
 using Domain.Exceptions;
 
 namespace Application.Services
@@ -18,6 +19,7 @@ namespace Application.Services
         private readonly ICategoryRepository _categoryRepository;
         private readonly IProductVariantRepository _productVariantRepository;
         private readonly IProductVariantService _productVariantService;
+        private readonly Domain.Repositories.IWarehouseTransferRepository _warehouseTransferRepository;
 
         public InventoryService(
             IProductRepository productRepository,
@@ -27,7 +29,8 @@ namespace Application.Services
             IStockEntryRepository stockEntryRepository,
             ICategoryRepository categoryRepository,
             IProductVariantRepository productVariantRepository,
-            IProductVariantService productVariantService)
+            IProductVariantService productVariantService,
+            Domain.Repositories.IWarehouseTransferRepository warehouseTransferRepository)
         {
             _productRepository = productRepository;
             _productWarehouseRepository = productWarehouseRepository;
@@ -37,6 +40,7 @@ namespace Application.Services
             _categoryRepository = categoryRepository;
             _productVariantRepository = productVariantRepository;
             _productVariantService = productVariantService;
+            _warehouseTransferRepository = warehouseTransferRepository;
         }
 
         #region Product Inventory
@@ -722,6 +726,119 @@ namespace Application.Services
             // Đồng bộ Product.StockQuantity sau khi chuyển kho
             // Tổng tồn kho không đổi khi chuyển kho, nhưng vẫn đồng bộ để đảm bảo
             await SyncProductStockFromWarehouses(request.ProductId);
+        }
+
+        #endregion
+
+        #region Warehouse Transfer
+
+        public async Task<WarehouseTransfer> InitiateTransferAsync(int fromWarehouseId, int toWarehouseId, Dictionary<int, int> productQuantities, string? reason = null)
+        {
+            if (fromWarehouseId == toWarehouseId)
+                throw new DomainException("Kho nguồn và kho đích không thể giống nhau");
+
+            var fromWarehouse = await _warehouseRepository.GetByIdAsync(fromWarehouseId);
+            var toWarehouse = await _warehouseRepository.GetByIdAsync(toWarehouseId);
+
+            if (fromWarehouse == null || toWarehouse == null)
+                throw new DomainException("Không tìm thấy kho");
+
+            // Validate each product has enough stock
+            foreach (var (productId, quantity) in productQuantities)
+            {
+                var sourceStock = await _productWarehouseRepository
+                    .GetByProductAndWarehouseAsync(productId, fromWarehouseId);
+
+                if (sourceStock == null || sourceStock.GetAvailableStock() < quantity)
+                    throw new DomainException($"Sản phẩm {productId} không đủ tồn kho để chuyển");
+            }
+
+            // Create transfer record for each product
+            // Note: WarehouseTransfer entity currently only supports single product per transfer
+            // For multi-product transfers, we'll create multiple transfer records
+            WarehouseTransfer? firstTransfer = null;
+
+            foreach (var (productId, quantity) in productQuantities)
+            {
+                var transfer = WarehouseTransfer.Create(fromWarehouseId, toWarehouseId, productId, quantity, reason);
+                _warehouseTransferRepository.Add(transfer);
+                await _warehouseTransferRepository.SaveChangesAsync();
+
+                firstTransfer ??= transfer;
+            }
+
+            return firstTransfer!;
+        }
+
+        public async Task ExecuteTransferAsync(int transferId)
+        {
+            var transfer = await _warehouseTransferRepository.GetByIdWithDetailsAsync(transferId);
+            if (transfer == null)
+                throw new DomainException("Không tìm thấy phiếu chuyển kho");
+
+            if (transfer.Status != WarehouseTransferStatus.Pending)
+                throw new DomainException("Chỉ có thể thực hiện chuyển kho đang chờ xử lý");
+
+            // Get source and destination stock - use method that doesn't use AsNoTracking
+            var sourceStock = await _productWarehouseRepository
+                .GetByProductVariantAndWarehouseForUpdateAsync(transfer.ProductId, null, transfer.FromWarehouseId);
+
+            if (sourceStock == null || sourceStock.GetAvailableStock() < transfer.Quantity)
+                throw new DomainException("Không đủ tồn kho để chuyển");
+
+            var destStock = await _productWarehouseRepository
+                .GetByProductVariantAndWarehouseForUpdateAsync(transfer.ProductId, null, transfer.ToWarehouseId);
+
+            if (destStock == null)
+            {
+                destStock = ProductWarehouse.Create(transfer.ProductId, transfer.ToWarehouseId, 0);
+                await _productWarehouseRepository.AddAsync(destStock);
+            }
+
+            // Execute the transfer
+            sourceStock.Dispatch(transfer.Quantity);
+            destStock.Receive(transfer.Quantity);
+
+            _productWarehouseRepository.Update(sourceStock);
+            _productWarehouseRepository.Update(destStock);
+            await _productWarehouseRepository.SaveChangesAsync();
+
+            // Mark transfer as completed
+            transfer.Execute();
+            _warehouseTransferRepository.Update(transfer);
+            await _warehouseTransferRepository.SaveChangesAsync();
+
+            // Sync product stock
+            await SyncProductStockFromWarehouses(transfer.ProductId);
+        }
+
+        public async Task CancelTransferAsync(int transferId, string reason)
+        {
+            var transfer = await _warehouseTransferRepository.GetByIdAsync(transferId);
+            if (transfer == null)
+                throw new DomainException("Không tìm thấy phiếu chuyển kho");
+
+            transfer.Cancel(reason);
+            _warehouseTransferRepository.Update(transfer);
+            // Note: SaveChangesAsync is not available in the interface, relying on ProductWarehouseRepository save
+            await _productWarehouseRepository.SaveChangesAsync();
+        }
+
+        public async Task<List<WarehouseTransfer>> GetTransfersAsync(int? warehouseId = null, WarehouseTransferStatus? status = null)
+        {
+            if (status.HasValue)
+            {
+                return (await _warehouseTransferRepository.GetByStatusAsync(status.Value)).ToList();
+            }
+
+            if (warehouseId.HasValue)
+            {
+                var fromTransfers = await _warehouseTransferRepository.GetByFromWarehouseAsync(warehouseId.Value);
+                var toTransfers = await _warehouseTransferRepository.GetByToWarehouseAsync(warehouseId.Value);
+                return fromTransfers.Concat(toTransfers).OrderByDescending(t => t.CreatedAt).ToList();
+            }
+
+            return (await _warehouseTransferRepository.GetAllAsync()).ToList();
         }
 
         #endregion

@@ -5,25 +5,25 @@
 namespace Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddWarrantyPeriodToProductVariant : Migration
+    public partial class AddOrderIdToWarrantyRequest : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<int>(
-                name: "WarrantyPeriod",
-                table: "ProductVariants",
+                name: "OrderId",
+                table: "WarrantyRequests",
                 type: "int",
                 nullable: false,
-                defaultValue: 12);
+                defaultValue: 0);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "WarrantyPeriod",
-                table: "ProductVariants");
+                name: "OrderId",
+                table: "WarrantyRequests");
         }
     }
 }
