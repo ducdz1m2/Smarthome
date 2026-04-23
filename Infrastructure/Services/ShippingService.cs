@@ -20,9 +20,18 @@ public class ShippingService : Domain.Services.IShippingService
             return Task.FromResult(Money.Vnd(0));
         }
 
-        // Regular orders: 30.000đ for regular orders
-        // Free shipping for orders >= 500.000đ
-        decimal fee = totalAmount >= 500000 ? 0 : 30000;
+        // Regular orders: tiered pricing based on order amount
+        // Orders < 5,000,000đ: 100,000đ
+        // Orders 5,000,000đ - 15,000,000đ: 50,000đ
+        // Orders 15,000,000đ - 25,000,000đ: 30,000đ
+        // Orders >= 25,000,000đ: Free shipping
+        decimal fee = totalAmount switch
+        {
+            >= 25000000 => 0,
+            >= 15000000 => 30000,
+            >= 5000000 => 50000,
+            _ => 100000
+        };
 
         return Task.FromResult(Money.Vnd(fee));
     }
@@ -38,8 +47,8 @@ public class ShippingService : Domain.Services.IShippingService
             {
                 Code = "STANDARD",
                 Name = "Giao hàng tiêu chuẩn",
-                Description = "3-5 ngày làm việc",
-                Fee = Money.Vnd(30000),
+                Description = "3-5 ngày làm việc. Phí: 30k-100k, miễn phí đơn >= 25 triệu",
+                Fee = Money.Vnd(50000),
                 EstimatedDays = 5,
                 IsCodAvailable = true
             }

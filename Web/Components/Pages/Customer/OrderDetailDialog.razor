@@ -18,6 +18,7 @@
 @inject IJSRuntime JSRuntime
 @inject IHttpClientFactory HttpClientFactory
 @inject SignalRService SignalRService
+@inject NavigationManager NavigationManager
 
 <MudDialog>
     <DialogContent>
@@ -171,59 +172,7 @@
                     </MudGrid>
                 </MudTabPanel>
 
-                <!-- Tab 2: Vận chuyển -->
-                <MudTabPanel Text="Vận chuyển" Icon="@Icons.Material.Filled.LocalShipping">
-                    @if (_order.Shipments.Any())
-                    {
-                        <MudGrid>
-                            @foreach (var shipment in _order.Shipments)
-                            {
-                                <MudItem xs="12">
-                                    <MudCard Elevation="0" Outlined="true" Class="mb-2">
-                                        <MudCardContent>
-                                            <div class="d-flex align-center justify-space-between">
-                                                <div>
-                                                    <MudText Typo="Typo.body2" Class="fw-bold">Mã vận đơn: @shipment.TrackingNumber</MudText>
-                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                        @if (!string.IsNullOrEmpty(shipment.Carrier))
-                                                        {
-                                                            <span>Đơn vị: @shipment.Carrier</span>
-                                                        }
-                                                        @if (!string.IsNullOrEmpty(shipment.TrackingNumber))
-                                                        {
-                                                            <span> | Mã vận: @shipment.TrackingNumber</span>
-                                                        }
-                                                    </MudText>
-                                                </div>
-                                                <MudChip T="string" Size="Size.Small" Color="@GetShipmentStatusColor(shipment.Status)">
-                                                    @GetShipmentStatusText(shipment.Status)
-                                                </MudChip>
-                                            </div>
-                                            @if (shipment.PickedUpAt.HasValue)
-                                            {
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                                                    Lấy hàng ngày: @shipment.PickedUpAt.Value.ToLocalTime().ToString("dd/MM/yyyy")
-                                                </MudText>
-                                            }
-                                            @if (shipment.DeliveredAt.HasValue)
-                                            {
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                                                    Giao hàng ngày: @shipment.DeliveredAt.Value.ToLocalTime().ToString("dd/MM/yyyy")
-                                                </MudText>
-                                            }
-                                        </MudCardContent>
-                                    </MudCard>
-                                </MudItem>
-                            }
-                        </MudGrid>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Chưa có thông tin vận chuyển</MudText>
-                    }
-                </MudTabPanel>
-
-                <!-- Tab 3: Hoàn hàng & Bảo hành -->
+                <!-- Tab 2: Hoàn hàng & Bảo hành -->
                 <MudTabPanel Text="Hoàn hàng & Bảo hành" Icon="@Icons.Material.Filled.AssignmentReturn">
                     <MudGrid>
                         <!-- Return Policy Countdown - Consistent with Header -->
@@ -335,17 +284,22 @@
                                 {
                                     <MudCard Class="mb-2" Elevation="0" Outlined="true">
                                         <MudCardContent>
-                                            <div class="d-flex align-center gap-2">
-                                                <MudRating SelectedValue="review.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
-                                                <MudText Typo="Typo.caption" Color="Color.Primary">@review.Rating/5</MudText>
-                                                @if (review.IsApproved)
-                                                {
-                                                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Đã duyệt</MudChip>
-                                                }
-                                                else
-                                                {
-                                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
-                                                }
+                                            <div class="d-flex align-center justify-space-between mb-2">
+                                                <div class="d-flex align-center gap-2">
+                                                    <MudRating SelectedValue="review.Rating" ReadOnly="true" MaxValue="5" Size="Size.Small" />
+                                                    <MudText Typo="Typo.caption" Color="Color.Primary">@review.Rating/5</MudText>
+                                                    @if (review.IsApproved)
+                                                    {
+                                                        <MudChip T="string" Color="Color.Success" Size="Size.Small">Đã duyệt</MudChip>
+                                                    }
+                                                    else
+                                                    {
+                                                        <MudChip T="string" Color="Color.Warning" Size="Size.Small">Chờ duyệt</MudChip>
+                                                    }
+                                                </div>
+                                                <MudButton Variant="Variant.Text" Color="Color.Primary" Class="pa-0 fw-bold" OnClick="() => NavigateToProduct(review.ProductId)">
+                                                    @review.ProductName
+                                                </MudButton>
                                             </div>
                                             <MudText Typo="Typo.body2" Class="mt-2">@review.Content</MudText>
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">@review.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudText>
@@ -1041,6 +995,11 @@
     private static string GetShipmentStatusText(string status)
     {
         return StatusHelper.GetShipmentStatusText(status);
+    }
+
+    private void NavigateToProduct(int productId)
+    {
+        NavigationManager.NavigateTo($"/products/{productId}");
     }
 
     private async Task LoadTechnicianChatMessages()
