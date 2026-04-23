@@ -42,3 +42,10 @@ public record InstallationAssignedEvent(
     int CustomerId,
     int TechnicianId,
     DateTime AssignedAt) : DomainEvent(BookingId, nameof(Entities.Installation.InstallationBooking));
+
+public record InstallationAwaitingMaterialEvent(
+    int BookingId,
+    int OrderId,
+    int TechnicianId,
+    DateTime ScheduledDate,
+    string TechnicianName) : DomainEvent(BookingId, nameof(Entities.Installation.InstallationBooking));

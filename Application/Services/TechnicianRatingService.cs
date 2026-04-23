@@ -3,6 +3,7 @@ using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Installation;
+using Domain.Enums;
 using Domain.Interfaces;
 
 namespace Application.Services
@@ -13,17 +14,26 @@ namespace Application.Services
         private readonly ITechnicianProfileRepository _technicianRepository;
         private readonly IInstallationBookingRepository _bookingRepository;
         private readonly ICurrentUserService _currentUserService;
+        private readonly INotificationService _notificationService;
+        private readonly IEmailService _emailService;
+        private readonly Domain.Repositories.IUserRepository _userRepository;
 
         public TechnicianRatingService(
             ITechnicianRatingRepository ratingRepository,
             ITechnicianProfileRepository technicianRepository,
             IInstallationBookingRepository bookingRepository,
-            ICurrentUserService currentUserService)
+            ICurrentUserService currentUserService,
+            INotificationService notificationService,
+            IEmailService emailService,
+            Domain.Repositories.IUserRepository userRepository)
         {
             _ratingRepository = ratingRepository;
             _technicianRepository = technicianRepository;
             _bookingRepository = bookingRepository;
             _currentUserService = currentUserService;
+            _notificationService = notificationService;
+            _emailService = emailService;
+            _userRepository = userRepository;
         }
 
         public async Task<List<TechnicianRatingResponse>> GetAllAsync()
@@ -188,6 +198,27 @@ namespace Application.Services
                 technician.CompleteJob(rating.Rating);
                 _technicianRepository.Update(technician);
                 await _technicianRepository.SaveChangesAsync();
+            }
+
+            // Send notification to user
+            await _notificationService.CreateNotificationAsync(new CreateNotificationRequest
+            {
+                UserId = rating.UserId,
+                UserType = UserType.Customer,
+                Type = NotificationType.InstallationScheduled,
+                Title = "Đánh giá kỹ thuật viên đã được duyệt",
+                Message = "Đánh giá kỹ thuật viên của bạn đã được duyệt và hiển thị công khai.",
+                ActionUrl = $"/installations/{rating.BookingId}",
+                Icon = "check-circle",
+                RelatedEntityId = rating.Id,
+                RelatedEntityType = "TechnicianRating"
+            });
+
+            // Send email
+            var user = await _userRepository.GetByIdAsync(rating.UserId);
+            if (user != null && !string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendRatingApprovedEmailAsync(user.Email, "TechnicianRating", rating.Id);
             }
         }
 

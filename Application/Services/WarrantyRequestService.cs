@@ -16,17 +16,26 @@ public class WarrantyRequestService : IWarrantyRequestService
     private readonly IWarrantyRepository _warrantyRepository;
     private readonly IOrderRepository _orderRepository;
     private readonly IProductRepository _productRepository;
+    private readonly INotificationService _notificationService;
+    private readonly IEmailService _emailService;
+    private readonly Domain.Repositories.IUserRepository _userRepository;
 
     public WarrantyRequestService(
         IWarrantyRequestRepository warrantyRequestRepository,
         IWarrantyRepository warrantyRepository,
         IOrderRepository orderRepository,
-        IProductRepository productRepository)
+        IProductRepository productRepository,
+        INotificationService notificationService,
+        IEmailService emailService,
+        Domain.Repositories.IUserRepository userRepository)
     {
         _warrantyRequestRepository = warrantyRequestRepository;
         _warrantyRepository = warrantyRepository;
         _orderRepository = orderRepository;
         _productRepository = productRepository;
+        _notificationService = notificationService;
+        _emailService = emailService;
+        _userRepository = userRepository;
     }
 
     public async Task<List<WarrantyRequestResponse>> GetAllAsync()
@@ -124,6 +133,20 @@ public class WarrantyRequestService : IWarrantyRequestService
         warrantyRequest.Approve();
         _warrantyRequestRepository.Update(warrantyRequest);
         await _warrantyRequestRepository.SaveChangesAsync();
+
+        // Send notification to customer
+        var order = await _orderRepository.GetByIdAsync(warrantyRequest.OrderId);
+        if (order != null)
+        {
+            await _notificationService.NotifyWarrantyClaimUpdatedAsync(id, order.UserId, "approved");
+
+            // Send email
+            var user = await _userRepository.GetByIdAsync(order.UserId);
+            if (user != null && !string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendWarrantyApprovedEmailAsync(user.Email, order.OrderNumber, id);
+            }
+        }
     }
 
     public async Task RejectAsync(int id, string reason)
@@ -135,6 +158,20 @@ public class WarrantyRequestService : IWarrantyRequestService
         warrantyRequest.Reject(reason);
         _warrantyRequestRepository.Update(warrantyRequest);
         await _warrantyRequestRepository.SaveChangesAsync();
+
+        // Send notification to customer
+        var order = await _orderRepository.GetByIdAsync(warrantyRequest.OrderId);
+        if (order != null)
+        {
+            await _notificationService.NotifyWarrantyClaimUpdatedAsync(id, order.UserId, "rejected");
+
+            // Send email
+            var user = await _userRepository.GetByIdAsync(order.UserId);
+            if (user != null && !string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendWarrantyRejectedEmailAsync(user.Email, order.OrderNumber, id, reason);
+            }
+        }
     }
 
     public async Task StartAsync(int id)
@@ -166,6 +203,20 @@ public class WarrantyRequestService : IWarrantyRequestService
         await _warrantyRequestRepository.SaveChangesAsync();
 
         Console.WriteLine($"[WarrantyRequestService.CompleteAsync] After complete - ID: {id}, Status: {warrantyRequest.Status}");
+
+        // Send notification to customer
+        var order = await _orderRepository.GetByIdAsync(warrantyRequest.OrderId);
+        if (order != null)
+        {
+            await _notificationService.NotifyWarrantyClaimUpdatedAsync(id, order.UserId, "resolved");
+
+            // Send email
+            var user = await _userRepository.GetByIdAsync(order.UserId);
+            if (user != null && !string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendWarrantyCompletedEmailAsync(user.Email, order.OrderNumber, id);
+            }
+        }
     }
 
     public async Task MarkItemAsReturnedAsync(int itemId)

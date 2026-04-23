@@ -3,6 +3,7 @@ using Application.DTOs.Responses;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities.Catalog;
+using Domain.Enums;
 
 namespace Application.Services
 {
@@ -10,11 +11,17 @@ namespace Application.Services
     {
         private readonly IProductCommentRepository _commentRepository;
         private readonly IProductRepository _productRepository;
+        private readonly INotificationService _notificationService;
+        private readonly IEmailService _emailService;
+        private readonly Domain.Repositories.IUserRepository _userRepository;
 
-        public ProductCommentService(IProductCommentRepository commentRepository, IProductRepository productRepository)
+        public ProductCommentService(IProductCommentRepository commentRepository, IProductRepository productRepository, INotificationService notificationService, IEmailService emailService, Domain.Repositories.IUserRepository userRepository)
         {
             _commentRepository = commentRepository;
             _productRepository = productRepository;
+            _notificationService = notificationService;
+            _emailService = emailService;
+            _userRepository = userRepository;
         }
 
         public async Task<List<ProductCommentResponse>> GetAllAsync()
@@ -139,10 +146,31 @@ namespace Application.Services
         {
             var comment = await _commentRepository.GetByIdForUpdateAsync(id);
             if (comment == null) return;
-            
+
             comment.Approve();
             _commentRepository.Update(comment);
             await _commentRepository.SaveChangesAsync();
+
+            // Send notification to user
+            await _notificationService.CreateNotificationAsync(new CreateNotificationRequest
+            {
+                UserId = comment.UserId,
+                UserType = UserType.Customer,
+                Type = NotificationType.OrderConfirmed,
+                Title = "Đánh giá sản phẩm đã được duyệt",
+                Message = "Đánh giá sản phẩm của bạn đã được duyệt và hiển thị công khai.",
+                ActionUrl = $"/products/{comment.ProductId}",
+                Icon = "check-circle",
+                RelatedEntityId = comment.Id,
+                RelatedEntityType = "ProductComment"
+            });
+
+            // Send email
+            var user = await _userRepository.GetByIdAsync(comment.UserId);
+            if (user != null && !string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendRatingApprovedEmailAsync(user.Email, "ProductComment", comment.Id);
+            }
         }
 
         public async Task RejectAsync(int id)

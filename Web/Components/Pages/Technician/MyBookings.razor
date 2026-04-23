@@ -160,8 +160,8 @@
                             <MudText Typo="Typo.body2">@context.CustomerName</MudText>
                             <MudText Typo="Typo.caption">@context.CustomerPhone</MudText>
                         </MudTd>
-                        <MudTd>@context.ScheduledDate.Date.ToString("dd/MM/yyyy")</MudTd>
-                        <MudTd>@context.StartTime?.ToString("hh\\:mm") - @context.EndTime?.ToString("hh\\:mm")</MudTd>
+                        <MudTd>@context.ScheduledDate.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+                        <MudTd>@context.StartTime?.ToString(@"hh\:mm") - @context.EndTime?.ToString(@"hh\:mm")</MudTd>
                         <MudTd>
                             @{
                                 var isUninstall = bookingType == "uninstall";

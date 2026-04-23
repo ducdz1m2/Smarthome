@@ -8,6 +8,8 @@ namespace Application.DTOs.Responses
         public string ReceiverName { get; set; } = string.Empty;
         public string? ReceiverPhone { get; set; }
         public string? ShippingAddress { get; set; }
+        public string? ShippingCity { get; set; }
+        public string? ShippingDistrict { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal SubTotal { get; set; }
         public decimal DiscountAmount { get; set; }

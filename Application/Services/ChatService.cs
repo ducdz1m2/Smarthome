@@ -14,17 +14,20 @@ public class ChatService : IChatService
     private readonly IChatMessageRepository _chatMessageRepository;
     private readonly IDomainEventDispatcher _eventDispatcher;
     private readonly IIdentityService _identityService;
+    private readonly INotificationService _notificationService;
 
     public ChatService(
         IChatRoomRepository chatRoomRepository,
         IChatMessageRepository chatMessageRepository,
         IDomainEventDispatcher eventDispatcher,
-        IIdentityService identityService)
+        IIdentityService identityService,
+        INotificationService notificationService)
     {
         _chatRoomRepository = chatRoomRepository;
         _chatMessageRepository = chatMessageRepository;
         _eventDispatcher = eventDispatcher;
         _identityService = identityService;
+        _notificationService = notificationService;
     }
 
     public async Task<List<ChatRoomResponse>> GetAllSupportChatRoomsAsync()
@@ -186,6 +189,13 @@ public class ChatService : IChatService
             (int)senderType,
             request.Content,
             DateTime.UtcNow));
+
+        // Send notification to recipient
+        var recipient = room.Participants.FirstOrDefault(p => p.UserId != senderId);
+        if (recipient != null)
+        {
+            await _notificationService.NotifyNewMessageAsync(roomId, senderId, recipient.UserId, recipient.UserType, request.Content);
+        }
 
         // Reload the message from database to ensure attachments are properly loaded
         var reloadedMessage = await _chatMessageRepository.GetByIdAsync(message.Id);

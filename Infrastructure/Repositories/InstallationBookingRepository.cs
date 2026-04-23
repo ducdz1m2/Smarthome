@@ -62,6 +62,20 @@ namespace Infrastructure.Repositories
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<List<InstallationBooking>> GetAllByOrderIdAsync(int orderId)
+        {
+            return await _context.InstallationBookings
+                .AsNoTracking()
+                .Where(b => b.OrderId == orderId)
+                .Include(b => b.Order)
+                .Include(b => b.Technician)
+                    .ThenInclude(t => t.User)
+                .Include(b => b.Slot)
+                .Include(b => b.Materials)
+                    .ThenInclude(m => m.Warehouse)
+                .ToListAsync();
+        }
+
         public async Task<List<InstallationBooking>> GetAllAsync()
         {
             return await _context.InstallationBookings

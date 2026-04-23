@@ -165,8 +165,8 @@ else
                             <MudText Typo="Typo.body2">@context.CustomerName</MudText>
                             <MudText Typo="Typo.caption">@context.CustomerPhone</MudText>
                         </MudTd>
-                        <MudTd>@context.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
-                        <MudTd>@context.StartTime?.ToString("hh\\:mm") - @context.EndTime?.ToString("hh\\:mm")</MudTd>
+                        <MudTd>@context.ScheduledDate.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+                        <MudTd>@context.StartTime?.ToString(@"hh\:mm") - @context.EndTime?.ToString(@"hh\:mm")</MudTd>
                         <MudTd>
                             <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
                                        OnClick="() => AcceptBooking(context.Id)">Tiếp nhận</MudButton>

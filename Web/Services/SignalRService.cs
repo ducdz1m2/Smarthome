@@ -56,7 +56,8 @@ public class SignalRService : IAsyncDisposable
 
         try
         {
-            await _notificationHub.StartAsync();
+            await _notificationHub.StartAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
+            Console.WriteLine("[SignalRService] Notification hub connected successfully");
         }
         catch (Exception ex)
         {
@@ -65,7 +66,8 @@ public class SignalRService : IAsyncDisposable
 
         try
         {
-            await _chatHub.StartAsync();
+            await _chatHub.StartAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
+            Console.WriteLine("[SignalRService] Chat hub connected successfully");
         }
         catch (Exception ex)
         {

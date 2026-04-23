@@ -63,7 +63,7 @@
         <MudTd DataLabel="Giảm tối đa">@(context.MaxDiscountAmount?.ToString("N0") ?? "-")</MudTd>
         <MudTd DataLabel="Hết hạn">
             <MudText Color="@GetExpiryColor(context.ExpiryDate, context.IsActive)" Typo="Typo.body2">
-                @context.ExpiryDate.ToString("dd/MM/yyyy")
+                @context.ExpiryDate.ToLocalTime().ToString("dd/MM/yyyy")
             </MudText>
         </MudTd>
         <MudTd DataLabel="Đã dùng">@context.UsageCount / @(context.UsageLimit?.ToString() ?? "∞")</MudTd>

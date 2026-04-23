@@ -8,6 +8,7 @@ namespace Application.Interfaces.Services
         Task<List<InstallationBookingListResponse>> GetAllAsync();
         Task<InstallationBookingResponse?> GetByIdAsync(int id);
         Task<InstallationBookingResponse?> GetByOrderIdAsync(int orderId);
+        Task<List<InstallationBookingResponse>> GetListByOrderIdAsync(int orderId);
         Task<(List<InstallationBookingListResponse> Items, int TotalCount)> GetPagedAsync(
             int page, int pageSize, int? technicianId = null, string? status = null, DateTime? fromDate = null, DateTime? toDate = null);
         Task<List<InstallationBookingListResponse>> GetByTechnicianAsync(int technicianId);
@@ -30,6 +31,8 @@ namespace Application.Interfaces.Services
         // Technician acceptance flow
         Task AcceptBookingAsync(int bookingId, int technicianId);
         Task RejectBookingAsync(int bookingId, int technicianId, RejectBookingRequest request);
+        Task ReportOutOfStockAsync(int bookingId, int technicianId);
+        Task ResetFromAwaitingMaterialAsync(int bookingId);
         Task FailBookingAsync(int bookingId, string reason);
         Task<List<InstallationBookingListResponse>> GetPendingForTechnicianAsync(int technicianId);
 

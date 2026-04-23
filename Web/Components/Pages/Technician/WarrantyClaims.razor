@@ -35,7 +35,7 @@ else
                 <MudText Typo="Typo.body2">@context.CustomerName</MudText>
                 <MudText Typo="Typo.caption">@context.CustomerPhone</MudText>
             </MudTd>
-            <MudTd>@context.ScheduledDate.Date.ToString("dd/MM/yyyy")</MudTd>
+            <MudTd>@context.ScheduledDate.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
             <MudTd>
                 <MudChip T="string" Size="Size.Small" Color="StatusHelper.GetInstallationStatusColor(context.Status)">@StatusHelper.GetInstallationStatusText(context.Status)</MudChip>
             </MudTd>

@@ -74,6 +74,7 @@ namespace Application.DTOs.Requests
         public int? VariantId { get; set; }
         public int Quantity { get; set; }
         public bool Selected { get; set; }
+        public int WarehouseId { get; set; }
     }
 
     public class RecordMaterialUsageRequest

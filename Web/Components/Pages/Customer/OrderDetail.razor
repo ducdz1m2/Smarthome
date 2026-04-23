@@ -1,0 +1,173 @@
+@page "/orders/{id:int}"
+@layout Web.Components.Layout.AccountLayout
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Enums
+@using Web.Helpers
+@using Web.Services
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IOrderService OrderService
+@inject IReturnOrderService ReturnOrderService
+@inject IWarrantyRequestService WarrantyRequestService
+@inject IProductCommentService CommentService
+@inject ITechnicianRatingService TechnicianRatingService
+@inject IInstallationService InstallationService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IChatService ChatService
+@inject CurrentUserService CurrentUser
+@inject IJSRuntime JSRuntime
+@inject IHttpClientFactory HttpClientFactory
+@inject SignalRService SignalRService
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h5" Class="mb-4">Chi tiết đơn hàng</MudText>
+
+@if (_isLoading)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="400px" Animation="Animation.Wave" />
+}
+else if (_order == null)
+{
+    <MudAlert Severity="Severity.Error">Không tìm thấy đơn hàng</MudAlert>
+}
+else
+{
+    <MudCard Elevation="2">
+        <MudCardContent>
+            <!-- Order Header -->
+            <div class="d-flex align-center justify-space-between mb-4">
+                <div>
+                    <MudText Typo="Typo.h6" Class="fw-bold">Đơn hàng #@_order.OrderNumber</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Đặt ngày @_order.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                    </MudText>
+                </div>
+                <MudChip T="string" Color="@StatusHelper.GetOrderStatusColor(_order.Status)" Size="Size.Medium">
+                    @StatusHelper.GetOrderStatusText(_order.Status)
+                </MudChip>
+            </div>
+
+            <!-- Cancel Reason -->
+            @if (!string.IsNullOrEmpty(_order.CancelReason))
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-3">
+                    <MudText Typo="Typo.body2">Lý do hủy: @_order.CancelReason</MudText>
+                </MudAlert>
+            }
+
+            <!-- Shipping Address -->
+            <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Địa chỉ giao hàng</MudText>
+            <MudText Typo="Typo.body2">
+                @_order.ReceiverName<br />
+                @_order.ReceiverPhone<br />
+                @_order.ShippingAddress
+            </MudText>
+
+            <!-- Order Items -->
+            <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Sản phẩm</MudText>
+            @foreach (var item in _order.Items)
+            {
+                <div class="d-flex align-center justify-space-between py-2 border-bottom">
+                    <div class="flex-grow-1">
+                        <MudText Typo="Typo.body1">@item.ProductName</MudText>
+                        @if (!string.IsNullOrEmpty(item.VariantName))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@item.VariantName</MudText>
+                        }
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Số lượng: @item.Quantity</MudText>
+                        @if (item.RequiresInstallation)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2">Cần lắp đặt</MudChip>
+                        }
+                    </div>
+                    <MudText Typo="Typo.body1" Class="fw-bold">@item.UnitPrice.ToString("N0") đ</MudText>
+                </div>
+            }
+
+            <!-- Total -->
+            <div class="d-flex justify-space-between align-center mt-4 pt-3 border-top">
+                <MudText Typo="Typo.subtitle1">Tổng cộng</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Primary" Class="fw-bold">@_order.TotalAmount.ToString("N0") đ</MudText>
+            </div>
+
+            <!-- Actions -->
+            <div class="d-flex gap-2 mt-4">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="NavigateBack">
+                    Quay lại
+                </MudButton>
+                @if (_order.Status.ToString() == "Pending")
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="CancelOrder">
+                        Hủy đơn hàng
+                    </MudButton>
+                }
+            </div>
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private OrderResponse? _order;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrderAsync();
+    }
+
+    private async Task LoadOrderAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _order = await OrderService.GetByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải đơn hàng: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/orders");
+    }
+
+    private async Task CancelOrder()
+    {
+        var parameters = new DialogParameters
+        {
+            ["Title"] = "Xác nhận hủy đơn hàng",
+            ["Message"] = "Bạn có chắc chắn muốn hủy đơn hàng này?",
+            ["YesText"] = "Hủy đơn hàng",
+            ["NoText"] = "Đóng"
+        };
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<Web.Components.Shared.ConfirmDialog>("Xác nhận", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: true })
+        {
+            try
+            {
+                await OrderService.CancelAsync(Id, "Khách hàng hủy đơn hàng");
+                Snackbar.Add("Đã hủy đơn hàng thành công", Severity.Success);
+                await LoadOrderAsync();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Lỗi hủy đơn hàng: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

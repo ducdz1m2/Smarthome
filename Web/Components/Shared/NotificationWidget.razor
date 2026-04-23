@@ -249,6 +249,6 @@
             return $"{(int)span.TotalHours} giờ trước";
         if (span.TotalDays < 7)
             return $"{(int)span.TotalDays} ngày trước";
-        return dateTime.ToString("dd/MM/yyyy");
+        return dateTime.ToLocalTime().ToString("dd/MM/yyyy");
     }
 }

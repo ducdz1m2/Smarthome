@@ -10,10 +10,14 @@ public class PushNotificationHandler :
     IDomainEventHandler<BulkNotificationCreatedEvent>
 {
     private readonly IHubContext<NotificationHub> _hubContext;
+    private readonly IPushNotificationService _pushNotificationService;
 
-    public PushNotificationHandler(IHubContext<NotificationHub> hubContext)
+    public PushNotificationHandler(
+        IHubContext<NotificationHub> hubContext,
+        IPushNotificationService pushNotificationService)
     {
         _hubContext = hubContext;
+        _pushNotificationService = pushNotificationService;
     }
 
     public async Task HandleAsync(NotificationCreatedEvent domainEvent, CancellationToken cancellationToken = default)
@@ -41,8 +45,24 @@ public class PushNotificationHandler :
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[PushNotificationHandler] Error sending notification: {ex.Message}");
+            Console.WriteLine($"[PushNotificationHandler] Error sending SignalR notification: {ex.Message}");
             Console.WriteLine($"[PushNotificationHandler] Stack trace: {ex.StackTrace}");
+        }
+
+        // Send Web Push notification
+        try
+        {
+            await _pushNotificationService.SendNotificationAsync(
+                domainEvent.UserId,
+                domainEvent.Title,
+                domainEvent.Message,
+                domainEvent.ActionUrl
+            );
+            Console.WriteLine($"[PushNotificationHandler] Sent Web Push notification to user {domainEvent.UserId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PushNotificationHandler] Error sending Web Push notification: {ex.Message}");
         }
     }
 
@@ -70,13 +90,22 @@ public class PushNotificationHandler :
             }
             else if (domainEvent.UserIds != null && domainEvent.UserIds.Count > 0)
             {
-                // Send to specific users
+                // Send to specific users via SignalR
                 foreach (var userId in domainEvent.UserIds)
                 {
                     var groupName = $"user_{userId}";
                     await _hubContext.Clients.Group(groupName).SendAsync("ReceiveNotification", notificationData, cancellationToken);
                 }
-                Console.WriteLine($"[PushNotificationHandler] Sent bulk notification to {domainEvent.UserIds.Count} users");
+                Console.WriteLine($"[PushNotificationHandler] Sent bulk SignalR notification to {domainEvent.UserIds.Count} users");
+
+                // Send Web Push notifications
+                await _pushNotificationService.SendNotificationToMultipleAsync(
+                    domainEvent.UserIds,
+                    domainEvent.Title,
+                    domainEvent.Message,
+                    domainEvent.ActionUrl
+                );
+                Console.WriteLine($"[PushNotificationHandler] Sent bulk Web Push notification to {domainEvent.UserIds.Count} users");
             }
             else
             {

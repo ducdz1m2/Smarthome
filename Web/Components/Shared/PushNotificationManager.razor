@@ -1,0 +1,107 @@
+@inject Web.Services.PushNotificationService PushNotificationService
+@inject IJSRuntime JSRuntime
+
+<div class="@Class push-notification-manager">
+    @if (isLoading)
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" Disabled="true" Class="nav-icon-btn" />
+    }
+    else if (!isSupported)
+    {
+        <MudIconButton Icon="@Icons.Material.Outlined.NotificationsNone" Color="Color.Inherit" Disabled="true" Class="nav-icon-btn" />
+    }
+    else if (isSubscribed)
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" @onclick="UnsubscribeAsync" Class="nav-icon-btn" Title="Tắt thông báo" />
+    }
+    else
+    {
+        <MudIconButton Icon="@Icons.Material.Outlined.NotificationsNone" Color="Color.Inherit" @onclick="SubscribeAsync" Class="nav-icon-btn" Title="Bật thông báo" />
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Class { get; set; } = string.Empty;
+
+    private bool isLoading = true;
+    private bool isSupported = false;
+    private bool isSubscribed = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckSupportAsync();
+    }
+
+    private async Task CheckSupportAsync()
+    {
+        isLoading = true;
+        try
+        {
+            isSupported = await PushNotificationService.IsSupportedAsync();
+            
+            if (isSupported)
+            {
+                await PushNotificationService.InitAsync();
+                isSubscribed = await PushNotificationService.IsSubscribedAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PushNotificationManager] Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SubscribeAsync()
+    {
+        try
+        {
+            var result = await PushNotificationService.SubscribeAsync();
+            if (result)
+            {
+                isSubscribed = true;
+                await JSRuntime.InvokeVoidAsync("alert", "Đã bật thông báo đẩy!");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Không thể bật thông báo. Vui lòng kiểm tra quyền truy cập.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PushNotificationManager] Subscribe error: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", "Có lỗi xảy ra khi bật thông báo.");
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task UnsubscribeAsync()
+    {
+        try
+        {
+            var result = await PushNotificationService.UnsubscribeAsync();
+            if (result)
+            {
+                isSubscribed = false;
+                await JSRuntime.InvokeVoidAsync("alert", "Đã tắt thông báo đẩy!");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PushNotificationManager] Unsubscribe error: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", "Có lỗi xảy ra khi tắt thông báo.");
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+}

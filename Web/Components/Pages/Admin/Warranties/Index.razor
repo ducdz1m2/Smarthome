@@ -9,6 +9,7 @@
 
 @inject IWarrantyRequestService WarrantyRequestService
 @inject IInstallationService InstallationService
+@inject IOrderService OrderService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
@@ -224,11 +225,18 @@
     {
         try
         {
+            // Get order information to extract shipping location for technician filtering
+            var order = await OrderService.GetByIdAsync(orderId);
+            string? filterCity = order?.ShippingCity;
+            string? filterDistrict = order?.ShippingDistrict;
+
             var parameters = new DialogParameters
             {
                 { "OrderId", orderId },
                 { "WarrantyRequestId", warrantyRequestId },
-                { "IsWarranty", true }
+                { "IsWarranty", true },
+                { "FilterCity", filterCity },
+                { "FilterDistrict", filterDistrict }
             };
 
             var dialog = await DialogService.ShowAsync<InstallationBookingDialog>("Tạo lịch bảo hành", parameters);

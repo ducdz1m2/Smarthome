@@ -88,6 +88,9 @@ namespace Infrastructure
             services.AddScoped<Application.Interfaces.Repositories.IChatMessageRepository, ChatMessageRepository>();
             services.AddScoped<Application.Interfaces.Repositories.INotificationRepository, NotificationRepository>();
 
+            // Push Notification repository
+            services.AddScoped<Domain.Repositories.IPushSubscriptionRepository, PushSubscriptionRepository>();
+
             // Shipping service
             services.AddScoped<Domain.Services.IShippingService, Services.ShippingService>();
 

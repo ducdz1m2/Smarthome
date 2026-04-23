@@ -1,0 +1,152 @@
+@page "/installations/{Id:int}"
+@using Application.DTOs.Responses
+@using Application.Interfaces.Services
+@using Domain.Enums
+@using Web.Helpers
+@inject IInstallationService InstallationService
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else if (_booking == null)
+{
+    <MudAlert Severity="Severity.Error">Không tìm thấy lịch lắp đặt.</MudAlert>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => NavigationManager.NavigateTo("/orders"))" Class="mb-4">
+            Quay lại danh sách đơn hàng
+        </MudButton>
+
+        <MudGrid>
+            <!-- Header -->
+            <MudItem xs="12">
+                <MudPaper Class="pa-4 mb-4" Elevation="2">
+                    <div class="d-flex justify-space-between align-center">
+                        <div>
+                            <MudText Typo="Typo.h5">@(_booking.IsWarranty ? "Lịch bảo hành" : _booking.IsUninstall ? "Lịch tháo lắp" : "Lịch lắp đặt") #@_booking.Id</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@_booking.OrderNumber</MudText>
+                        </div>
+                        <MudChip T="string" Color="StatusHelper.GetInstallationStatusColor(_booking.Status)" Size="Size.Large">@StatusHelper.GetInstallationStatusText(_booking.Status)</MudChip>
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Schedule Info -->
+            <MudItem xs="12" md="6">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">Thông tin lịch hẹn</MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText><b>Ngày:</b> @_booking.ScheduledDate.ToLocalTime().ToString("dd/MM/yyyy")</MudText>
+                        <MudText><b>Giờ:</b> @(_booking.StartTime?.ToString(@"hh\:mm") ?? "N/A") - @(_booking.EndTime?.ToString(@"hh\:mm") ?? "N/A")</MudText>
+                        <MudText><b>Địa chỉ:</b> @_booking.ShippingAddress</MudText>
+                        @if (!string.IsNullOrEmpty(_booking.Notes))
+                        {
+                            <MudText Class="mt-2"><b>Ghi chú:</b> @_booking.Notes</MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <!-- Technician Info -->
+            <MudItem xs="12" md="6">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">Thông tin kỹ thuật viên</MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (!string.IsNullOrEmpty(_booking.TechnicianName))
+                        {
+                            <MudText><b>Tên:</b> @_booking.TechnicianName</MudText>
+                            <MudText><b>SĐT:</b> @_booking.TechnicianPhone</MudText>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Chưa phân công kỹ thuật viên</MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <!-- Products -->
+            <MudItem xs="12">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">Sản phẩm cần lắp đặt</MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (_booking.Products != null && _booking.Products.Any())
+                        {
+                            @foreach (var product in _booking.Products)
+                            {
+                                <MudPaper Class="pa-3 mb-2" Elevation="0">
+                                    <MudText Typo="Typo.subtitle1">@product.ProductName</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Số lượng: @product.Quantity</MudText>
+                                </MudPaper>
+                            }
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Không có thông tin sản phẩm</MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <!-- Notes -->
+            <MudItem xs="12">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">Ghi chú</MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (!string.IsNullOrEmpty(_booking.Notes))
+                        {
+                            <MudText>@_booking.Notes</MudText>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Không có ghi chú</MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private InstallationBookingResponse? _booking;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBookingAsync();
+    }
+
+    private async Task LoadBookingAsync()
+    {
+        _loading = true;
+        try
+        {
+            _booking = await InstallationService.GetByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi tải thông tin lịch lắp đặt: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

@@ -18,6 +18,7 @@ using Application.Interfaces.Repositories;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
+using FluentEmail.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,6 +59,14 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 
 // Add controllers for API endpoints
 builder.Services.AddControllers();
+
+// Add antiforgery for Razor components
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+});
 
 // Add layers
 builder.Services.AddApplication();
@@ -119,9 +128,18 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<Web.Services.SignalRService>();
 
+// Register Web Push service
+builder.Services.AddScoped<Web.Services.PushNotificationService>();
+
 // Register Push Notification Handlers
 builder.Services.AddScoped<IDomainEventHandler<NotificationCreatedEvent>, Web.EventHandlers.PushNotificationHandler>();
 builder.Services.AddScoped<IDomainEventHandler<BulkNotificationCreatedEvent>, Web.EventHandlers.PushNotificationHandler>();
+
+// Configure FluentEmail
+var smtpSettings = builder.Configuration.GetSection("SmtpSettings");
+builder.Services.AddFluentEmail(smtpSettings["FromEmail"], smtpSettings["FromName"])
+    .AddSmtpSender(smtpSettings["Host"], int.Parse(smtpSettings["Port"]!), smtpSettings["User"], smtpSettings["Password"])
+    .AddRazorRenderer();
 
 // Register Speech services
 builder.Services.AddScoped<SpeechService>();
@@ -182,14 +200,16 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/uploads/temp"
 });
 
-app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Map API controllers BEFORE antiforgery to bypass it
+app.MapControllers();
+
+// Use antiforgery for Razor components
+app.UseAntiforgery();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
-
-// Map API controllers
-app.MapControllers();
 
 // Map warehouse endpoint
 app.MapGet("/api/warehouses", async (Application.Interfaces.Repositories.IWarehouseRepository warehouseRepository) =>

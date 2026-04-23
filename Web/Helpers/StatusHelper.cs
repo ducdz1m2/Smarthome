@@ -71,6 +71,7 @@ namespace Web.Helpers
                 "Completed" => Color.Success,
                 "Cancelled" => Color.Error,
                 "Failed" => Color.Error,
+                "AwaitingMaterial" => Color.Warning,
                 _ => Color.Default
             };
         }
@@ -90,6 +91,7 @@ namespace Web.Helpers
                 "Completed" => "Hoàn thành",
                 "Cancelled" => "Đã hủy",
                 "Failed" => "Thất bại",
+                "AwaitingMaterial" => "Chờ vật tư",
                 _ => status
             };
         }
@@ -111,6 +113,7 @@ namespace Web.Helpers
                     "Completed" => Color.Success,
                     "Cancelled" => Color.Error,
                     "Failed" => Color.Error,
+                    "AwaitingMaterial" => Color.Warning,
                     _ => Color.Default
                 };
             }

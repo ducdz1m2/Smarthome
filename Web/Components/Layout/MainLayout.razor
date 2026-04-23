@@ -53,11 +53,11 @@
             }
         }
 
-        @* Notification widget - commented out due to errors *@
-        @* @if (CurrentUserService.IsAuthenticated)
+        @* Push Notification Manager *@
+        @if (CurrentUserService.IsAuthenticated)
         {
-            <NotificationWidget Class="mx-2" />
-        } *@
+            <PushNotificationManager Class="mx-2" />
+        }
 
         @* Nút tài khoản với avatar *@
         <MudIconButton Href="/profile" Title="Quản lý tài khoản" Class="avatar-btn">

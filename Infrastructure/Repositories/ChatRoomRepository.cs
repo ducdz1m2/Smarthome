@@ -36,12 +36,42 @@ public class ChatRoomRepository : IChatRoomRepository
             .ToListAsync();
 
     public async Task<List<ChatRoom>> GetByUserIdAsync(int userId, UserType userType)
-        => await _context.ChatRooms
-            .Include(r => r.Participants)
-            .Include(r => r.Messages.OrderByDescending(m => m.SentAt).Take(1))
-            .Where(r => r.Participants.Any(p => p.UserId == userId && p.UserType == userType && p.IsActive))
-            .OrderByDescending(r => r.CreatedAt)
-            .ToListAsync();
+    {
+        try
+        {
+            // Simplified query to avoid connection closed error
+            var chatRoomIds = await _context.ChatParticipants
+                .Where(p => p.UserId == userId && p.UserType == userType && p.IsActive)
+                .Select(p => p.ChatRoomId)
+                .Distinct()
+                .ToListAsync();
+
+            if (!chatRoomIds.Any())
+                return new List<ChatRoom>();
+
+            var chatRooms = await _context.ChatRooms
+                .Where(r => chatRoomIds.Contains(r.Id))
+                .Include(r => r.Participants)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync();
+
+            // Load messages separately to avoid complex query
+            foreach (var room in chatRooms)
+            {
+                _context.Entry(room).Collection(r => r.Messages).Query()
+                    .OrderByDescending(m => m.SentAt)
+                    .Take(1)
+                    .Load();
+            }
+
+            return chatRooms;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ChatRoomRepository.GetByUserIdAsync] Error: {ex.Message}");
+            return new List<ChatRoom>();
+        }
+    }
 
     public async Task<List<ChatRoom>> GetByParticipantAsync(int userId, UserType userType)
         => await GetByUserIdAsync(userId, userType);

@@ -32,6 +32,11 @@ namespace Application.Services
         private readonly ITechnicianRatingService _technicianRatingService;
         private readonly Domain.Repositories.IInstallationMaterialRepository _installationMaterialRepository;
         private readonly IWarrantyRepository _warrantyRepository;
+        private readonly ITechnicianProfileService _technicianProfileService;
+        private readonly IInstallationSlotService _slotService;
+        private readonly INotificationService _notificationService;
+        private readonly IEmailService _emailService;
+        private readonly Domain.Repositories.IUserRepository _userRepository;
 
         public InstallationService(
             IInstallationBookingRepository bookingRepository,
@@ -49,7 +54,12 @@ namespace Application.Services
             IProductVariantService productVariantService,
             ITechnicianRatingService technicianRatingService,
             Domain.Repositories.IInstallationMaterialRepository installationMaterialRepository,
-            IWarrantyRepository warrantyRepository)
+            IWarrantyRepository warrantyRepository,
+            ITechnicianProfileService technicianProfileService,
+            IInstallationSlotService slotService,
+            INotificationService notificationService,
+            IEmailService emailService,
+            Domain.Repositories.IUserRepository userRepository)
         {
             _bookingRepository = bookingRepository;
             _technicianRepository = technicianRepository;
@@ -60,6 +70,11 @@ namespace Application.Services
             _productWarehouseRepository = productWarehouseRepository;
             _warehouseRepository = warehouseRepository;
             _stockIssueRepository = stockIssueRepository;
+            _technicianProfileService = technicianProfileService;
+            _slotService = slotService;
+            _notificationService = notificationService;
+            _emailService = emailService;
+            _userRepository = userRepository;
             _currentUserService = currentUserService;
             _productRepository = productRepository;
             _productVariantRepository = productVariantRepository;
@@ -87,6 +102,17 @@ namespace Application.Services
             var booking = await _bookingRepository.GetByOrderIdAsync(orderId);
             if (booking == null) return null;
             return await MapToResponseAsync(booking);
+        }
+
+        public async Task<List<InstallationBookingResponse>> GetListByOrderIdAsync(int orderId)
+        {
+            var bookings = await _bookingRepository.GetAllByOrderIdAsync(orderId);
+            var responses = new List<InstallationBookingResponse>();
+            foreach (var booking in bookings)
+            {
+                responses.Add(await MapToResponseAsync(booking));
+            }
+            return responses;
         }
 
         public async Task<(List<InstallationBookingListResponse> Items, int TotalCount)> GetPagedAsync(
@@ -194,6 +220,23 @@ namespace Application.Services
 
             Console.WriteLine($"[InstallationService.CreateAsync] Booking saved to database");
 
+            // Notify customer about installation assignment
+            var order = await _orderRepository.GetByIdAsync(request.OrderId);
+            if (order != null)
+            {
+                var assignedTechnician = await _technicianRepository.GetByIdAsync(request.TechnicianId);
+                var technicianName = assignedTechnician?.EmployeeCode ?? $"KTV {request.TechnicianId}";
+
+                await _notificationService.NotifyInstallationStatusChangedAsync(booking.Id, order.UserId, "assigned");
+
+                // Send email
+                var user = await _userRepository.GetByIdAsync(order.UserId);
+                if (user != null && !string.IsNullOrEmpty(user.Email))
+                {
+                    await _emailService.SendInstallationAssignedEmailAsync(user.Email, order.OrderNumber, technicianName);
+                }
+            }
+
             // Mark slot as booked (only for non-warranty bookings)
             if (!request.IsWarranty)
             {
@@ -276,6 +319,8 @@ namespace Application.Services
             if (slot.IsBooked && slot.BookingId != id)
                 throw new DomainException("Slot đã được đặt bởi lịch khác");
 
+            var oldTechnicianId = booking.TechnicianId;
+
             // Release old slot if exists
             if (booking.SlotId.HasValue)
             {
@@ -291,6 +336,35 @@ namespace Application.Services
             slot.Book(booking.Id);
 
             await _bookingRepository.SaveChangesAsync();
+
+            // Notify customer if technician changed
+            if (oldTechnicianId != technicianId)
+            {
+                var order = await _orderRepository.GetByIdAsync(booking.OrderId);
+                if (order != null)
+                {
+                    var technician = await _technicianRepository.GetByIdAsync(technicianId);
+                    var technicianName = technician?.EmployeeCode ?? $"KTV {technicianId}";
+
+                    await _notificationService.CreateNotificationAsync(new CreateNotificationRequest
+                    {
+                        UserId = order.UserId,
+                        UserType = UserType.Customer,
+                        Type = NotificationType.InstallationAssigned,
+                        Title = "Kỹ thuật viên đã thay đổi",
+                        Message = $"Đơn hàng #{order.OrderNumber} đã được bàn giao cho kỹ thuật viên {technicianName}.",
+                        RelatedEntityId = booking.Id,
+                        RelatedEntityType = "InstallationBooking"
+                    });
+
+                    // Send email notification
+                    var user = await _userRepository.GetByIdAsync(order.UserId);
+                    if (user != null && !string.IsNullOrEmpty(user.Email))
+                    {
+                        await _emailService.SendTechnicianChangedEmailAsync(user.Email, order.OrderNumber, technicianName);
+                    }
+                }
+            }
         }
 
         public async Task StartPreparationAsync(int id)
@@ -328,12 +402,17 @@ namespace Application.Services
 
         public async Task StartInstallationAsync(int id)
         {
+            Console.WriteLine($"[StartInstallationAsync] Loading booking {id} from database");
             var booking = await _bookingRepository.GetByIdAsync(id);
             if (booking == null)
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
+            Console.WriteLine($"[StartInstallationAsync] Booking {id} loaded - Status: {booking.Status}, IsWarranty: {booking.IsWarranty}, ScheduledDate: {booking.ScheduledDate}");
+
             booking.StartInstallation();
             await _bookingRepository.SaveChangesAsync();
+
+            Console.WriteLine($"[StartInstallationAsync] Booking {id} completed - Status: {booking.Status}");
 
             // Order status already set to Installing by StartTravelAsync
         }
@@ -376,6 +455,19 @@ namespace Application.Services
 
             await _bookingRepository.SaveChangesAsync();
             Console.WriteLine($"[CompleteAsync] After save booking - Booking ID: {booking.Id}, Status: {booking.Status}");
+
+            // Send notification to customer
+            await _notificationService.NotifyInstallationStatusChangedAsync(id, customerId, "completed");
+
+            // Send email
+            if (booking.Order != null)
+            {
+                var user = await _userRepository.GetByIdAsync(customerId);
+                if (user != null && !string.IsNullOrEmpty(user.Email))
+                {
+                    await _emailService.SendInstallationCompletedEmailAsync(user.Email, booking.Order.OrderNumber);
+                }
+            }
 
             // Track which technician installed the product (for warranty/uninstall assignment)
             // Only for regular installations, not warranty or uninstall
@@ -634,6 +726,29 @@ namespace Application.Services
             booking.CustomerReschedule(request.NewSlotId, request.NewDate);
 
             await _bookingRepository.SaveChangesAsync();
+
+            // Notify technician about reschedule
+            await _notificationService.CreateNotificationAsync(new CreateNotificationRequest
+            {
+                UserId = booking.TechnicianId,
+                UserType = UserType.Technician,
+                Type = NotificationType.InstallationScheduled,
+                Title = "Khách hàng đã đổi lịch",
+                Message = $"Lịch lắp đặt đã được khách hàng đổi sang ngày {request.NewDate:dd/MM/yyyy}. Vui lòng xác nhận lịch mới.",
+                RelatedEntityId = booking.Id,
+                RelatedEntityType = "InstallationBooking"
+            });
+
+            // Send email notification to customer
+            var order = await _orderRepository.GetByIdAsync(booking.OrderId);
+            if (order != null)
+            {
+                var user = await _userRepository.GetByIdAsync(order.UserId);
+                if (user != null && !string.IsNullOrEmpty(user.Email))
+                {
+                    await _emailService.SendRescheduleEmailAsync(user.Email, order.OrderNumber, request.NewDate);
+                }
+            }
         }
 
         public async Task CancelAsync(int id, CancelInstallationRequest request)
@@ -1049,7 +1164,76 @@ namespace Application.Services
                 }
             }
 
+            // Try to reassign to another technician before cancelling
+            var order = await _orderRepository.GetByIdAsync(booking.OrderId);
+            if (order != null)
+            {
+                Console.WriteLine($"[RejectBookingAsync] Attempting to reassign booking {bookingId} to another technician");
+
+                // Get technicians in the same district
+                var technicians = await _technicianProfileService.GetByDistrictAsync(order.ShippingAddress.District);
+
+                // Fallback to city if no technician found in district
+                if (!technicians.Any())
+                {
+                    technicians = await _technicianProfileService.GetByCityAsync(order.ShippingAddress.City);
+                }
+
+                // Filter out the rejecting technician
+                var availableTechnicians = technicians
+                    .Where(t => t.Id != technicianId && t.IsAvailable)
+                    .ToList();
+
+                if (availableTechnicians.Any())
+                {
+                    // Try to find an available slot for the new technician
+                    foreach (var newTech in availableTechnicians.Take(3)) // Try first 3 available technicians
+                    {
+                        var availableSlots = await _slotService.GetAvailableSlotsAsync(newTech.Id, booking.ScheduledDate);
+                        if (availableSlots.Any())
+                        {
+                            Console.WriteLine($"[RejectBookingAsync] Reassigning booking {bookingId} to technician {newTech.Id} with slot {availableSlots.First().Id}");
+                            var newSlotResponse = availableSlots.First();
+                            booking.AssignTechnician(newTech.Id, newSlotResponse.Id);
+                            await _bookingRepository.SaveChangesAsync();
+                            Console.WriteLine($"[RejectBookingAsync] Successfully reassigned booking {bookingId}");
+                            return;
+                        }
+                    }
+                }
+
+                Console.WriteLine($"[RejectBookingAsync] No available technicians or slots found for reassigning booking {bookingId}");
+            }
+
+            // If reassign failed, cancel the booking
             booking.Reject(request.Reason);
+            await _bookingRepository.SaveChangesAsync();
+        }
+
+        public async Task ReportOutOfStockAsync(int bookingId, int technicianId)
+        {
+            var booking = await _bookingRepository.GetByIdAsync(bookingId);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            if (booking.TechnicianId != technicianId)
+                throw new DomainException("Bạn không được phân công cho lịch này");
+
+            var technician = await _technicianRepository.GetByIdAsync(technicianId);
+            if (technician == null)
+                throw new DomainException("Không tìm thấy kỹ thuật viên");
+
+            booking.ReportOutOfStock(technician.FullName ?? $"KTV #{technicianId}");
+            await _bookingRepository.SaveChangesAsync();
+        }
+
+        public async Task ResetFromAwaitingMaterialAsync(int bookingId)
+        {
+            var booking = await _bookingRepository.GetByIdAsync(bookingId);
+            if (booking == null)
+                throw new DomainException("Không tìm thấy lịch lắp đặt");
+
+            booking.ResetFromAwaitingMaterial();
             await _bookingRepository.SaveChangesAsync();
         }
 
@@ -1125,6 +1309,7 @@ namespace Application.Services
                 CustomerPhone = order?.ReceiverPhone?.ToString() ?? string.Empty,
                 ShippingAddress = string.Join(", ", addressParts),
                 District = order?.ShippingAddress?.District,
+                City = order?.ShippingAddress?.City,
                 
                 // Products
                 Products = products,
@@ -1139,8 +1324,8 @@ namespace Application.Services
                 // Schedule info
                 SlotId = booking.SlotId,
                 ScheduledDate = booking.ScheduledDate,
-                StartTime = booking.Slot?.StartTime,
-                EndTime = booking.Slot?.EndTime,
+                StartTime = booking.Slot?.StartTime ?? booking.ScheduledDate.TimeOfDay,
+                EndTime = booking.Slot?.EndTime ?? booking.ScheduledDate.Add(booking.EstimatedDuration).TimeOfDay,
                 EstimatedDuration = booking.EstimatedDuration,
                 
                 // Status
@@ -1271,6 +1456,10 @@ namespace Application.Services
             var order = booking.Order;
             var technician = booking.Technician;
             
+            // Use Slot's time if available, otherwise use ScheduledDate's time
+            TimeSpan? startTime = booking.Slot?.StartTime ?? booking.ScheduledDate.TimeOfDay;
+            TimeSpan? endTime = booking.Slot?.EndTime ?? booking.ScheduledDate.Add(booking.EstimatedDuration).TimeOfDay;
+            
             return new InstallationBookingListResponse
             {
                 Id = booking.Id,
@@ -1281,8 +1470,8 @@ namespace Application.Services
                 CustomerName = order?.ReceiverName ?? string.Empty,
                 CustomerPhone = order?.ReceiverPhone != null ? order.ReceiverPhone.ToString() : string.Empty,
                 ScheduledDate = booking.ScheduledDate,
-                StartTime = booking.Slot?.StartTime,
-                EndTime = booking.Slot?.EndTime,
+                StartTime = startTime,
+                EndTime = endTime,
                 Status = booking.Status.ToString(),
                 MaterialsPrepared = booking.MaterialsPrepared,
                 CompletedAt = booking.CompletedAt,

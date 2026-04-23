@@ -159,13 +159,16 @@ public class ReturnOrderService : IReturnOrderService
                 if (availableSlot != null)
                 {
                     // Create uninstall booking with the available slot
+                    // Combine slot Date with StartTime to create proper ScheduledDate with time component
+                    var scheduledDate = availableSlot.Date.Add(availableSlot.StartTime);
                     Console.WriteLine($"[ReturnOrderService.ApproveAsync] Creating uninstall booking for technician {technicianId} with slot {availableSlot.Id}");
+                    Console.WriteLine($"[ReturnOrderService.ApproveAsync] ScheduledDate: {scheduledDate:dd/MM/yyyy HH:mm} (Date: {availableSlot.Date:dd/MM/yyyy}, StartTime: {availableSlot.StartTime})");
                     var uninstallBookingId = await _installationService.CreateAsync(new CreateInstallationBookingRequest
                     {
                         OrderId = order.Id,
                         TechnicianId = technicianId,
                         SlotId = availableSlot.Id,
-                        ScheduledDate = availableSlot.Date,
+                        ScheduledDate = scheduledDate,
                         IsUninstall = true
                     });
                     Console.WriteLine($"[ReturnOrderService.ApproveAsync] Uninstall booking created with ID: {uninstallBookingId}");

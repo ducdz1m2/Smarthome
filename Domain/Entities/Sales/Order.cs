@@ -70,11 +70,8 @@ public class Order : AggregateRoot
             CreatedAt = createdAt ?? DateTime.UtcNow
         };
 
-        order.AddDomainEvent(new OrderCreatedEvent(
-            order.Id,
-            userId,
-            order.OrderNumber,
-            order.TotalAmount.Amount));
+        // Note: OrderCreatedEvent will be dispatched in OrderService.CreateAsync after the order is saved to DB
+        // This ensures the OrderId is properly assigned before the event is dispatched
 
         return order;
     }
@@ -265,13 +262,20 @@ public class Order : AggregateRoot
         public void UpdateStatusFromInstallation(OrderStatus newStatus)
         {
             // Only allow status changes related to installation
-            if (newStatus != OrderStatus.Installing && newStatus != OrderStatus.Completed)
+            if (newStatus != OrderStatus.Installing && newStatus != OrderStatus.Completed && newStatus != OrderStatus.TechnicianAssigned)
             {
                 throw new BusinessRuleViolationException("InvalidStatusChange", "Chỉ có thể cập nhật trạng thái lắp đặt");
             }
 
             Status = newStatus;
-            AddStatusHistory(Status, newStatus == OrderStatus.Installing ? "Đang lắp đặt" : "Hoàn thành lắp đặt");
+            string statusText = newStatus switch
+            {
+                OrderStatus.Installing => "Đang lắp đặt",
+                OrderStatus.Completed => "Hoàn thành lắp đặt",
+                OrderStatus.TechnicianAssigned => "Kỹ thuật viên đã tiếp nhận",
+                _ => newStatus.ToString()
+            };
+            AddStatusHistory(Status, statusText);
         }
 
         private void UpdateOverallStatus()

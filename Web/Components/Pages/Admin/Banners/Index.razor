@@ -62,13 +62,13 @@
                 <div>
                     @if (context.StartDate.HasValue)
                     {
-                        <MudText Typo="Typo.caption">Từ: @context.StartDate.Value.ToString("dd/MM")</MudText>
+                        <MudText Typo="Typo.caption">Từ: @context.StartDate.Value.ToLocalTime().ToString("dd/MM")</MudText>
                     }
                 </div>
                 <div>
                     @if (context.EndDate.HasValue)
                     {
-                        <MudText Typo="Typo.caption" Color="@GetExpiryColor(context)">Đến: @context.EndDate.Value.ToString("dd/MM")</MudText>
+                        <MudText Typo="Typo.caption" Color="@GetExpiryColor(context)">Đến: @context.EndDate.Value.ToLocalTime().ToString("dd/MM")</MudText>
                     }
                 </div>
             }

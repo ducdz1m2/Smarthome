@@ -63,7 +63,7 @@
                         @foreach (var slot in _availableSlots)
                         {
                             <MudSelectItem T="int" Value="@slot.Id">
-                                @slot.StartTime.ToString("hh\\:mm") - @slot.EndTime.ToString("hh\\:mm")
+                                @slot.StartTime.ToString(@"hh\:mm") - @slot.EndTime.ToString(@"hh\:mm")
                             </MudSelectItem>
                         }
                     </MudSelect>
@@ -91,9 +91,12 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Hủy</MudButton>
-        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
-            @(_isEdit ? "Cập nhật" : "Thêm mới")
-        </MudButton>
+        @if (!IsReadOnly)
+        {
+            <MudButton Color="Color.Primary" OnClick="Submit" Disabled="!_isValid">
+                @(_isEdit ? "Cập nhật" : "Thêm mới")
+            </MudButton>
+        }
     </DialogActions>
 </MudDialog>
 
@@ -113,11 +116,20 @@
     [Parameter]
     public bool IsWarranty { get; set; } = false;
 
+    [Parameter]
+    public bool IsReadOnly { get; set; } = false;
+
+    [Parameter]
+    public string? FilterCity { get; set; }
+
+    [Parameter]
+    public string? FilterDistrict { get; set; }
+
     private MudForm _form = null!;
     private bool _isValid;
     private bool _isEdit => BookingId.HasValue;
     private bool _isWarrantyMode => IsWarranty && !BookingId.HasValue;
-    
+
     private List<TechnicianResponse> _technicians = new();
     private List<InstallationSlotResponse> _availableSlots = new();
     private List<OrderResponse> _orders = new();
@@ -170,7 +182,22 @@
     {
         try
         {
-            _technicians = await TechnicianService.GetAvailableAsync();
+            // Filter technicians by location if filter parameters are provided
+            if (!string.IsNullOrWhiteSpace(FilterDistrict))
+            {
+                _technicians = await TechnicianService.GetByDistrictAsync(FilterDistrict);
+                Console.WriteLine($"[InstallationBookingDialog] Loaded {_technicians.Count} technicians filtered by district: {FilterDistrict}");
+            }
+            else if (!string.IsNullOrWhiteSpace(FilterCity))
+            {
+                _technicians = await TechnicianService.GetByCityAsync(FilterCity);
+                Console.WriteLine($"[InstallationBookingDialog] Loaded {_technicians.Count} technicians filtered by city: {FilterCity}");
+            }
+            else
+            {
+                _technicians = await TechnicianService.GetAvailableAsync();
+                Console.WriteLine($"[InstallationBookingDialog] Loaded {_technicians.Count} available technicians (no location filter)");
+            }
         }
         catch (Exception ex)
         {
@@ -272,7 +299,18 @@
             return;
         }
 
-        _request.ScheduledDate = _scheduledDate.Value;
+        // Combine scheduled date with slot start time to create proper ScheduledDate with time component
+        var selectedSlot = _availableSlots.FirstOrDefault(s => s.Id == _request.SlotId);
+        if (selectedSlot != null)
+        {
+            _request.ScheduledDate = _scheduledDate.Value.Add(selectedSlot.StartTime);
+            Console.WriteLine($"[InstallationBookingDialog Submit] ScheduledDate: {_request.ScheduledDate:dd/MM/yyyy HH:mm} (Date: {_scheduledDate.Value:dd/MM/yyyy}, StartTime: {selectedSlot.StartTime})");
+        }
+        else
+        {
+            _request.ScheduledDate = _scheduledDate.Value;
+            Console.WriteLine($"[InstallationBookingDialog Submit] No slot selected, using date only: {_request.ScheduledDate:dd/MM/yyyy}");
+        }
 
         try
         {

@@ -47,10 +47,17 @@ namespace Web.Services
         /// <summary>
         /// Get warehouses with available stock for products
         /// </summary>
-        public async Task<List<WarehouseStockForTechnicianResponse>> GetWarehousesForProductsAsync(List<int> productIds)
+        public async Task<List<WarehouseStockForTechnicianResponse>> GetWarehousesForProductsAsync(
+            List<int> productIds,
+            string? city = null,
+            string? district = null)
         {
             await AddAuthTokenAsync();
             var queryString = string.Join("&", productIds.Select(id => $"productIds={id}"));
+            if (!string.IsNullOrWhiteSpace(city))
+                queryString += $"&city={Uri.EscapeDataString(city)}";
+            if (!string.IsNullOrWhiteSpace(district))
+                queryString += $"&district={Uri.EscapeDataString(district)}";
             var response = await _httpClient.GetAsync($"api/installation/warehouses/for-products?{queryString}");
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<List<WarehouseStockForTechnicianResponse>>() ?? new();
@@ -114,6 +121,20 @@ namespace Web.Services
         {
             await AddAuthTokenAsync();
             var response = await _httpClient.PostAsJsonAsync($"api/installation/{bookingId}/reject?technicianId={technicianId}", request);
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task ReportOutOfStockAsync(int bookingId, int technicianId)
+        {
+            await AddAuthTokenAsync();
+            var response = await _httpClient.PostAsync($"api/installation/{bookingId}/report-out-of-stock?technicianId={technicianId}", null);
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task ResetFromAwaitingMaterialAsync(int bookingId)
+        {
+            await AddAuthTokenAsync();
+            var response = await _httpClient.PostAsync($"api/installation/{bookingId}/reset-from-awaiting-material", null);
             response.EnsureSuccessStatusCode();
         }
 

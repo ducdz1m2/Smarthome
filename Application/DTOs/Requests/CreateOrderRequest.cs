@@ -13,6 +13,7 @@
         public Domain.Enums.PaymentMethod PaymentMethod { get; set; } = Domain.Enums.PaymentMethod.COD;
         public DateTime? InstallationDate { get; set; }
         public int? InstallationSlotId { get; set; }
+        public int? TechnicianId { get; set; }
         public List<CreateOrderItemRequest> Items { get; set; } = new();
     }
 

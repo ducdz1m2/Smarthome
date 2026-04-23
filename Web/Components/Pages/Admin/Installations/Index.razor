@@ -6,11 +6,14 @@
 @using Microsoft.AspNetCore.Authorization
 @using Web.Helpers
 @using Web.Components.Shared.Common
+@using Web.Services
 
 @inject IInstallationService InstallationService
 @inject ITechnicianProfileService TechnicianService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject IWarehouseService WarehouseService
+@inject InstallationApiService InstallationApiService
 
 <PageHeader Title="Quản lý Lịch Lắp đặt" AddButtonText="Thêm lịch lắp đặt" OnAddClick="@(() => OpenDialog(null))" />
 
@@ -51,11 +54,11 @@
                 <MudTd DataLabel="ID">@booking.Id</MudTd>
                 <MudTd DataLabel="Đơn hàng">#@booking.OrderId</MudTd>
                 <MudTd DataLabel="Kỹ thuật viên">@(booking.TechnicianName ?? "Chưa phân công")</MudTd>
-                <MudTd DataLabel="Ngày lắp">@booking.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Ngày lắp">@booking.ScheduledDate.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
                 <MudTd DataLabel="Khung giờ">
                     @if (booking.StartTime.HasValue && booking.EndTime.HasValue)
                     {
-                        <span>@booking.StartTime.Value.ToString("hh\\:mm") - @booking.EndTime.Value.ToString("hh\\:mm")</span>
+                        <span>@booking.StartTime.Value.ToString(@"hh\:mm") - @booking.EndTime.Value.ToString(@"hh\:mm")</span>
                     }
                     else
                     {
@@ -88,6 +91,7 @@
                     <MudSelectItem T="string" Value="@("Installing")">Đang bảo hành</MudSelectItem>
                     <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
                     <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("AwaitingMaterial")">Chờ vật tư</MudSelectItem>
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
@@ -112,11 +116,11 @@
                 <MudTd DataLabel="ID">@booking.Id</MudTd>
                 <MudTd DataLabel="Đơn hàng">#@booking.OrderId</MudTd>
                 <MudTd DataLabel="Kỹ thuật viên">@(booking.TechnicianName ?? "Chưa phân công")</MudTd>
-                <MudTd DataLabel="Ngày bảo hành">@booking.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Ngày bảo hành">@booking.ScheduledDate.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
                 <MudTd DataLabel="Khung giờ">
                     @if (booking.StartTime.HasValue && booking.EndTime.HasValue)
                     {
-                        <span>@booking.StartTime.Value.ToString("hh\\:mm") - @booking.EndTime.Value.ToString("hh\\:mm")</span>
+                        <span>@booking.StartTime.Value.ToString(@"hh\:mm") - @booking.EndTime.Value.ToString(@"hh\:mm")</span>
                     }
                     else
                     {
@@ -129,9 +133,21 @@
                     </MudChip>
                 </MudTd>
                 <MudTd>
-                    <ActionButtons ShowView="false" ShowAdd="false"
-                                  OnEdit="@(() => OpenDialog(booking))"
-                                  OnDelete="@(() => DeleteItem(booking))" />
+                    @if (booking.Status == "AwaitingMaterial")
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenTransferDialog(booking))">
+                            Chuyển kho
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small" OnClick="@(() => OpenDialog(booking))" Class="ml-1">
+                            Sửa
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <ActionButtons ShowView="false" ShowAdd="false"
+                                      OnEdit="@(() => OpenDialog(booking))"
+                                      OnDelete="@(() => DeleteItem(booking))" />
+                    }
                 </MudTd>
             </RowTemplate>
         </DataTable>
@@ -173,11 +189,11 @@
                 <MudTd DataLabel="ID">@booking.Id</MudTd>
                 <MudTd DataLabel="Đơn hàng">#@booking.OrderId</MudTd>
                 <MudTd DataLabel="Kỹ thuật viên">@(booking.TechnicianName ?? "Chưa phân công")</MudTd>
-                <MudTd DataLabel="Ngày tháo dỡ">@booking.ScheduledDate.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Ngày tháo dỡ">@booking.ScheduledDate.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
                 <MudTd DataLabel="Khung giờ">
                     @if (booking.StartTime.HasValue && booking.EndTime.HasValue)
                     {
-                        <span>@booking.StartTime.Value.ToString("hh\\:mm") - @booking.EndTime.Value.ToString("hh\\:mm")</span>
+                        <span>@booking.StartTime.Value.ToString(@"hh\:mm") - @booking.EndTime.Value.ToString(@"hh\:mm")</span>
                     }
                     else
                     {
@@ -308,6 +324,64 @@
             {
                 Snackbar.Add($"Lỗi khi xóa: {ex.Message}", Severity.Error);
             }
+        }
+    }
+
+    private async Task OpenTransferDialog(InstallationBookingListResponse booking)
+    {
+        try
+        {
+            var bookingDetails = await InstallationService.GetByIdAsync(booking.Id);
+            if (bookingDetails == null || !bookingDetails.Products.Any())
+            {
+                Snackbar.Add("Không tìm thấy sản phẩm trong booking", Severity.Warning);
+                return;
+            }
+
+            // Find warehouse in technician's area (district/city)
+            var warehouses = await WarehouseService.GetAllAsync();
+            int toWarehouseId = 0;
+
+            if (!string.IsNullOrWhiteSpace(bookingDetails.District))
+            {
+                toWarehouseId = warehouses.FirstOrDefault(w => w.AddressDistrict == bookingDetails.District)?.Id ?? 0;
+            }
+
+            if (toWarehouseId == 0 && !string.IsNullOrWhiteSpace(bookingDetails.City))
+            {
+                toWarehouseId = warehouses.FirstOrDefault(w => w.AddressCity == bookingDetails.City)?.Id ?? 0;
+            }
+
+            // Don't filter by product availability for now - let user select any warehouse
+            // The API call for filtering is causing 401 errors
+            var filteredWarehouses = warehouses;
+
+            var parameters = new DialogParameters<WarehouseTransferDialog>
+            {
+                { x => x.SelectedProductId, bookingDetails.Products.First().ProductId },
+                { x => x.AvailableWarehouses, filteredWarehouses }
+            };
+
+            if (toWarehouseId > 0)
+            {
+                parameters.Add(x => x.ToWarehouseId, toWarehouseId);
+            }
+
+            var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+            var dialog = await DialogService.ShowAsync<WarehouseTransferDialog>("Chuyển kho", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result.Canceled)
+            {
+                // After successful transfer, reset booking status to Assigned
+                await InstallationService.ResetFromAwaitingMaterialAsync(booking.Id);
+                Snackbar.Add("Đã chuyển kho và reset trạng thái booking", Severity.Success);
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi khi mở dialog chuyển kho: {ex.Message}", Severity.Error);
         }
     }
 }

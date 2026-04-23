@@ -616,8 +616,8 @@
             }
         }
 
-        @* Nút Đổi lịch - hiển thị khi có lắp đặt và chưa hoàn thành và chưa đổi lịch *@
-        @if (_hasInstallation && _installationBooking != null && _installationBooking.Status != "Completed" && _installationBooking.CustomerRescheduleCount < 1)
+        @* Nút Đổi lịch - hiển thị khi có lắp đặt và chưa bàn giao KTV và chưa hoàn thành và chưa đổi lịch *@
+        @if (_hasInstallation && _installationBooking != null && _installationBooking.Status == "Pending" && _installationBooking.CustomerRescheduleCount < 1)
         {
             <MudButton Color="Color.Tertiary" OnClick="OpenRescheduleDialog" StartIcon="@Icons.Material.Filled.Event">
                 Đổi lịch lắp đặt

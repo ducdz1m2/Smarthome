@@ -3,6 +3,8 @@
 @using Application.Interfaces.Services
 @using MudBlazor
 @using System.Text.Json
+@using Web.Services
+@using System.Net.Http.Headers
 
 <MudDialog>
     <TitleContent>
@@ -14,7 +16,15 @@
                 <MudSelect T="int" Label="Kho nguồn" @bind-Value="_fromWarehouseId" Required="true">
                     @foreach (var warehouse in _warehouses)
                     {
-                        <MudSelectItem T="int" Value="@warehouse.Id">@warehouse.Name (@warehouse.Code)</MudSelectItem>
+                        var stock = GetWarehouseStock(warehouse.Id);
+                        var hasStock = stock > 0;
+                        <MudSelectItem T="int" Value="@warehouse.Id">
+                            @warehouse.Name (@warehouse.Code) - Tồn: @stock
+                            @if (!hasStock)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Error"> (Không đủ)</MudText>
+                            }
+                        </MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
@@ -78,10 +88,13 @@
     
     [Parameter] public int FromWarehouseId { get; set; }
     [Parameter] public int SelectedProductId { get; set; }
+    [Parameter] public int ToWarehouseId { get; set; }
+    [Parameter] public List<WarehouseResponse>? AvailableWarehouses { get; set; }
     
     private List<WarehouseResponse> _warehouses = new();
     private List<ProductInventoryResponse> _products = new();
     private Dictionary<int, int> _productQuantities = new();
+    private Dictionary<int, int> _warehouseStock = new(); // Warehouse ID -> Available stock
     
     private int _fromWarehouseId = 0;
     private int _toWarehouseId = 0;
@@ -95,6 +108,8 @@
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private HttpClient Http { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private InstallationApiService InstallationApiService { get; set; } = null!;
+    [Inject] private JwtTokenHandler TokenHandler { get; set; } = null!;
     
     protected override async Task OnInitializedAsync()
     {
@@ -102,6 +117,12 @@
         if (FromWarehouseId > 0)
         {
             _fromWarehouseId = FromWarehouseId;
+        }
+        
+        // Pre-fill to warehouse if provided
+        if (ToWarehouseId > 0)
+        {
+            _toWarehouseId = ToWarehouseId;
         }
         
         // Pre-fill product if provided
@@ -117,13 +138,80 @@
     {
         try
         {
-            _warehouses = await WarehouseService.GetAllAsync();
+            // Use available warehouses if provided, otherwise load all
+            if (AvailableWarehouses != null && AvailableWarehouses.Any())
+            {
+                _warehouses = AvailableWarehouses;
+            }
+            else
+            {
+                _warehouses = await WarehouseService.GetAllAsync();
+            }
+            
             _products = await InventoryService.GetProductInventoryAsync();
+
+            // Load stock for the selected product in each warehouse
+            if (SelectedProductId > 0)
+            {
+                await LoadWarehouseStock();
+            }
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Lỗi khi tải dữ liệu: {ex.Message}", Severity.Error);
         }
+    }
+
+    private async Task LoadWarehouseStock()
+    {
+        try
+        {
+            Console.WriteLine($"[LoadWarehouseStock] SelectedProductId: {SelectedProductId}");
+            Console.WriteLine($"[LoadWarehouseStock] Loading stock for {_warehouses.Count} warehouses");
+            
+            // Use InventoryService to get stock for each warehouse
+            foreach (var warehouse in _warehouses)
+            {
+                Console.WriteLine($"[LoadWarehouseStock] Checking warehouse {warehouse.Id}");
+                
+                var productInventory = await InventoryService.GetProductInventoryByIdAsync(SelectedProductId, warehouse.Id);
+                
+                if (productInventory != null)
+                {
+                    var totalAvailable = productInventory.AvailableStock;
+                    _warehouseStock[warehouse.Id] = totalAvailable;
+                    Console.WriteLine($"[LoadWarehouseStock] Warehouse {warehouse.Id}: {totalAvailable} available");
+                }
+                else
+                {
+                    _warehouseStock[warehouse.Id] = 0;
+                    Console.WriteLine($"[LoadWarehouseStock] Warehouse {warehouse.Id}: 0 (no inventory data)");
+                }
+            }
+            
+            // Log final warehouse stock dictionary
+            Console.WriteLine($"[LoadWarehouseStock] Final warehouse stock dict: {_warehouseStock.Count} entries");
+            foreach (var kvp in _warehouseStock)
+            {
+                Console.WriteLine($"[LoadWarehouseStock] Warehouse {kvp.Key}: {kvp.Value}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LoadWarehouseStock] Exception: {ex.Message}");
+            Console.WriteLine($"[LoadWarehouseStock] Stack trace: {ex.StackTrace}");
+            Snackbar.Add($"Lỗi khi tải tồn kho: {ex.Message}", Severity.Error);
+            // Set all to 0 on error
+            foreach (var warehouse in _warehouses)
+            {
+                _warehouseStock[warehouse.Id] = 0;
+            }
+        }
+    }
+
+    private int GetWarehouseStock(int warehouseId)
+    {
+        return _warehouseStock.TryGetValue(warehouseId, out var stock) ? stock : 0;
     }
     
     private void AddProduct()
@@ -180,6 +268,9 @@
         
         try
         {
+            // Add auth token
+            var token = await TokenHandler.GetTokenAsync();
+            
             var request = new InitiateTransferRequest
             {
                 FromWarehouseId = _fromWarehouseId,
@@ -189,7 +280,15 @@
             };
             
             var url = $"{NavigationManager.BaseUri}api/warehouse/transfer/initiate";
-            var response = await Http.PostAsJsonAsync(url, request);
+            
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+            if (!string.IsNullOrEmpty(token))
+            {
+                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+            httpRequest.Content = JsonContent.Create(request);
+            
+            var response = await Http.SendAsync(httpRequest);
             
             if (response.IsSuccessStatusCode)
             {
@@ -199,7 +298,15 @@
                 // Execute the transfer immediately
                 var executeRequest = new ExecuteTransferRequest { TransferId = transferId };
                 var executeUrl = $"{NavigationManager.BaseUri}api/warehouse/transfer/execute";
-                var executeResponse = await Http.PostAsJsonAsync(executeUrl, executeRequest);
+                
+                var executeHttpRequest = new HttpRequestMessage(HttpMethod.Post, executeUrl);
+                if (!string.IsNullOrEmpty(token))
+                {
+                    executeHttpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                }
+                executeHttpRequest.Content = JsonContent.Create(executeRequest);
+                
+                var executeResponse = await Http.SendAsync(executeHttpRequest);
                 
                 if (executeResponse.IsSuccessStatusCode)
                 {

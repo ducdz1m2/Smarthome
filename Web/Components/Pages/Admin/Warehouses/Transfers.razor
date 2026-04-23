@@ -59,9 +59,9 @@
         <MudTd DataLabel="Trạng thái">
             <MudChip Color="@GetStatusColor(context.Status)" Size="Size.Small" T="string">@GetStatusText(context.Status)</MudChip>
         </MudTd>
-        <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+        <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
         <MudTd DataLabel="Ngày thực hiện">
-            @(context.ExecutedAt?.ToString("dd/MM/yyyy HH:mm") ?? "-")
+            @(context.ExecutedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")
         </MudTd>
         <MudTd>
             @if (context.Status == "Pending")

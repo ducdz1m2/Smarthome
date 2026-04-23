@@ -7,9 +7,10 @@ using Domain.Entities.Inventory;
 using Domain.Entities.Sales;
 using Domain.Enums;
 using Domain.Exceptions;
-using Domain.ValueObjects;
+using Domain.Events;
 using Domain.Interfaces;
 using Domain.Services;
+using Domain.ValueObjects;
 
 namespace Application.Services
 {
@@ -30,6 +31,10 @@ namespace Application.Services
         private readonly ICurrentUserService _currentUserService;
         private readonly IWarrantyRepository _warrantyRepository;
         private readonly IWarrantyRequestRepository _warrantyRequestRepository;
+        private readonly INotificationService _notificationService;
+        private readonly IEmailService _emailService;
+        private readonly Domain.Repositories.IUserRepository _userRepository;
+        private readonly IDomainEventDispatcher _eventDispatcher;
 
         public OrderService(
             IOrderRepository orderRepository,
@@ -46,7 +51,11 @@ namespace Application.Services
             IProductVariantRepository productVariantRepository,
             ICurrentUserService currentUserService,
             IWarrantyRepository warrantyRepository,
-            IWarrantyRequestRepository warrantyRequestRepository)
+            IWarrantyRequestRepository warrantyRequestRepository,
+            INotificationService notificationService,
+            IEmailService emailService,
+            Domain.Repositories.IUserRepository userRepository,
+            IDomainEventDispatcher eventDispatcher)
         {
             _orderRepository = orderRepository;
             _productRepository = productRepository;
@@ -63,6 +72,10 @@ namespace Application.Services
             _currentUserService = currentUserService;
             _warrantyRepository = warrantyRepository;
             _warrantyRequestRepository = warrantyRequestRepository;
+            _notificationService = notificationService;
+            _emailService = emailService;
+            _userRepository = userRepository;
+            _eventDispatcher = eventDispatcher;
         }
 
         public async Task<List<OrderResponse>> GetAllAsync()
@@ -115,6 +128,7 @@ namespace Application.Services
         public async Task<int> CreateAsync(CreateOrderRequest request)
         {
             Console.WriteLine($"[OrderService] CreateAsync called for UserId: {request.UserId}");
+            Console.WriteLine($"[OrderService] TechnicianId: {request.TechnicianId}, InstallationSlotId: {request.InstallationSlotId}");
 
             var order = Order.Create(
                 request.UserId,
@@ -184,10 +198,57 @@ namespace Application.Services
             await _orderRepository.AddAsync(order);
             Console.WriteLine($"[OrderService] About to call SaveChangesAsync");
             await _orderRepository.SaveChangesAsync();
-            Console.WriteLine($"[OrderService] SaveChangesAsync completed");
+            Console.WriteLine($"[OrderService] SaveChangesAsync completed, OrderId: {order.Id}");
+
+            // Dispatch OrderCreatedEvent after order is saved to DB to ensure OrderId is assigned
+            await _eventDispatcher.DispatchAsync(new OrderCreatedEvent(
+                order.Id,
+                order.UserId,
+                order.OrderNumber,
+                order.TotalAmount.Amount));
+            Console.WriteLine($"[OrderService] OrderCreatedEvent dispatched with OrderId: {order.Id}");
 
             // Handle warehouse allocations
             await HandleWarehouseAllocationsAsync(order, request);
+
+            // Create installation booking immediately if customer selected technician and slot
+            if (request.TechnicianId.HasValue && request.InstallationSlotId.HasValue)
+            {
+                Console.WriteLine($"[OrderService] Customer selected technician {request.TechnicianId} and slot {request.InstallationSlotId}, creating installation booking immediately");
+
+                var hasInstallItems = order.Items.Any(i => i.RequiresInstallation);
+                if (hasInstallItems)
+                {
+                    // Create installation booking for all installation items (without changing order status)
+                    var installItems = order.Items.Where(i => i.RequiresInstallation).ToList();
+                    foreach (var installItem in installItems)
+                    {
+                        var bookingRequest = new CreateInstallationBookingRequest
+                        {
+                            OrderId = order.Id,
+                            TechnicianId = request.TechnicianId.Value,
+                            SlotId = request.InstallationSlotId.Value,
+                            ScheduledDate = request.InstallationDate ?? DateTime.Today.AddDays(1)
+                        };
+
+                        var bookingId = await _installationService.CreateAsync(bookingRequest);
+
+                        // Assign booking to order item
+                        var orderForUpdate = await _orderRepository.GetByIdAsync(order.Id);
+                        if (orderForUpdate != null)
+                        {
+                            var orderItem = orderForUpdate.Items.FirstOrDefault(i => i.Id == installItem.Id);
+                            if (orderItem != null)
+                            {
+                                orderItem.AssignInstallation(bookingId);
+                                await _orderRepository.SaveChangesAsync();
+                            }
+                        }
+                    }
+
+                    Console.WriteLine($"[OrderService] Installation booking created successfully");
+                }
+            }
 
             return order.Id;
         }
@@ -313,22 +374,31 @@ namespace Application.Services
 
         private async Task<int> CreateInstallationBookingAsync(int orderId, CreateOrderRequest request)
         {
-            // Get available technicians based on shipping district
-            var technicians = await _technicianProfileService.GetByDistrictAsync(request.ShippingDistrict);
-
-            // Fallback to city if no technician found for the district
-            if (!technicians.Any())
+            // Use the technician selected by the customer if provided
+            int technicianId;
+            if (request.TechnicianId.HasValue)
             {
-                technicians = await _technicianProfileService.GetByCityAsync(request.ShippingCity);
+                technicianId = request.TechnicianId.Value;
             }
-
-            if (!technicians.Any())
+            else
             {
-                throw new DomainException($"Không tìm thấy kỹ thuật viên cho khu vực {request.ShippingDistrict} hoặc thành phố {request.ShippingCity}. Vui lòng chọn khu vực khác hoặc liên hệ hỗ trợ.");
-            }
+                // Fallback to auto-select technician (for backward compatibility)
+                var technicians = await _technicianProfileService.GetByDistrictAsync(request.ShippingDistrict);
 
-            // Select the first available technician (could be enhanced with load balancing)
-            var technicianId = technicians.First(t => t.IsAvailable)?.Id ?? technicians.First().Id;
+                // Fallback to city if no technician found for the district
+                if (!technicians.Any())
+                {
+                    technicians = await _technicianProfileService.GetByCityAsync(request.ShippingCity);
+                }
+
+                if (!technicians.Any())
+                {
+                    throw new DomainException($"Không tìm thấy kỹ thuật viên cho khu vực {request.ShippingDistrict} hoặc thành phố {request.ShippingCity}. Vui lòng chọn khu vực khác hoặc liên hệ hỗ trợ.");
+                }
+
+                // Select the first available technician (could be enhanced with load balancing)
+                technicianId = technicians.First(t => t.IsAvailable)?.Id ?? technicians.First().Id;
+            }
 
             // Get available slot for the selected date and technician
             var slots = await _installationSlotService.GetAvailableSlotsAsync(
@@ -419,10 +489,15 @@ namespace Application.Services
 
             // Check if order was in Pending status before confirming
             var isWasPending = orderWithDetails.Status.ToString() == "Pending";
+            var oldStatus = orderWithDetails.Status;
+
+            Console.WriteLine($"[ConfirmAsync] OrderId: {id}, Status: {orderWithDetails.Status}, WasPending: {isWasPending}");
 
             // Calculate item types
             var hasInstallItems = orderWithDetails.Items.Any(i => i.RequiresInstallation);
             var hasShipItems = orderWithDetails.Items.Any(i => !i.RequiresInstallation);
+
+            Console.WriteLine($"[ConfirmAsync] hasInstallItems: {hasInstallItems}, hasShipItems: {hasShipItems}");
 
             // Only call Confirm() if order is in Pending status
             if (isWasPending)
@@ -433,7 +508,25 @@ namespace Application.Services
                     throw new DomainException("Không tìm thấy đơn hàng");
 
                 order.Confirm(hasInstallItems, hasShipItems);
+                Console.WriteLine($"[ConfirmAsync] After Confirm, Status: {order.Status}");
                 await _orderRepository.SaveChangesAsync();
+
+                // Reload to verify status was saved
+                order = await _orderRepository.GetByIdAsync(id);
+                Console.WriteLine($"[ConfirmAsync] After SaveChangesAsync, Status: {order?.Status}");
+
+                // Send notification to customer
+                if (order != null)
+                {
+                    await _notificationService.NotifyOrderStatusChangedAsync(id, orderWithDetails.UserId, oldStatus, order.Status);
+
+                    // Send email
+                    var user = await _userRepository.GetByIdAsync(orderWithDetails.UserId);
+                    if (user != null && !string.IsNullOrEmpty(user.Email))
+                    {
+                        await _emailService.SendOrderStatusChangedEmailAsync(user.Email, orderWithDetails.OrderNumber, order.Status.ToString());
+                    }
+                }
             }
 
             // Handle warehouse allocations if provided
@@ -453,13 +546,20 @@ namespace Application.Services
                     if (order == null)
                         throw new DomainException("Không tìm thấy đơn hàng");
                     
-                    order.StartInstallationFlow();
+                    order.StartInstallationFlow(hasInstallItems);
                     await _orderRepository.SaveChangesAsync();
                     
-                    // Create installation booking for each installation item
+                    // Create installation booking for each installation item (only if not already created)
                     var installItems = orderWithDetails.Items.Where(i => i.RequiresInstallation).ToList();
                     foreach (var installItem in installItems)
                     {
+                        // Skip if booking already created by customer during checkout
+                        if (installItem.InstallationBookingId.HasValue)
+                        {
+                            Console.WriteLine($"[ConfirmAsync] OrderItem {installItem.Id} already has installation booking {installItem.InstallationBookingId}, skipping creation");
+                            continue;
+                        }
+
                         var request = new CreateOrderRequest
                         {
                             ShippingDistrict = orderWithDetails.ShippingAddress?.District ?? "",
@@ -508,10 +608,18 @@ namespace Application.Services
 
                     order.StartInstallationFlow(hasInstallItems);
                     await _orderRepository.SaveChangesAsync();
-                    
+
+                    // Create installation booking for each installation item (only if not already created)
                     var installItems = orderWithDetails.Items.Where(i => i.RequiresInstallation).ToList();
                     foreach (var installItem in installItems)
                     {
+                        // Skip if booking already created by customer during checkout
+                        if (installItem.InstallationBookingId.HasValue)
+                        {
+                            Console.WriteLine($"[ConfirmAsync] OrderItem {installItem.Id} already has installation booking {installItem.InstallationBookingId}, skipping creation");
+                            continue;
+                        }
+
                         var request = new CreateOrderRequest
                         {
                             ShippingDistrict = orderWithDetails.ShippingAddress?.District ?? "",
@@ -519,15 +627,16 @@ namespace Application.Services
                             InstallationDate = DateTime.Today
                         };
                         var bookingId = await CreateInstallationBookingAsync(orderWithDetails.Id, request);
-                        
+
+                        // Reload order to assign installation
                         order = await _orderRepository.GetByIdAsync(id);
                         if (order == null)
                             throw new DomainException("Không tìm thấy đơn hàng");
-                        
+
                         orderWithDetails = await _orderRepository.GetByIdWithDetailsAsync(id);
                         if (orderWithDetails == null)
                             throw new DomainException("Không tìm thấy đơn hàng");
-                        
+
                         var updatedInstallItem = orderWithDetails.Items.FirstOrDefault(i => i.Id == installItem.Id);
                         if (updatedInstallItem != null)
                         {
@@ -574,6 +683,25 @@ namespace Application.Services
             {
                 if (allocationsByItem.TryGetValue(orderItem.Id, out var itemAllocations) && itemAllocations.Any())
                 {
+                    // Delete existing allocations for this order item before adding new ones
+                    var existingAllocations = await _orderWarehouseAllocationRepository.GetByOrderItemIdAsync(orderItem.Id);
+                    Console.WriteLine($"[HandleWarehouseAllocationsForConfirmationAsync] Deleting {existingAllocations.Count} existing allocations for OrderItemId: {orderItem.Id}");
+                    foreach (var existingAlloc in existingAllocations)
+                    {
+                        // Release reserved stock from the warehouse
+                        var productWarehouse = await _productWarehouseRepository.GetByProductVariantAndWarehouseForUpdateAsync(
+                            orderItem.ProductId,
+                            orderItem.VariantId,
+                            existingAlloc.WarehouseId
+                        );
+                        if (productWarehouse != null)
+                        {
+                            productWarehouse.Release(existingAlloc.AllocatedQuantity);
+                            Console.WriteLine($"[HandleWarehouseAllocationsForConfirmationAsync] Released {existingAlloc.AllocatedQuantity} reserved stock from WarehouseId: {existingAlloc.WarehouseId}");
+                        }
+                        _orderWarehouseAllocationRepository.Delete(existingAlloc);
+                    }
+
                     await ApplyManualWarehouseAllocationsAsync(orderItem, itemAllocations);
                 }
                 else
@@ -620,11 +748,23 @@ namespace Application.Services
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
+            var oldStatus = order.Status;
+
             // Note: Stock is reserved during confirmation (ApplyManualWarehouseAllocationsAsync)
             // Actual dispatch happens via OrderShippingStartedEvent in OrderInventoryHandler
 
             order.StartShipping();
             await _orderRepository.SaveChangesAsync();
+
+            // Send notification to customer
+            await _notificationService.NotifyOrderStatusChangedAsync(id, order.UserId, oldStatus, order.Status);
+
+            // Send email
+            var user = await _userRepository.GetByIdAsync(order.UserId);
+            if (user != null && !string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendOrderStatusChangedEmailAsync(user.Email, order.OrderNumber, order.Status.ToString());
+            }
         }
 
         public async Task MarkDeliveredAsync(int id)
@@ -634,10 +774,22 @@ namespace Application.Services
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
+            var oldStatus = order.Status;
+
             // TODO: Get actual userId from authentication context
             order.MarkDelivered(0);
             await _orderRepository.SaveChangesAsync();
             Console.WriteLine($"[MarkDeliveredAsync] Order {id} marked as delivered, new status: {order.Status}");
+
+            // Send notification to customer
+            await _notificationService.NotifyOrderStatusChangedAsync(id, order.UserId, oldStatus, order.Status);
+
+            // Send email
+            var user = await _userRepository.GetByIdAsync(order.UserId);
+            if (user != null && !string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendOrderStatusChangedEmailAsync(user.Email, order.OrderNumber, order.Status.ToString());
+            }
         }
 
         public async Task CancelAsync(int id, string reason)
@@ -646,6 +798,8 @@ namespace Application.Services
             var order = await _orderRepository.GetByIdWithDetailsForUpdateAsync(id);
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
+
+            var oldStatus = order.Status;
 
             // Return stock to warehouse if order hasn't been shipped yet
             if (order.Status.ToString() != "Shipping" && order.Status.ToString() != "Delivered" && order.Status.ToString() != "Completed")
@@ -674,6 +828,16 @@ namespace Application.Services
             order.Cancel(reason, userId);
             await _productWarehouseRepository.SaveChangesAsync();
             await _orderRepository.SaveChangesAsync();
+
+            // Send notification to customer
+            await _notificationService.NotifyOrderStatusChangedAsync(id, order.UserId, oldStatus, order.Status);
+
+            // Send email
+            var user = await _userRepository.GetByIdAsync(order.UserId);
+            if (user != null && !string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendOrderStatusChangedEmailAsync(user.Email, order.OrderNumber, order.Status.ToString());
+            }
         }
 
         public async Task CompleteAsync(int id)
@@ -823,6 +987,8 @@ namespace Application.Services
                 ReceiverName = order.ReceiverName,
                 ReceiverPhone = order.ReceiverPhone?.ToString(),
                 ShippingAddress = shippingAddress,
+                ShippingCity = order.ShippingAddress?.City,
+                ShippingDistrict = order.ShippingAddress?.District,
                 TotalAmount = order.TotalAmount.Amount,
                 SubTotal = order.Items.Sum(i => i.GetSubtotal()),
                 DiscountAmount = order.DiscountAmount.Amount,

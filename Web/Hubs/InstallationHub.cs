@@ -96,4 +96,19 @@ public class InstallationHub : Hub
                 RemainingSlots = remainingSlots 
             });
     }
+
+    public async Task NotifyBookingStatusChanged(int bookingId, int orderId, string status)
+    {
+        await Clients.Group($"order_{orderId}")
+            .SendAsync("BookingStatusChanged", new { 
+                BookingId = bookingId, 
+                OrderId = orderId, 
+                Status = status 
+            });
+    }
+
+    public async Task JoinOrderGroup(int orderId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"order_{orderId}");
+    }
 }

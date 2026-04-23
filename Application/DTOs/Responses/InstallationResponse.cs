@@ -14,6 +14,7 @@ namespace Application.DTOs.Responses
         public string CustomerPhone { get; set; } = string.Empty;
         public string ShippingAddress { get; set; } = string.Empty;
         public string? District { get; set; }
+        public string? City { get; set; }
         
         // Sản phẩm cần lắp
         public List<InstallationProductItem> Products { get; set; } = new();
@@ -84,6 +85,8 @@ namespace Application.DTOs.Responses
         public string WarehouseName { get; set; } = string.Empty;
         public string WarehouseCode { get; set; } = string.Empty;
         public string WarehouseAddress { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string District { get; set; } = string.Empty;
         public List<ProductStockForTechnician> AvailableProducts { get; set; } = new();
     }
 

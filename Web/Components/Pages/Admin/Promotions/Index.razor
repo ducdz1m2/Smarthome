@@ -56,12 +56,12 @@
         <MudTd DataLabel="Đơn tối thiểu">@(context.MinOrderAmount?.ToString("N0") ?? "-")</MudTd>
         <MudTd DataLabel="Bắt đầu">
             <MudText Color="@GetDateColor(context.StartDate, true)" Typo="Typo.body2">
-                @context.StartDate.ToString("dd/MM/yyyy")
+                @context.StartDate.ToLocalTime().ToString("dd/MM/yyyy")
             </MudText>
         </MudTd>
         <MudTd DataLabel="Kết thúc">
             <MudText Color="@GetDateColor(context.EndDate, false)" Typo="Typo.body2">
-                @context.EndDate.ToString("dd/MM/yyyy")
+                @context.EndDate.ToLocalTime().ToString("dd/MM/yyyy")
             </MudText>
         </MudTd>
         <MudTd DataLabel="Ưu tiên">@context.Priority</MudTd>

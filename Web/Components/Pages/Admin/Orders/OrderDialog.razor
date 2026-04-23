@@ -4,11 +4,16 @@
 @using Domain.Enums
 @using Microsoft.AspNetCore.Authorization
 @using Web.Helpers
+@using Web.Components.Pages.Admin.Installations
 
 @inject IOrderService OrderService
 @inject ISnackbar Snackbar
 @inject IWarehouseService WarehouseService
 @inject IInventoryService InventoryService
+@inject IInstallationService InstallationService
+@inject ITechnicianProfileService TechnicianService
+@inject IInstallationSlotService SlotService
+@inject IDialogService DialogService
 
 <MudDialog>
     <DialogContent>
@@ -220,6 +225,52 @@
                         </MudAlert>
                     </MudItem>
                 }
+
+                <!-- Installation Booking Section -->
+                @if (_order.Items.Any(i => i.RequiresInstallation))
+                {
+                    <MudItem xs="12">
+                        <MudCard Elevation="0" Class="mt-4">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">Lắp đặt / Bảo hành</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                @if (_installationBookings.Any())
+                                {
+                                    @foreach (var booking in _installationBookings)
+                                    {
+                                        <MudAlert Severity="Severity.Info" Class="mb-3">
+                                            <div>
+                                                <strong>@(booking.IsWarranty ? "Đã có lịch bảo hành:" : "Đã có lịch lắp đặt:")</strong>
+                                                <div>Kỹ thuật viên: @booking.TechnicianName</div>
+                                                <div>Ngày: @booking.ScheduledDate.ToLocalTime().ToString("dd/MM/yyyy")</div>
+                                                <div>Khung giờ: @(booking.StartTime.HasValue && booking.EndTime.HasValue ? $"{booking.StartTime.Value:hh\\:mm} - {booking.EndTime.Value:hh\\:mm}" : (booking.SlotId.HasValue ? $"Slot #{booking.SlotId}" : "Chưa chọn"))</div>
+                                                <div>Trạng thái: @StatusHelper.GetInstallationStatusText(booking.Status, booking.IsUninstall)</div>
+                                            </div>
+                                        </MudAlert>
+                                    }
+                                    @if (_installationBookings.First().Status == "Pending" || _installationBookings.First().Status == "Assigned")
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenInstallationBookingDialog">
+                                            Cập nhật lịch lắp đặt
+                                        </MudButton>
+                                    }
+                                }
+                                else
+                                {
+                                    <MudAlert Severity="Severity.Warning" Class="mb-3">
+                                        Đơn hàng này cần lắp đặt nhưng chưa có lịch. Vui lòng chọn kỹ thuật viên và lịch hẹn.
+                                    </MudAlert>
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenInstallationBookingDialog">
+                                        Tạo lịch lắp đặt
+                                    </MudButton>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
             </MudGrid>
         }
     </DialogContent>
@@ -230,19 +281,31 @@
         {
             @if (_order.Status == "Pending")
             {
-                <MudButton Color="Color.Primary" OnClick="ConfirmOrder" StartIcon="@Icons.Material.Filled.CheckCircle">
-                    Xác nhận
-                </MudButton>
+                @if (IsCombinedOrder())
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-2">
+                        <MudText Typo="Typo.body2">
+                            <strong>Đơn ghép:</strong> Đơn hàng này có cả sản phẩm cần lắp đặt và cần giao hàng.
+                            Vui lòng tạo lịch lắp đặt cho kỹ thuật viên. Quản trị viên không thể xác nhận trực tiếp đơn ghép.
+                        </MudText>
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudButton Color="Color.Primary" OnClick="ConfirmOrder" StartIcon="@Icons.Material.Filled.CheckCircle">
+                        Xác nhận
+                    </MudButton>
+                }
             }
 
-            @if (_order.Status == "AwaitingPickup")
+            @if (_order.Status == "AwaitingPickup" && !IsCombinedOrder())
             {
                 <MudButton Color="Color.Primary" OnClick="StartShipping" StartIcon="@Icons.Material.Filled.LocalShipping">
                     Bắt đầu giao
                 </MudButton>
             }
 
-            @if (_order.Status == "Shipping")
+            @if (_order.Status == "Shipping" && !IsCombinedOrder())
             {
                 <MudButton Color="Color.Success" OnClick="MarkDelivered" StartIcon="@Icons.Material.Filled.Done">
                     Đã giao
@@ -282,6 +345,7 @@
     private Dictionary<int, List<WarehouseAllocationItem>> _warehouseAllocations = new();
     private Dictionary<int, Dictionary<int, int>> _availableStockByWarehouse = new();
     private Dictionary<int, Dictionary<int, bool>> _checkboxStates = new();
+    private List<InstallationBookingResponse> _installationBookings = new();
 
     private class WarehouseAllocationItem
     {
@@ -295,6 +359,7 @@
         Console.WriteLine($"[OrderDialog OnInitializedAsync] Initializing dialog with OrderId: {OrderId}, IsReadOnly: {IsReadOnly}");
         await LoadWarehouses();
         await LoadOrder();
+        await LoadInstallationBooking();
         Console.WriteLine($"[OrderDialog OnInitializedAsync] Dialog initialized, _order.Id: {_order?.Id}, _warehouseAllocations count: {_warehouseAllocations.Count}");
         foreach (var kvp in _warehouseAllocations)
         {
@@ -615,5 +680,64 @@
     private static bool CanCancel(string status)
     {
         return status != "Completed" && status != "Cancelled" && status != "Refunded";
+    }
+
+    private bool IsCombinedOrder()
+    {
+        return _order != null && _order.HasInstallationItems && _order.HasShippingItems;
+    }
+
+    private async Task LoadInstallationBooking()
+    {
+        if (_order == null) return;
+
+        try
+        {
+            _installationBookings = await InstallationService.GetListByOrderIdAsync(OrderId);
+            Console.WriteLine($"[LoadInstallationBooking] Installation bookings loaded: {_installationBookings.Count}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LoadInstallationBooking] Error loading installation booking: {ex.Message}");
+            _installationBookings = new();
+        }
+    }
+
+    private async Task OpenInstallationBookingDialog()
+    {
+        if (_order == null) return;
+
+        // Get shipping city and district for filtering technicians
+        var city = _order.ShippingCity ?? "";
+        var district = _order.ShippingDistrict ?? "";
+
+        var parameters = new DialogParameters
+        {
+            { "OrderId", OrderId },
+            { "FilterCity", city },
+            { "FilterDistrict", district },
+            { "IsReadOnly", IsReadOnly }
+        };
+
+        // If there's an existing booking, pass it for editing
+        if (_installationBookings.Any())
+        {
+            parameters.Add("BookingId", _installationBookings.First().Id);
+        }
+
+        var dialog = await DialogService.ShowAsync<InstallationBookingDialog>(
+            _installationBookings.Any() ? "Cập nhật lịch lắp đặt" : "Tạo lịch lắp đặt",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true }
+        );
+
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            Snackbar.Add("Đã lưu lịch lắp đặt thành công", Severity.Success);
+            await LoadInstallationBooking();
+            await LoadOrder();
+            StateHasChanged();
+        }
     }
 }

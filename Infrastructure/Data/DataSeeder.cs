@@ -295,15 +295,42 @@ namespace Infrastructure.Data
             {
                 var warehouses = new[]
                 {
+                    // Hà Nội
                     Warehouse.Create("Kho chính Hà Nội", "WH-HN-001", 
                         Address.Create("123 Nguyễn Trãi", "Thanh Xuân", "Thanh Xuân", "Hà Nội"),
                         PhoneNumber.Create("0901234567"), "Nguyễn Văn A"),
+                    Warehouse.Create("Kho Hà Nội - Cầu Giấy", "WH-HN-002", 
+                        Address.Create("456 Đường Láng", "Quan Hoa", "Cầu Giấy", "Hà Nội"),
+                        PhoneNumber.Create("0901234568"), "Trần Thị B"),
+                    Warehouse.Create("Kho Hà Nội - Hoàng Mai", "WH-HN-003", 
+                        Address.Create("789 Giải Phóng", "Tam Hiệp", "Hoàng Mai", "Hà Nội"),
+                        PhoneNumber.Create("0901234569"), "Lê Văn C"),
+                    
+                    // TP.HCM
                     Warehouse.Create("Kho chính TP.HCM", "WH-HCM-001", 
                         Address.Create("456 Nguyễn Văn Linh", "Bình Chánh", "Bình Chánh", "TP.HCM"),
-                        PhoneNumber.Create("0907654321"), "Trần Văn B"),
+                        PhoneNumber.Create("0907654321"), "Trần Văn D"),
+                    Warehouse.Create("Kho TP.HCM - Quận 1", "WH-HCM-002", 
+                        Address.Create("123 Lê Lợi", "Bến Nghé", "Quận 1", "TP.HCM"),
+                        PhoneNumber.Create("0907654322"), "Phạm Thị E"),
+                    Warehouse.Create("Kho TP.HCM - Quận 7", "WH-HCM-003", 
+                        Address.Create("789 Huỳnh Tấn Phát", "Tân Tạo", "Quận 7", "TP.HCM"),
+                        PhoneNumber.Create("0907654323"), "Hoàng Văn F"),
+                    
+                    // Đà Nẵng
                     Warehouse.Create("Kho Đà Nẵng", "WH-DN-001", 
                         Address.Create("789 Võ Nguyên Giáp", "Hải Châu", "Hải Châu", "Đà Nẵng"),
-                        PhoneNumber.Create("0905432167"), "Lê Văn C")
+                        PhoneNumber.Create("0905432167"), "Lê Văn G"),
+                    
+                    // Hải Phòng
+                    Warehouse.Create("Kho Hải Phòng", "WH-HP-001", 
+                        Address.Create("123 Lê Thánh Tông", "Đằng Giang", "Hải An", "Hải Phòng"),
+                        PhoneNumber.Create("0905432168"), "Phạm Thị H"),
+                    
+                    // Cần Thơ
+                    Warehouse.Create("Kho Cần Thơ", "WH-CT-001", 
+                        Address.Create("456 Võ Văn Kiệt", "Cái Khế", "Ninh Kiều", "Cần Thơ"),
+                        PhoneNumber.Create("0905432169"), "Huỳnh Văn I")
                 };
 
                 await context.Warehouses.AddRangeAsync(warehouses);
@@ -347,18 +374,18 @@ namespace Infrastructure.Data
                     if (!product.Variants.Any())
                     {
                         // Nếu sản phẩm không có variant, tạo ProductWarehouse cho product (VariantId = null)
-                        var warehouseCount = random.Next(1, 4);
+                        // Phân phối ngẫu nhiên vào 2-4 kho
+                        var warehouseCount = random.Next(2, 5);
                         var selectedWarehouses = warehouses.OrderBy(x => random.Next()).Take(warehouseCount).ToList();
 
                         var totalStock = 0;
 
                         foreach (var warehouse in selectedWarehouses)
                         {
-                            var quantity = random.Next(0, 101);
-                            if (warehouse.Id == 1)
-                            {
-                                quantity = random.Next(20, 101);
-                            }
+                            // HN warehouses get more stock (20-50), others get 10-30
+                            var quantity = warehouse.Address.City.Contains("Hà Nội") 
+                                ? random.Next(20, 51) 
+                                : random.Next(10, 31);
 
                             var productWarehouse = ProductWarehouse.Create(product.Id, null, warehouse.Id, quantity);
                             productWarehouses.Add(productWarehouse);
@@ -372,18 +399,18 @@ namespace Infrastructure.Data
                         // Nếu sản phẩm có variants, phân phối cho từng variant
                         foreach (var variant in product.Variants)
                         {
-                            var warehouseCount = random.Next(1, 4);
+                            // Phân phối ngẫu nhiên vào 2-4 kho
+                            var warehouseCount = random.Next(2, 5);
                             var selectedWarehouses = warehouses.OrderBy(x => random.Next()).Take(warehouseCount).ToList();
 
                             var totalStock = 0;
 
                             foreach (var warehouse in selectedWarehouses)
                             {
-                                var quantity = random.Next(0, 101);
-                                if (warehouse.Id == 1)
-                                {
-                                    quantity = random.Next(20, 101);
-                                }
+                                // HN warehouses get more stock (15-40), others get 5-25
+                                var quantity = warehouse.Address.City.Contains("Hà Nội") 
+                                    ? random.Next(15, 41) 
+                                    : random.Next(5, 26);
 
                                 var productWarehouse = ProductWarehouse.Create(product.Id, variant.Id, warehouse.Id, quantity);
                                 productWarehouses.Add(productWarehouse);
@@ -761,136 +788,58 @@ namespace Infrastructure.Data
                 var productData = new List<(string Name, string Category, string Brand, int Price, bool RequiresInstallation)>
                 {
                     // Tủ lạnh
-                    ("Samsung Inverter 450L RT46K6335S9", "Tủ lạnh", "Samsung", 18500000, false),
-                    ("Samsung Side-by-Side 670L RS68A8860S9", "Tủ lạnh", "Samsung", 42900000, false),
-                    ("Samsung Inverter 458L RT46K6345S9", "Tủ lạnh", "Samsung", 19900000, false),
-                    ("LG Inverter 450L GR-B452HLHU", "Tủ lạnh", "LG", 17900000, false),
-                    ("LG Door-in-Door 633L GR-X31FTQHL", "Tủ lạnh", "LG", 38900000, false),
-                    ("LG Inverter 280L GR-B242SLCL", "Tủ lạnh", "LG", 12500000, false),
-                    ("Panasonic Inverter 316L NR-BL331SP", "Tủ lạnh", "Panasonic", 14900000, false),
-                    ("Panasonic Inverter 458L NR-BX468S", "Tủ lạnh", "Panasonic", 23900000, false),
-                    ("Toshiba Inverter 360L GR-R388WE", "Tủ lạnh", "Toshiba", 13900000, false),
-                    ("Toshiba Inverter 519L GR-R570WE", "Tủ lạnh", "Toshiba", 18900000, false),
-                    ("Sharp Inverter 450L SJ-F70PS-SL", "Tủ lạnh", "Sharp", 16500000, false),
-                    ("Sharp Plasmacluster 670L SJ-X686V-SL", "Tủ lạnh", "Sharp", 39900000, false),
-                    ("Electrolux Inverter 520L ESE5600A", "Tủ lạnh", "Electrolux", 21900000, false),
-                    ("Electrolux Inverter 450L ETE4500A", "Tủ lạnh", "Electrolux", 17500000, false),
-                    ("Aqua Inverter 360L AQR-D360F", "Tủ lạnh", "Aqua", 11900000, false),
-                    ("Aqua Inverter 520L AQR-D520F", "Tủ lạnh", "Aqua", 15900000, false),
+                    ("Samsung Inverter 450L RB46A", "Tủ lạnh", "Samsung", 18900000, true),
+                    ("LG Inverter 520L GR-B257", "Tủ lạnh", "LG", 21900000, true),
+                    ("Panasonic Inverter 519L GR-R570", "Tủ lạnh", "Panasonic", 19900000, true),
                     
                     // Máy lạnh
-                    ("Samsung Inverter 1HP AR12TYFQAWK", "Máy lạnh", "Samsung", 8900000, true),
-                    ("Samsung Inverter 2HP AR24TYFQAWK", "Máy lạnh", "Samsung", 15900000, true),
-                    ("Samsung Inverter 1.5HP AR18TYFQAWK", "Máy lạnh", "Samsung", 11900000, true),
-                    ("LG Inverter 1HP V13APV2", "Máy lạnh", "LG", 8500000, true),
-                    ("LG Inverter 2HP V24APV2", "Máy lạnh", "LG", 14900000, true),
-                    ("LG Inverter 1.5HP V18APV2", "Máy lạnh", "LG", 11500000, true),
-                    ("Panasonic Inverter 1HP CU/CS-N9UKH", "Máy lạnh", "Panasonic", 9500000, true),
-                    ("Panasonic Inverter 2HP CU/CS-N18UKH", "Máy lạnh", "Panasonic", 16900000, true),
-                    ("Daikin Inverter 1HP FTKA35VA", "Máy lạnh", "Daikin", 10500000, true),
-                    ("Daikin Inverter 2HP FTKA50VA", "Máy lạnh", "Daikin", 18900000, true),
-                    ("Midea Inverter 1HP MSMA-09CR", "Máy lạnh", "Midea", 7500000, true),
-                    ("Midea Inverter 2HP MSMA-18CR", "Máy lạnh", "Midea", 13500000, true),
+                    ("Samsung Inverter 1HP AR12TY", "Máy lạnh", "Samsung", 8900000, true),
+                    ("Samsung Inverter 2HP AR24TY", "Máy lạnh", "Samsung", 15900000, true),
+                    ("LG Inverter 1.5HP V18APV", "Máy lạnh", "LG", 11500000, true),
+                    ("Daikin Inverter 2HP FTKA50", "Máy lạnh", "Daikin", 18900000, true),
                     
                     // Máy giặt
-                    ("Samsung Inverter 8.5kg WA80H4000", "Máy giặt", "Samsung", 8900000, true),
-                    ("Samsung Inverter 9kg WA90H4000", "Máy giặt", "Samsung", 9900000, true),
-                    ("LG Inverter 8kg T2108VSPM", "Máy giặt", "LG", 8500000, true),
-                    ("LG Inverter 9kg T2308VSPM", "Máy giặt", "LG", 9500000, true),
-                    ("Panasonic Inverter 7kg NA-F70B4", "Máy giặt", "Panasonic", 7900000, true),
-                    ("Panasonic Inverter 8kg NA-F80B4", "Máy giặt", "Panasonic", 8900000, true),
-                    ("Toshiba Inverter 7kg AW-D710", "Máy giặt", "Toshiba", 7500000, true),
-                    ("Toshiba Inverter 8kg AW-D810", "Máy giặt", "Toshiba", 8500000, true),
-                    ("Electrolux Inverter 8kg EWF8024", "Máy giặt", "Electrolux", 9500000, true),
-                    ("Electrolux Inverter 9kg EWF9024", "Máy giặt", "Electrolux", 10500000, true),
-                    ("Bosch Inverter 7kg WAK24160", "Máy giặt", "Bosch", 12500000, true),
-                    ("Bosch Inverter 8kg WAK24180", "Máy giặt", "Bosch", 13500000, true),
-                    
-                    // Máy sấy
-                    ("Samsung Heat Pump 8kg DV80T5220", "Máy sấy", "Samsung", 11900000, true),
-                    ("LG Heat Pump 9kg RC90V9AV2D", "Máy sấy", "LG", 13900000, true),
-                    ("Panasonic Inverter 8kg NH-P80H1", "Máy sấy", "Panasonic", 10900000, true),
-                    ("Electrolux Heat Pump 8kg EW8H458", "Máy sấy", "Electrolux", 11500000, true),
-                    ("Bosch Heat Pump 9kg WTW875W0", "Máy sấy", "Bosch", 14500000, true),
+                    ("Samsung Inverter 8kg WA80H", "Máy giặt", "Samsung", 8900000, true),
+                    ("LG Inverter 9kg T2308V", "Máy giặt", "LG", 9500000, true),
+                    ("Bosch Inverter 8kg WAK241", "Máy giặt", "Bosch", 13500000, true),
                     
                     // Tivi
-                    ("Samsung 43\" 4K Smart TV UA43CU7700", "Tivi", "Samsung", 12900000, false),
-                    ("Samsung 55\" 4K QLED TV QA55Q70CA", "Tivi", "Samsung", 24900000, false),
-                    ("Samsung 65\" 4K QLED TV QA65Q80CA", "Tivi", "Samsung", 38900000, false),
-                    ("LG 43\" 4K Smart TV 43UQ7500", "Tivi", "LG", 11900000, false),
-                    ("LG 55\" 4K OLED TV 55C3", "Tivi", "LG", 28900000, false),
-                    ("LG 65\" 4K OLED TV 65C3", "Tivi", "LG", 44900000, false),
-                    ("Sony 43\" 4K Smart TV KD-43X75", "Tivi", "Sony", 14900000, false),
-                    ("Sony 55\" 4K OLED TV XR-55A80L", "Tivi", "Sony", 32900000, false),
-                    ("Sony 65\" 4K OLED TV XR-65A80L", "Tivi", "Sony", 49900000, false),
-                    ("Panasonic 43\" 4K Smart TV TH-43MX620", "Tivi", "Panasonic", 10900000, false),
-                    ("Panasonic 55\" 4K Smart TV TH-55MX620", "Tivi", "Panasonic", 17900000, false),
-                    ("TCL 43\" 4K Smart TV 43P735", "Tivi", "TCL", 8900000, false),
-                    ("TCL 55\" 4K QLED TV 55C735", "Tivi", "TCL", 14900000, false),
-                    ("TCL 65\" 4K QLED TV 65C735", "Tivi", "TCL", 21900000, false),
-                    ("Philips 43\" 4K Smart TV 43PUS7505", "Tivi", "Philips", 11900000, false),
-                    ("Philips 55\" 4K OLED TV 55OLED805", "Tivi", "Philips", 27900000, false),
+                    ("Samsung 43\" 4K Smart UA43CU", "Tivi", "Samsung", 12900000, false),
+                    ("Samsung 55\" 4K QLED QA55Q7", "Tivi", "Samsung", 24900000, false),
+                    ("LG 55\" 4K OLED 55C3", "Tivi", "LG", 28900000, false),
+                    ("Sony 55\" 4K OLED XR-55A8", "Tivi", "Sony", 32900000, false),
                     
                     // Âm thanh
-                    ("Samsung Soundbar HW-T650", "Âm thanh", "Samsung", 5900000, false),
+                    ("Samsung Soundbar HW-T65", "Âm thanh", "Samsung", 5900000, false),
                     ("LG Soundbar S95QR", "Âm thanh", "LG", 15900000, false),
-                    ("Sony Soundbar HT-G700", "Âm thanh", "Sony", 11900000, false),
-                    ("Sony Soundbar HT-ST5000", "Âm thanh", "Sony", 18900000, false),
-                    ("Philips Soundbar TAPB603", "Âm thanh", "Philips", 4900000, false),
-                    ("Samsung Bluetooth Speaker Level U", "Âm thanh", "Samsung", 1990000, false),
-                    ("LG Bluetooth Speaker XBoom Go", "Âm thanh", "LG", 1790000, false),
-                    ("Sony Bluetooth Speaker SRS-XB33", "Âm thanh", "Sony", 2990000, false),
-                    
-                    // Nồi cơm
-                    ("Samsung Nồi cơm 1.8L ECJ-HC15", "Nồi cơm", "Samsung", 1490000, false),
-                    ("LG Nồi cơm 1.0L LRC-057", "Nồi cơm", "LG", 1190000, false),
-                    ("Panasonic Nồi cơm 1.8L SR-DF181", "Nồi cơm", "Panasonic", 1290000, false),
-                    ("Toshiba Nồi cơm 1.8L RC-18NMF", "Nồi cơm", "Toshiba", 1190000, false),
-                    ("Sharp Nồi cơm 1.8L KS-18TJV", "Nồi cơm", "Sharp", 1090000, false),
-                    ("Midea Nồi cơm 1.8L MR-CM18", "Nồi cơm", "Midea", 990000, false),
-                    
-                    // Bếp từ
-                    ("Samsung Bếp từ đôi NZ64H370", "Bếp từ", "Samsung", 3900000, true),
-                    ("LG Bếp từ đôi LCE301", "Bếp từ", "LG", 3500000, true),
-                    ("Panasonic Bếp từ đôi K-WT37", "Bếp từ", "Panasonic", 4200000, true),
-                    ("Toshiba Bếp từ đôi 2S-DF18", "Bếp từ", "Toshiba", 3800000, true),
-                    ("Midea Bếp từ đôi MC-2D20", "Bếp từ", "Midea", 2900000, true),
-                    ("Bosch Bếp từ ba PFS061", "Bếp từ", "Bosch", 8900000, true),
-                    
-                    // Lò nướng
-                    ("Samsung Lò nướng 28L MC28H5013", "Lò nướng", "Samsung", 1490000, false),
-                    ("LG Lò nướng 28L MS2595", "Lò nướng", "LG", 1390000, false),
-                    ("Panasonic Lò nướng 32L NN-GT35", "Lò nướng", "Panasonic", 1590000, false),
-                    ("Electrolux Lò nướng 44L EOT3005", "Lò nướng", "Electrolux", 2190000, false),
-                    ("Bosch Lò nướng 71L HBG672BS2", "Lò nướng", "Bosch", 15900000, true),
-                    
-                    // Máy hút mùi
-                    ("Samsung Máy hút mùi CF-300", "Máy hút mùi", "Samsung", 2500000, true),
-                    ("LG Máy hút mùi H-C560", "Máy hút mùi", "LG", 2800000, true),
-                    ("Panasonic Máy hút mùi F-908", "Máy hút mùi", "Panasonic", 3200000, true),
-                    ("Toshiba Máy hút mùi VF-30", "Máy hút mùi", "Toshiba", 2700000, true),
-                    ("Bosch Máy hút mùi DHI965", "Máy hút mùi", "Bosch", 8900000, true),
-                    
-                    // Máy nước nóng
-                    ("Samsung Máy nước nóng trực tiếp DQE-50", "Máy nước nóng", "Samsung", 2900000, true),
-                    ("LG Máy nước nóng trực tiếp DHE-50", "Máy nước nóng", "LG", 2700000, true),
-                    ("Panasonic Máy nước nóng trực tiếp DH-4JS", "Máy nước nóng", "Panasonic", 3100000, true),
-                    ("Toshiba Máy nước nóng trực tiếp DS-50", "Máy nước nóng", "Toshiba", 2800000, true),
-                    ("Aqua Máy nước nóng trực tiếp A-50", "Máy nước nóng", "Aqua", 2600000, true),
                     
                     // Robot hút bụi
                     ("Dyson V15 Detect Robot", "Robot hút bụi", "Dyson", 19900000, false),
                     ("Samsung Jet Bot Robot", "Robot hút bụi", "Samsung", 8900000, false),
-                    ("LG CordZero Robot", "Robot hút bụi", "LG", 12900000, false),
                     ("Xiaomi Robot Vacuum S10", "Robot hút bụi", "Xiaomi", 5900000, false),
-                    ("Xiaomi Robot Vacuum S10+", "Robot hút bụi", "Xiaomi", 7900000, false),
                     
                     // Máy lọc không khí
                     ("Samsung AX60R5080WD", "Máy lọc không khí", "Samsung", 7900000, false),
                     ("LG PuriCare 360", "Máy lọc không khí", "LG", 8900000, false),
-                    ("Panasonic F-PXJ30A", "Máy lọc không khí", "Panasonic", 9900000, false),
-                    ("Dyson Pure Cool TP07", "Máy lọc không khí", "Dyson", 15900000, false),
-                    ("Xiaomi Air Purifier 4 Pro", "Máy lọc không khí", "Xiaomi", 4900000, false)
+                    
+                    // Bếp từ
+                    ("Samsung Bếp từ đôi NZ64H", "Bếp từ", "Samsung", 3900000, true),
+                    ("Bosch Bếp từ ba PFS061", "Bếp từ", "Bosch", 8900000, true),
+                    
+                    // Máy nước nóng
+                    ("Samsung Máy nước nóng DQE-50", "Máy nước nóng", "Samsung", 2900000, true),
+                    ("Aqua Máy nước nóng A-50", "Máy nước nóng", "Aqua", 2600000, true),
+                    
+                    // Máy hút mùi
+                    ("Samsung Máy hút mùi CF-300", "Máy hút mùi", "Samsung", 2500000, true),
+                    ("Bosch Máy hút mùi DHI965", "Máy hút mùi", "Bosch", 8900000, true),
+                    
+                    // Lò nướng
+                    ("Bosch Lò nướng 71L HBG67", "Lò nướng", "Bosch", 15900000, true),
+                    
+                    // Nồi cơm
+                    ("Samsung Nồi cơm 1.8L ECJ-HC", "Nồi cơm", "Samsung", 1490000, false),
+                    ("Panasonic Nồi cơm 1.8L SR-DF18", "Nồi cơm", "Panasonic", 1290000, false)
                 };
 
                 // Dùng HashSet để tránh trùng SKU
@@ -1369,7 +1318,9 @@ namespace Infrastructure.Data
                     var tech = technicians[random.Next(technicians.Count)];
                     var slot = slots[slotIndex++];
 
-                    var booking = InstallationBooking.Create(order.Id, tech.Id, slot.Id, slot.Date);
+                    // Combine slot Date with StartTime to create proper ScheduledDate with time component
+                    var scheduledDate = slot.Date.Add(slot.StartTime);
+                    var booking = InstallationBooking.Create(order.Id, tech.Id, slot.Id, scheduledDate);
                     slot.Book(booking.Id);
 
                     // Random status

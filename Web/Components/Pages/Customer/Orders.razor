@@ -5,6 +5,7 @@
 @using Domain.Enums
 @using Web.Helpers
 @using Web.Services
+@using Microsoft.AspNetCore.Components.Authorization
 
 @inject IOrderService OrderService
 @inject IReturnOrderService ReturnOrderService
@@ -13,6 +14,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <MudText Typo="Typo.h5" Class="mb-4">Đơn hàng của tôi</MudText>
 
@@ -150,42 +152,42 @@
 </style>
 
 @code {
+    private MudForm _form = null!;
+    private bool _isLoading = true;
     private List<OrderResponse> _orders = new();
     private List<OrderResponse> _pagedOrders = new();
-    private bool _isLoading = true;
-    private int _currentPageValue = 1;
-    private int _pageSize = 5;
-    private int _totalPages => (int)Math.Ceiling(_orders.Count / (double)_pageSize);
     private Dictionary<int, ReturnOrderResponse?> _returnOrders = new();
     private Dictionary<int, WarrantyRequestResponse?> _warrantyRequests = new();
     private int? _currentUserId;
+    private int _currentPageValue = 1;
+    private int _pageSize = 10;
+    private int _totalPages => (int)Math.Ceiling(_orders.Count / (double)_pageSize);
 
-    private int CurrentPage
+    protected override async Task OnInitializedAsync()
     {
-        get => _currentPageValue;
-        set
-        {
-            _currentPageValue = value;
-            UpdatePagedItems();
-            StateHasChanged();
-        }
-    }
+        // Wait for auth state to be ready
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await LoadCurrentUserId();
-            await LoadOrdersAsync();
-        }
+        Console.WriteLine($"[Orders.OnInitializedAsync] User.Identity?.IsAuthenticated: {user.Identity?.IsAuthenticated}");
+        Console.WriteLine($"[Orders.OnInitializedAsync] User.Identity?.Name: {user.Identity?.Name}");
+
+        await LoadCurrentUserId();
+        await LoadOrdersAsync();
     }
 
     private async Task LoadCurrentUserId()
     {
         var userIdStr = await AuthService.GetUserIdAsync();
+        Console.WriteLine($"[Orders.LoadCurrentUserId] userIdStr: '{userIdStr}'");
         if (int.TryParse(userIdStr, out var userId))
         {
             _currentUserId = userId;
+            Console.WriteLine($"[Orders.LoadCurrentUserId] _currentUserId: {_currentUserId}");
+        }
+        else
+        {
+            Console.WriteLine($"[Orders.LoadCurrentUserId] Failed to parse userIdStr");
         }
     }
 

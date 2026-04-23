@@ -37,10 +37,22 @@ namespace Web.Controllers
         [HttpGet("warehouses/for-products")]
         [Authorize(Roles = "Technician,Admin")]
         public async Task<ActionResult<List<WarehouseStockForTechnicianResponse>>> GetWarehousesForProducts(
-            [FromQuery] List<int> productIds)
+            [FromQuery] List<int> productIds,
+            [FromQuery] string? city = null,
+            [FromQuery] string? district = null)
         {
             var warehouses = await _warehouseRepository.GetAllAsync();
             var result = new List<WarehouseStockForTechnicianResponse>();
+
+            // Filter by location if provided - strict filtering, no fallback
+            if (!string.IsNullOrWhiteSpace(district))
+            {
+                warehouses = warehouses.Where(w => w.Address?.District == district).ToList();
+            }
+            else if (!string.IsNullOrWhiteSpace(city))
+            {
+                warehouses = warehouses.Where(w => w.Address?.City == city).ToList();
+            }
 
             foreach (var warehouse in warehouses.Where(w => w.IsActive))
             {
@@ -73,6 +85,8 @@ namespace Web.Controllers
                         WarehouseName = warehouse.Name,
                         WarehouseCode = warehouse.Code,
                         WarehouseAddress = warehouse.Address.ToFullString(),
+                        City = warehouse.Address.City,
+                        District = warehouse.Address.District,
                         AvailableProducts = availableProducts
                     });
                 }
@@ -86,27 +100,45 @@ namespace Web.Controllers
         /// </summary>
         [HttpGet("stock/{productId}")]
         [Authorize(Roles = "Technician,Admin")]
-        public async Task<ActionResult<List<ProductStockForTechnician>>> GetProductStockAcrossWarehouses(int productId)
+        public async Task<ActionResult<List<WarehouseStockForTechnicianResponse>>> GetProductStockAcrossWarehouses(int productId, [FromQuery] int? warehouseId = null)
         {
             var stocks = await _productWarehouseRepository.GetByProductAsync(productId);
             var product = await _productRepository.GetByIdAsync(productId);
             var warehouses = await _warehouseRepository.GetAllAsync();
 
-            var result = stocks
-                .Where(s => s.GetAvailableStock() > 0)
-                .Select(s => new ProductStockForTechnician
+            // Filter by warehouse if specified
+            if (warehouseId.HasValue)
+            {
+                stocks = stocks.Where(s => s.WarehouseId == warehouseId.Value).ToList();
+            }
+
+            // Group by warehouse
+            var warehouseStocks = stocks.GroupBy(s => s.WarehouseId)
+                .Select(g => new WarehouseStockForTechnicianResponse
                 {
-                    ProductId = productId,
-                    ProductName = product?.Name ?? $"Sản phẩm #{productId}",
-                    Sku = product?.Sku.Value ?? "",
-                    VariantId = s.VariantId,
-                    VariantName = s.VariantId.HasValue ? "Variant " + s.VariantId : null,
-                    AvailableStock = s.GetAvailableStock(),
-                    ReservedStock = s.ReservedQuantity
+                    WarehouseId = g.Key,
+                    WarehouseName = warehouses.FirstOrDefault(w => w.Id == g.Key)?.Name ?? "",
+                    WarehouseCode = warehouses.FirstOrDefault(w => w.Id == g.Key)?.Code ?? "",
+                    WarehouseAddress = warehouses.FirstOrDefault(w => w.Id == g.Key)?.Address?.ToString() ?? "",
+                    City = warehouses.FirstOrDefault(w => w.Id == g.Key)?.Address?.City ?? "",
+                    District = warehouses.FirstOrDefault(w => w.Id == g.Key)?.Address?.District ?? "",
+                    AvailableProducts = new List<ProductStockForTechnician>
+                    {
+                        new ProductStockForTechnician
+                        {
+                            ProductId = productId,
+                            ProductName = product?.Name ?? $"Sản phẩm #{productId}",
+                            Sku = product?.Sku.Value ?? "",
+                            VariantId = g.FirstOrDefault()?.VariantId,
+                            VariantName = g.FirstOrDefault()?.VariantId.HasValue == true ? "Variant " + g.FirstOrDefault()?.VariantId : null,
+                            AvailableStock = g.Sum(s => s.GetAvailableStock()),
+                            ReservedStock = g.Sum(s => s.ReservedQuantity)
+                        }
+                    }
                 })
                 .ToList();
 
-            return Ok(result);
+            return Ok(warehouseStocks);
         }
 
         /// <summary>
@@ -214,6 +246,42 @@ namespace Web.Controllers
             {
                 await _installationService.RejectBookingAsync(bookingId, technicianId, request);
                 return Ok(new { message = "Đã từ chối lịch lắp đặt" });
+            }
+            catch (DomainException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Report out of stock for warranty replacement
+        /// </summary>
+        [HttpPost("{bookingId}/report-out-of-stock")]
+        [Authorize(Roles = "Technician,Admin")]
+        public async Task<ActionResult> ReportOutOfStock(int bookingId, [FromQuery] int technicianId)
+        {
+            try
+            {
+                await _installationService.ReportOutOfStockAsync(bookingId, technicianId);
+                return Ok(new { message = "Đã báo cáo hết sản phẩm thay thế" });
+            }
+            catch (DomainException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Reset booking status from AwaitingMaterial to Assigned
+        /// </summary>
+        [HttpPost("{bookingId}/reset-from-awaiting-material")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> ResetFromAwaitingMaterial(int bookingId)
+        {
+            try
+            {
+                await _installationService.ResetFromAwaitingMaterialAsync(bookingId);
+                return Ok(new { message = "Đã reset trạng thái booking" });
             }
             catch (DomainException ex)
             {

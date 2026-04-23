@@ -13,6 +13,7 @@
         Completed = 8,            // Hoàn thành, khách ký nhận
         Failed = 9,               // Lắp thất bại (cần quay lại)
         Rescheduled = 10,          // Đổi lịch
-        Cancelled = 11            // Hủy
+        Cancelled = 11,           // Hủy
+        AwaitingMaterial = 12     // Chờ vật tư (hết sản phẩm thay thế trong khu vực)
     }
 }

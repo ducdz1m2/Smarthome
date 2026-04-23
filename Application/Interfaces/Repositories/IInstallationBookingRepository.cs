@@ -7,6 +7,7 @@ namespace Application.Interfaces.Repositories
         Task<InstallationBooking?> GetByIdAsync(int id);
         Task<InstallationBooking?> GetByIdWithDetailsAsync(int id);
         Task<InstallationBooking?> GetByOrderIdAsync(int orderId);
+        Task<List<InstallationBooking>> GetAllByOrderIdAsync(int orderId);
         Task<List<InstallationBooking>> GetAllAsync();
         Task<List<InstallationBooking>> GetByTechnicianIdAsync(int technicianId);
         Task<List<InstallationBooking>> GetByStatusAsync(string status);

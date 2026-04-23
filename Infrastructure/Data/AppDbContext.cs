@@ -1,6 +1,7 @@
 ﻿using Domain.Abstractions;
 using Domain.Entities;
 using Domain.Entities.Catalog;
+using Domain.Entities.Communication;
 using Domain.Entities.Content;
 using Domain.Entities.Identity;
 using Domain.Entities.Installation;
@@ -77,6 +78,9 @@ namespace Infrastructure.Data
         // Content
         public DbSet<UserAddress> UserAddresses => Set<UserAddress>();
         public DbSet<Banner> Banners => Set<Banner>();
+
+        // Communication
+        public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
 
         // ML/Recommendation
         // Communication

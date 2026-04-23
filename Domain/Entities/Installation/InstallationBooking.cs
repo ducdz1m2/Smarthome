@@ -105,6 +105,11 @@ public class InstallationBooking : AggregateRoot
             if (IsUninstall && Status != InstallationStatus.Confirmed && Status != InstallationStatus.Preparing)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể di chuyển từ trạng thái đã xác nhận hoặc đang chuẩn bị");
 
+            // Validate that it's the scheduled date or close to it (allow starting travel on the day before)
+            var daysUntilScheduled = (ScheduledDate.Date - DateTime.UtcNow.Date).Days;
+            if (daysUntilScheduled > 1)
+                throw new BusinessRuleViolationException("BookingDate", $"Chỉ có thể bắt đầu di chuyển trong vòng 1 ngày trước ngày hẹn. Ngày hẹn: {ScheduledDate:dd/MM/yyyy}");
+
             Status = InstallationStatus.OnTheWay;
             OnTheWayAt = DateTime.UtcNow;
         }
@@ -118,6 +123,11 @@ public class InstallationBooking : AggregateRoot
             if (Status != InstallationStatus.OnTheWay)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể lắp sau khi đã đến nơi");
 
+            // Validate that it's the scheduled date or close to it (allow starting on the scheduled day)
+            var daysUntilScheduled = (ScheduledDate.Date - DateTime.UtcNow.Date).Days;
+            if (daysUntilScheduled > 0)
+                throw new BusinessRuleViolationException("BookingDate", $"Chỉ có thể bắt đầu lắp đặt vào ngày hẹn hoặc sau đó. Ngày hẹn: {ScheduledDate:dd/MM/yyyy}");
+
             Status = InstallationStatus.Installing;
             StartedAt = DateTime.UtcNow;
         }
@@ -130,6 +140,12 @@ public class InstallationBooking : AggregateRoot
 
             if (Status != InstallationStatus.Assigned && Status != InstallationStatus.Confirmed && Status != InstallationStatus.OnTheWay)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể bắt đầu bảo hành ở trạng thái đã phân công, đã xác nhận hoặc đang di chuyển");
+
+            // For warranty, allow more flexibility with timing since it's urgent
+            // But still validate it's not too far in the future
+            var daysUntilScheduled = (ScheduledDate.Date - DateTime.UtcNow.Date).Days;
+            if (daysUntilScheduled > 2)
+                throw new BusinessRuleViolationException("BookingDate", $"Chỉ có thể bắt đầu bảo hành trong vòng 2 ngày trước ngày hẹn. Ngày hẹn: {ScheduledDate:dd/MM/yyyy}");
 
             Status = InstallationStatus.Installing; // Use Installing status for warranty as well
             StartedAt = DateTime.UtcNow;
@@ -205,6 +221,8 @@ public class InstallationBooking : AggregateRoot
             {
                 if (Status != InstallationStatus.Assigned)
                     throw new BusinessRuleViolationException("BookingStatus", "Đơn bảo hành chỉ có thể tiếp nhận ở trạng thái đã phân công");
+
+                // Allow accepting warranty bookings at any time (urgent nature)
                 Status = InstallationStatus.Confirmed;
                 AddDomainEvent(new InstallationBookingConfirmedEvent(Id, DateTime.UtcNow));
                 return;
@@ -212,6 +230,11 @@ public class InstallationBooking : AggregateRoot
 
             if (Status != InstallationStatus.Assigned && Status != InstallationStatus.Rescheduled)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể tiếp nhận lịch ở trạng thái đã phân công hoặc đã đổi lịch");
+
+            // Validate that the scheduled date is not in the past (allow accepting up to 1 day before)
+            var daysUntilScheduled = (ScheduledDate.Date - DateTime.UtcNow.Date).Days;
+            if (daysUntilScheduled < -1)
+                throw new BusinessRuleViolationException("BookingDate", $"Không thể tiếp nhận lịch đã quá hạn. Ngày hẹn: {ScheduledDate:dd/MM/yyyy}");
 
             Status = InstallationStatus.Confirmed;
 
@@ -277,5 +300,35 @@ public class InstallationBooking : AggregateRoot
             Notes = reason;
 
             AddDomainEvent(new InstallationCancelledEvent(Id, reason));
+        }
+
+        public void ReportOutOfStock(string technicianName)
+        {
+            if (Status != InstallationStatus.Assigned && Status != InstallationStatus.Confirmed)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể báo cáo hết sản phẩm ở trạng thái đã phân công hoặc đã xác nhận");
+
+            Status = InstallationStatus.AwaitingMaterial;
+            Notes = $"Kỹ thuật viên {technicianName} báo cáo hết sản phẩm thay thế trong khu vực. Cần điều phối từ kho khác.";
+
+            AddDomainEvent(new InstallationAwaitingMaterialEvent(Id, OrderId, TechnicianId, ScheduledDate, technicianName));
+        }
+
+        public void ResetFromAwaitingMaterial(DateTime? newScheduledDate = null)
+        {
+            if (Status != InstallationStatus.AwaitingMaterial)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể reset trạng thái từ Chờ vật tư");
+
+            Status = InstallationStatus.Assigned;
+            Notes = $"Đã điều phối sản phẩm từ kho khác. Sẵn sàng thực hiện.";
+            
+            // Update scheduled date if provided, otherwise use tomorrow
+            if (newScheduledDate.HasValue)
+            {
+                ScheduledDate = newScheduledDate.Value;
+            }
+            else
+            {
+                ScheduledDate = DateTime.Today.AddDays(1);
+            }
         }
     }

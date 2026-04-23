@@ -224,7 +224,7 @@
             </HeaderContent>
             <RowTemplate>
                 <MudTd>NK-@context.Id.ToString("D5")</MudTd>
-                <MudTd>@context.EntryDate.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                <MudTd>@context.EntryDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
                 <MudTd>@context.SupplierName</MudTd>
                 <MudTd>@context.WarehouseName</MudTd>
                 <MudTd>@context.ItemCount</MudTd>

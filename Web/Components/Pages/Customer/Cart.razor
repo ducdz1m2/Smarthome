@@ -56,6 +56,12 @@
                                 </MudItem>
                                 <MudItem xs="12" sm="5">
                                     <MudText Typo="Typo.subtitle1" Class="fw-bold">@item.ProductName</MudText>
+                                    @if (item.RequiresInstallation)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="mt-1">
+                                            Lắp đặt
+                                        </MudChip>
+                                    }
                                     @if (!string.IsNullOrEmpty(item.VariantSku))
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">

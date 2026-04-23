@@ -54,6 +54,8 @@ namespace Application
             // Chat & Notification services
             services.AddScoped<IChatService, ChatService>();
             services.AddScoped<INotificationService, NotificationService>();
+            services.AddScoped<IEmailService, EmailService>();
+            services.AddScoped<IPushNotificationService, PushNotificationService>();
 
             // Identity services (User, Role, Auth combined)
             // Note: IIdentityService and IdentityService are registered in Web/Program.cs
