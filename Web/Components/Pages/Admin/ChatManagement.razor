@@ -108,7 +108,7 @@
                         if (isFirstNewMessage)
                         {
                             Console.WriteLine($"[ChatManagement] Showing separator - LastReadAt: {_lastReadAt}, MsgTime: {msg.SentAt}");
-                            <div class="message-separator">
+                            <div class="msg-separator">
                                 <div class="separator-line"></div>
                                 <div class="separator-text">Tin nhắn mới</div>
                                 <div class="separator-line"></div>
@@ -116,36 +116,38 @@
                             _separatorShown = true;
                         }
 
-                        <div class="@($"message {(msg.SenderId == CurrentUser.UserId ? "sent" : "received")}")">
+                        <div class="@($"msg-row {(msg.SenderId == CurrentUser.UserId ? "user" : "")}")">
                             @if (msg.SenderId != CurrentUser.UserId)
                             {
-                                <div class="message-avatar">@GetInitials(msg.SenderId.ToString())</div>
+                                <div class="msg-avatar">@GetInitials(msg.SenderName ?? msg.SenderId.ToString())</div>
                             }
-                            <div class="message-content">
-                                <div class="message-bubble">
-                                    @if (msg.Attachments != null && msg.Attachments.Any())
+                            <div class="msg-bubble @(msg.SenderId == CurrentUser.UserId ? "user" : "bot")">
+                                @if (msg.Attachments != null && msg.Attachments.Any())
+                                {
+                                    @foreach (var attachment in msg.Attachments)
                                     {
-                                        @foreach (var attachment in msg.Attachments)
+                                        @if (!string.IsNullOrEmpty(attachment.FileType) && attachment.FileType.StartsWith("image/"))
                                         {
-                                            @if (!string.IsNullOrEmpty(attachment.FileType) && attachment.FileType.StartsWith("image/"))
-                                            {
-                                                <img src="@attachment.FileUrl" alt="@attachment.FileName" style="max-width: 100%; max-height: 300px; border-radius: 8px;" />
-                                            }
-                                            else
-                                            {
-                                                <div class="file-attachment">
-                                                    <span>📎</span>
-                                                    <a href="@attachment.FileUrl" target="_blank">@attachment.FileName</a>
-                                                </div>
-                                            }
+                                            <div class="msg-image">
+                                                <img src="@attachment.FileUrl" alt="@attachment.FileName" style="max-width: 200px; max-height: 200px; border-radius: 8px;" />
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="msg-file">
+                                                <a href="@attachment.FileUrl" target="_blank" class="file-link">
+                                                    <span class="file-icon">📎</span>
+                                                    <span class="file-name">@attachment.FileName</span>
+                                                </a>
+                                            </div>
                                         }
                                     }
-                                    @if (!string.IsNullOrEmpty(msg.Content))
-                                    {
-                                        <MudText Typo="Typo.body2">@msg.Content</MudText>
-                                    }
-                                </div>
-                                <div class="message-time">@msg.SentAt.ToLocalTime().ToString("HH:mm")</div>
+                                }
+                                @if (!string.IsNullOrEmpty(msg.Content))
+                                {
+                                    @msg.Content
+                                }
+                                <span class="msg-time">@msg.SentAt.ToLocalTime().ToString("HH:mm")</span>
                             </div>
                         </div>
                     }
@@ -298,16 +300,21 @@
 }
 
 .chat-header {
-    padding: 16px 24px;
-    border-bottom: 1px solid #e0e0e0;
-    background: white;
+    height: 60px;
+    padding: 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
 }
 
 .chat-header-avatar {
     width: 40px;
     height: 40px;
+    background: rgba(255,255,255,0.2);
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     display: flex;
     align-items: center;
@@ -318,66 +325,82 @@
 .chat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
+    padding: 16px;
     background: #f5f5f5;
 }
 
-.message {
+.msg-row {
     display: flex;
-    margin-bottom: 16px;
     gap: 8px;
+    margin-bottom: 12px;
 }
 
-.message.received {
-    justify-content: flex-start;
+.msg-row.user {
+    flex-direction: row-reverse;
 }
 
-.message.sent {
-    justify-content: flex-end;
-}
-
-.message-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+.msg-avatar {
+    width: 32px;
+    height: 32px;
     background: #e0e0e0;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
     font-size: 14px;
     flex-shrink: 0;
 }
 
-.message-content {
+.msg-bubble {
     max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    position: relative;
 }
 
-.message-bubble {
-    padding: 12px 16px;
-    border-radius: 18px;
-    margin-bottom: 4px;
-}
-
-.message.received .message-bubble {
+.msg-bubble.bot {
     background: white;
-    border-bottom-left-radius: 4px;
+    border-bottom-left-radius: 2px;
 }
 
-.message.sent .message-bubble {
+.msg-bubble.user {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    border-bottom-right-radius: 4px;
+    border-bottom-right-radius: 2px;
 }
 
-.message-time {
-    font-size: 11px;
-    color: #757575;
-    text-align: right;
+.msg-time {
+    font-size: 10px;
+    opacity: 0.7;
+    margin-top: 4px;
+    display: block;
 }
 
-.message.sent .message-time {
-    color: rgba(255,255,255,0.8);
+.msg-image img {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 8px;
+}
+
+.msg-caption {
+    margin-top: 8px;
+    font-size: 12px;
+}
+
+.file-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.file-icon {
+    font-size: 24px;
+}
+
+.file-name {
+    font-weight: 500;
 }
 
 .message-separator {
@@ -401,13 +424,21 @@
 }
 
 .chat-input-area {
-    padding: 16px 24px;
-    border-top: 1px solid #e0e0e0;
+    padding: 12px;
     background: white;
+    border-top: 1px solid #e0e0e0;
 }
 
 .chat-input-field {
     flex: 1;
+    padding: 10px 14px;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    outline: none;
+}
+
+.chat-input-field:focus {
+    border-color: #667eea;
 }
 
 .chat-send-button {

@@ -855,7 +855,7 @@
                         SenderName = m.SenderId == userId ? "Bạn" : "Admin",
                         Content = m.Content,
                         IsFromAdmin = m.SenderId != userId,
-                        CreatedDate = m.SentAt,
+                        CreatedDate = m.SentAt.ToLocalTime(),
                         MessageType = m.Attachments != null && m.Attachments.Any() 
                             ? (m.Attachments.First().FileType != null && m.Attachments.First().FileType.StartsWith("image/") ? MessageType.Image : MessageType.File)
                             : MessageType.Text,

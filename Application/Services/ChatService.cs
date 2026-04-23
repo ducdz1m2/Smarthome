@@ -12,31 +12,49 @@ public class ChatService : IChatService
 {
     private readonly IChatRoomRepository _chatRoomRepository;
     private readonly IDomainEventDispatcher _eventDispatcher;
+    private readonly IIdentityService _identityService;
 
     public ChatService(
         IChatRoomRepository chatRoomRepository,
-        IDomainEventDispatcher eventDispatcher)
+        IDomainEventDispatcher eventDispatcher,
+        IIdentityService identityService)
     {
         _chatRoomRepository = chatRoomRepository;
         _eventDispatcher = eventDispatcher;
+        _identityService = identityService;
     }
 
     public async Task<List<ChatRoomResponse>> GetAllSupportChatRoomsAsync()
     {
         var rooms = await _chatRoomRepository.GetActiveSupportRoomsAsync();
-        return rooms.Select(MapToRoomResponse).ToList();
+        var result = new List<ChatRoomResponse>();
+        foreach (var room in rooms)
+        {
+            result.Add(await MapToRoomResponseAsync(room));
+        }
+        return result;
     }
 
     public async Task<List<ChatRoomResponse>> GetInstallationChatRoomsAsync(int technicianId)
     {
         var rooms = await _chatRoomRepository.GetByTechnicianIdAsync(technicianId);
-        return rooms.Select(MapToRoomResponse).ToList();
+        var result = new List<ChatRoomResponse>();
+        foreach (var room in rooms)
+        {
+            result.Add(await MapToRoomResponseAsync(room));
+        }
+        return result;
     }
 
     public async Task<List<ChatRoomResponse>> GetCustomerChatRoomsAsync(int customerId)
     {
         var rooms = await _chatRoomRepository.GetByUserIdAsync(customerId, UserType.Customer);
-        return rooms.Select(MapToRoomResponse).ToList();
+        var result = new List<ChatRoomResponse>();
+        foreach (var room in rooms)
+        {
+            result.Add(await MapToRoomResponseAsync(room));
+        }
+        return result;
     }
 
     public async Task<ChatRoomResponse?> GetChatRoomAsync(int roomId, int userId, UserType userType)
@@ -44,7 +62,7 @@ public class ChatService : IChatService
         var room = await _chatRoomRepository.GetByIdWithParticipantsAsync(roomId);
         if (room == null) return null;
 
-        var response = MapToRoomResponse(room);
+        var response = await MapToRoomResponseAsync(room);
         response.UnreadCount = room.Participants
             .FirstOrDefault(p => p.UserId == userId && p.UserType == userType)
             ?.UnreadCount ?? 0;
@@ -112,11 +130,17 @@ public class ChatService : IChatService
         var room = await _chatRoomRepository.GetByIdWithMessagesAsync(roomId);
         if (room == null) return new List<ChatMessageResponse>();
 
-        return room.Messages
+        var messages = room.Messages
             .Where(m => !m.IsDeleted)
             .OrderBy(m => m.SentAt)
-            .Select(m => MapToMessageResponse(m, userId, userType))
             .ToList();
+
+        var result = new List<ChatMessageResponse>();
+        foreach (var message in messages)
+        {
+            result.Add(await MapToMessageResponseAsync(message, userId, userType));
+        }
+        return result;
     }
 
     public async Task<ChatMessageResponse> SendMessageAsync(int roomId, int senderId, UserType senderType, SendMessageRequest request)
@@ -141,7 +165,7 @@ public class ChatService : IChatService
             request.Content,
             DateTime.UtcNow));
 
-        return MapToMessageResponse(message, senderId, senderType);
+        return await MapToMessageResponseAsync(message, senderId, senderType);
     }
 
     public async Task<ChatMessageResponse?> EditMessageAsync(int messageId, int userId, EditMessageRequest request)
@@ -184,8 +208,28 @@ public class ChatService : IChatService
 
     // --- Mapping helpers ---
 
-    private static ChatRoomResponse MapToRoomResponse(ChatRoom room)
+    private async Task<ChatRoomResponse> MapToRoomResponseAsync(ChatRoom room)
     {
+        var participantResponses = new List<ChatParticipantResponse>();
+        foreach (var p in room.Participants)
+        {
+            var user = await _identityService.GetUserByIdAsync(p.UserId);
+            participantResponses.Add(new ChatParticipantResponse
+            {
+                Id = p.Id,
+                UserId = p.UserId,
+                UserType = p.UserType.ToString(),
+                UserName = user?.FullName,
+                UserAvatar = user?.Avatar,
+                JoinedAt = p.JoinedAt,
+                IsActive = p.IsActive,
+                IsBlocked = p.IsBlocked,
+                UnreadCount = p.UnreadCount,
+                LastActivityAt = p.LastActivityAt,
+                LastReadAt = p.LastReadAt
+            });
+        }
+
         return new ChatRoomResponse
         {
             Id = room.Id,
@@ -197,18 +241,7 @@ public class ChatService : IChatService
             RelatedOrderId = room.RelatedOrderId,
             RelatedInstallationId = room.RelatedInstallationId,
             RelatedWarrantyClaimId = room.RelatedWarrantyClaimId,
-            Participants = room.Participants.Select(p => new ChatParticipantResponse
-            {
-                Id = p.Id,
-                UserId = p.UserId,
-                UserType = p.UserType.ToString(),
-                JoinedAt = p.JoinedAt,
-                IsActive = p.IsActive,
-                IsBlocked = p.IsBlocked,
-                UnreadCount = p.UnreadCount,
-                LastActivityAt = p.LastActivityAt,
-                LastReadAt = p.LastReadAt
-            }).ToList(),
+            Participants = participantResponses,
             LastMessage = room.Messages
                 .Where(m => !m.IsDeleted)
                 .OrderByDescending(m => m.SentAt)
@@ -224,14 +257,17 @@ public class ChatService : IChatService
         };
     }
 
-    private static ChatMessageResponse MapToMessageResponse(ChatMessage message, int currentUserId, UserType currentUserType)
+    private async Task<ChatMessageResponse> MapToMessageResponseAsync(ChatMessage message, int currentUserId, UserType currentUserType)
     {
+        var user = await _identityService.GetUserByIdAsync(message.SenderId);
         return new ChatMessageResponse
         {
             Id = message.Id,
             ChatRoomId = message.ChatRoomId,
             SenderId = message.SenderId,
             SenderType = message.SenderType.ToString(),
+            SenderName = user?.FullName,
+            SenderAvatar = user?.Avatar,
             Content = message.Content,
             SentAt = message.SentAt,
             EditedAt = message.EditedAt,
