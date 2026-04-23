@@ -50,6 +50,8 @@ namespace Application.DTOs.Responses
         public string Sku { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public int StockQuantity { get; set; }
+        public int FrozenStockQuantity { get; set; }
+        public int AvailableStock => StockQuantity - FrozenStockQuantity;
         public int WarrantyPeriod { get; set; } = 12;
         public Dictionary<string, string> Attributes { get; set; } = new();
         public bool IsActive { get; set; }
@@ -72,7 +74,10 @@ namespace Application.DTOs.Responses
         public decimal MinPrice { get; set; }
         public decimal MaxPrice { get; set; }
         public int StockQuantity { get; set; }
+        public int FrozenStockQuantity { get; set; }
+        public int AvailableStock => StockQuantity - FrozenStockQuantity;
         public bool IsActive { get; set; }
+        public bool RequiresInstallation { get; set; }
         public string CategoryName { get; set; } = string.Empty;
         public string BrandName { get; set; } = string.Empty;
         public string? MainImageUrl { get; set; }

@@ -17,7 +17,8 @@
             <MudText Typo="Typo.h6" Class="admin-brand-text">Smarthome Admin</MudText>
         </div>
         <MudSpacer />
-        <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" Class="admin-icon-btn" />
+        @* Notification button - commented out due to errors *@
+        @* <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" Class="admin-icon-btn" /> *@
         @* Avatar button *@
         <MudIconButton Href="/profile" Title="Quản lý tài khoản" Class="admin-avatar-btn">
             @if (!string.IsNullOrEmpty(_avatarUrl))

@@ -53,11 +53,11 @@
             }
         }
 
-        @* Notification widget - hiển thị cho tất cả user đã đăng nhập *@
-        @if (CurrentUserService.IsAuthenticated)
+        @* Notification widget - commented out due to errors *@
+        @* @if (CurrentUserService.IsAuthenticated)
         {
             <NotificationWidget Class="mx-2" />
-        }
+        } *@
 
         @* Nút tài khoản với avatar *@
         <MudIconButton Href="/profile" Title="Quản lý tài khoản" Class="avatar-btn">

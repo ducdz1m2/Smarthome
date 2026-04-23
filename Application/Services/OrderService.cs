@@ -807,6 +807,14 @@ namespace Application.Services
                 // Ignore errors checking for warranty requests
             }
 
+            // Determine order type based on items
+            var hasInstallationItems = order.Items.Any(i => i.RequiresInstallation);
+            var hasShippingItems = order.Items.Any(i => !i.RequiresInstallation);
+            string orderType = hasInstallationItems && hasShippingItems ? "Đơn ghép"
+                            : hasInstallationItems ? "Lắp đặt"
+                            : hasShippingItems ? "Ship"
+                            : "Khác";
+
             return new OrderResponse
             {
                 Id = order.Id,
@@ -826,6 +834,9 @@ namespace Application.Services
                 CreatedAt = order.CreatedAt,
                 HasUninstallBooking = hasUninstallBooking,
                 HasWarrantyRequest = hasWarrantyRequest,
+                HasInstallationItems = hasInstallationItems,
+                HasShippingItems = hasShippingItems,
+                OrderType = orderType,
                 Items = order.Items.Select(i =>
                 {
                     productsDict.TryGetValue(i.ProductId, out var product);

@@ -141,7 +141,7 @@
                 <MudGrid Spacing="3">
                     @foreach (var product in _products)
                     {
-                        var isOutOfStock = product.StockQuantity <= 0;
+                        var isOutOfStock = product.AvailableStock <= 0;
                         <MudItem xs="12" sm="6" md="4">
                             <MudCard Elevation="2" Class="h-100 cursor-pointer product-card" @onclick="() => NavigateToProduct(product.Id)">
                                 <div class="product-image-container">
@@ -158,6 +158,10 @@
                                     @if (isOutOfStock)
                                     {
                                         <div class="out-of-stock-badge">Hết hàng</div>
+                                    }
+                                    @if (product.RequiresInstallation)
+                                    {
+                                        <div class="installation-badge">Cần lắp đặt</div>
                                     }
                                 </div>
                                 <MudCardContent Class="pa-3">
@@ -245,6 +249,17 @@
         top: 10px;
         left: 10px;
         background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .installation-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         padding: 4px 12px;
         border-radius: 4px;

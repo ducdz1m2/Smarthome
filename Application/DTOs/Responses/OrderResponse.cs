@@ -13,7 +13,7 @@ namespace Application.DTOs.Responses
         public decimal DiscountAmount { get; set; }
         public decimal ShippingFee { get; set; }
         public string Status { get; set; } = string.Empty;
-        public bool HasWarrantyRequest { get; set; } 
+        public bool HasWarrantyRequest { get; set; }
         public string PaymentMethod { get; set; } = string.Empty;
         public string ShippingMethod { get; set; } = string.Empty;
         public string? CancelReason { get; set; }
@@ -21,6 +21,11 @@ namespace Application.DTOs.Responses
         public List<OrderItemResponse> Items { get; set; } = new();
         public List<OrderShipmentResponse> Shipments { get; set; } = new();
         public bool HasUninstallBooking { get; set; } = false;
+
+        // Order type classification
+        public bool HasInstallationItems { get; set; } = false;
+        public bool HasShippingItems { get; set; } = false;
+        public string OrderType { get; set; } = string.Empty; // "Ship", "Lắp đặt", "Đơn ghép"
     }
 
     public class OrderItemResponse

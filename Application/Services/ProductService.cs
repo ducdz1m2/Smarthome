@@ -27,7 +27,7 @@ namespace Application.Services
         public async Task<List<ProductListResponse>> GetAllAsync()
         {
             var products = await _productRepository.GetAllAsync();
-            return products.Select(MapToListResponse).ToList();
+            return products.Select(p => MapToListResponse(p, 0, 0)).ToList();
         }
 
         public async Task<ProductResponse?> GetByIdAsync(int id)
@@ -54,13 +54,35 @@ namespace Application.Services
             int page, int pageSize, string? search = null, int? categoryId = null, int? brandId = null, bool? isActive = null, int? promotionId = null)
         {
             var (items, totalCount) = await _productRepository.GetPagedAsync(page, pageSize, search, categoryId, brandId, isActive, promotionId);
-            return (items.Select(MapToListResponse).ToList(), totalCount);
+            
+            // Load warehouse stocks for all products
+            var productIds = items.Select(p => p.Id).ToList();
+            var warehouseStocks = await _productWarehouseRepository.GetByProductsAsync(productIds);
+            
+            return (items.Select(p => 
+            {
+                var productStocks = warehouseStocks.Where(ws => ws.ProductId == p.Id).ToList();
+                var totalQty = productStocks.Sum(ws => ws.Quantity);
+                var totalReserved = productStocks.Sum(ws => ws.ReservedQuantity);
+                return MapToListResponse(p, totalQty, totalReserved);
+            }).ToList(), totalCount);
         }
 
         public async Task<List<ProductListResponse>> GetByCategoryAsync(int categoryId)
         {
             var products = await _productRepository.GetByCategoryAsync(categoryId);
-            return products.Select(MapToListResponse).ToList();
+            
+            // Load warehouse stocks for all products
+            var productIds = products.Select(p => p.Id).ToList();
+            var warehouseStocks = await _productWarehouseRepository.GetByProductsAsync(productIds);
+            
+            return products.Select(p => 
+            {
+                var productStocks = warehouseStocks.Where(ws => ws.ProductId == p.Id).ToList();
+                var totalQty = productStocks.Sum(ws => ws.Quantity);
+                var totalReserved = productStocks.Sum(ws => ws.ReservedQuantity);
+                return MapToListResponse(p, totalQty, totalReserved);
+            }).ToList();
         }
 
         public async Task<List<ProductListResponse>> SearchAsync(string keyword, string? filters)
@@ -79,7 +101,18 @@ namespace Application.Services
                 }
             }
             var products = await _productRepository.SearchAsync(keyword, categoryId);
-            return products.Select(MapToListResponse).ToList();
+            
+            // Load warehouse stocks for all products
+            var productIds = products.Select(p => p.Id).ToList();
+            var warehouseStocks = await _productWarehouseRepository.GetByProductsAsync(productIds);
+            
+            return products.Select(p => 
+            {
+                var productStocks = warehouseStocks.Where(ws => ws.ProductId == p.Id).ToList();
+                var totalQty = productStocks.Sum(ws => ws.Quantity);
+                var totalReserved = productStocks.Sum(ws => ws.ReservedQuantity);
+                return MapToListResponse(p, totalQty, totalReserved);
+            }).ToList();
         }
 
         public async Task<int> CreateAsync(CreateProductRequest request)
@@ -338,6 +371,7 @@ namespace Application.Services
                         Sku = v.Sku.Value,
                         Price = v.Price.Amount,
                         StockQuantity = variantQty,
+                        FrozenStockQuantity = variantReserved,
                         WarrantyPeriod = v.WarrantyPeriod,
                         Attributes = v.GetAttributes(),
                         IsActive = v.IsActive
@@ -368,7 +402,7 @@ namespace Application.Services
             };
         }
 
-        private ProductListResponse MapToListResponse(Product product)
+        private ProductListResponse MapToListResponse(Product product, int totalQuantity = 0, int totalReserved = 0)
         {
             var activeVariants = product.Variants?.Where(v => v.IsActive).ToList() ?? new List<ProductVariant>();
             var minPrice = activeVariants.Any() ? activeVariants.Min(v => v.Price.Amount) : 0;
@@ -381,8 +415,10 @@ namespace Application.Services
                 Sku = product.Sku.Value,
                 MinPrice = minPrice,
                 MaxPrice = maxPrice,
-                StockQuantity = product.StockQuantity,
+                StockQuantity = totalQuantity > 0 ? totalQuantity : product.StockQuantity,
+                FrozenStockQuantity = totalReserved > 0 ? totalReserved : product.FrozenStockQuantity,
                 IsActive = product.IsActive,
+                RequiresInstallation = product.RequiresInstallation,
                 CategoryName = product.Category?.Name ?? "",
                 BrandName = product.Brand?.Name ?? "",
                 MainImageUrl = product.Images?.FirstOrDefault(i => i.IsMain)?.Url ?? product.Images?.FirstOrDefault()?.Url

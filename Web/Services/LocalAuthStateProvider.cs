@@ -21,8 +21,6 @@ public class LocalAuthStateProvider : AuthenticationStateProvider
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
-        Console.WriteLine($"[LocalAuthStateProvider] GetAuthenticationStateAsync called");
-        
         string? token = null;
         
         // Try to read from session first
@@ -30,7 +28,6 @@ public class LocalAuthStateProvider : AuthenticationStateProvider
         if (httpContext != null)
         {
             token = httpContext.Session.GetString("JWTToken");
-            Console.WriteLine($"[LocalAuthStateProvider] Token from session: {(token != null ? "exists" : "null")}");
         }
 
         // If not in session, try localStorage
@@ -39,38 +36,33 @@ public class LocalAuthStateProvider : AuthenticationStateProvider
             try
             {
                 token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "JWTToken");
-                Console.WriteLine($"[LocalAuthStateProvider] Token from localStorage: {(token != null ? "exists" : "null")}");
             }
             catch (Microsoft.JSInterop.JSDisconnectedException)
             {
                 // Circuit is disconnecting, return anonymous
-                Console.WriteLine($"[LocalAuthStateProvider] Circuit disconnected, returning anonymous");
                 _currentUserService.Clear();
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
             catch (Microsoft.JSInterop.JSException)
             {
                 // JS interop not available (prerendering), return anonymous
-                Console.WriteLine($"[LocalAuthStateProvider] JS interop not available (prerendering), returning anonymous");
                 _currentUserService.Clear();
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
             catch (InvalidOperationException)
             {
                 // Invalid operation during prerendering, return anonymous
-                Console.WriteLine($"[LocalAuthStateProvider] Invalid operation (prerendering), returning anonymous");
                 _currentUserService.Clear();
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"[LocalAuthStateProvider] Error reading from localStorage: {ex.Message}");
+                // Error reading from localStorage
             }
         }
 
         if (string.IsNullOrEmpty(token))
         {
-            Console.WriteLine($"[LocalAuthStateProvider] No token found, returning anonymous");
             _currentUserService.Clear();
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
         }
@@ -83,17 +75,8 @@ public class LocalAuthStateProvider : AuthenticationStateProvider
             // Extract claims from JWT token
             var claims = jwtToken.Claims.ToList();
             
-            // Debug: log all claims
-            Console.WriteLine($"[LocalAuthStateProvider] JWT Claims count: {claims.Count}");
-            foreach (var claim in claims)
-            {
-                Console.WriteLine($"[LocalAuthStateProvider] Claim: {claim.Type} = {claim.Value}");
-            }
-            
             var identity = new ClaimsIdentity(claims, "Jwt");
             var principal = new ClaimsPrincipal(identity);
-
-            Console.WriteLine($"[LocalAuthStateProvider] User authenticated: {principal.Identity?.Name}");
 
             // Sync user data to CurrentUserService
             // JWT uses custom claim types: nameid, unique_name, email, given_name, role
@@ -109,23 +92,16 @@ public class LocalAuthStateProvider : AuthenticationStateProvider
                 technicianId = tid;
             }
 
-            Console.WriteLine($"[LocalAuthStateProvider] Extracted: UserIdClaim={userIdClaim}, UserName={userName}, Email={email}, FullName={fullName}, Roles=[{string.Join(", ", roles)}], TechnicianId={technicianId}");
 
             if (int.TryParse(userIdClaim, out var userId))
             {
                 _currentUserService.SetUser(userId, userName ?? "", email ?? "", fullName ?? "", roles, technicianId);
-                Console.WriteLine($"[LocalAuthStateProvider] Synced to CurrentUserService: UserId={userId}, UserName={userName}, TechnicianId={technicianId}");
-            }
-            else
-            {
-                Console.WriteLine($"[LocalAuthStateProvider] Failed to parse UserIdClaim: {userIdClaim}");
             }
 
             return new AuthenticationState(principal);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Console.WriteLine($"[LocalAuthStateProvider] Error parsing JWT: {ex.Message}");
             _currentUserService.Clear();
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
         }
@@ -133,7 +109,6 @@ public class LocalAuthStateProvider : AuthenticationStateProvider
 
     public void NotifyAuthenticationStateChanged()
     {
-        Console.WriteLine($"[LocalAuthStateProvider] NotifyAuthenticationStateChanged called");
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
     }
 

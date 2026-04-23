@@ -46,8 +46,7 @@
                 <MudNumericField T="int" Label="Số lượng" @bind-Value="_selectedQuantity" Required="true" Min="1" />
             </MudItem>
             <MudItem xs="12" md="2">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddProduct" Class="mt-4">
-                    <Icons.Material.Filled.Add />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddProduct" Class="mt-4" StartIcon="@Icons.Material.Filled.Add">
                 </MudButton>
             </MudItem>
         </MudGrid>
@@ -69,8 +68,8 @@
         </MudTable>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel">Hủy</MudButton>
-        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(_productQuantities.Count == 0)">Tạo phiếu chuyển</MudButton>
+        <MudButton OnClick="Cancel" StartIcon="@Icons.Material.Filled.Cancel">Hủy</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(_productQuantities.Count == 0)" StartIcon="@Icons.Material.Filled.Send">Tạo phiếu chuyển</MudButton>
     </DialogActions>
 </MudDialog>
 

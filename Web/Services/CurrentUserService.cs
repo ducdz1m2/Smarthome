@@ -124,14 +124,12 @@ public class CurrentUserService : ICurrentUserService
     {
         lock (_lock)
         {
-            Console.WriteLine($"[CurrentUserService] SetUser called: UserId={userId}, UserName={userName}, TechnicianId={technicianId}");
             _userId = userId;
             _userName = userName;
             _email = email;
             _fullName = fullName;
             _roles = roles.ToList();
             _technicianId = technicianId;
-            Console.WriteLine($"[CurrentUserService] IsAuthenticated after SetUser: {IsAuthenticated}");
         }
     }
 
@@ -139,7 +137,6 @@ public class CurrentUserService : ICurrentUserService
     {
         lock (_lock)
         {
-            Console.WriteLine($"[CurrentUserService] Clear called");
             _userId = null;
             _userName = "";
             _email = "";

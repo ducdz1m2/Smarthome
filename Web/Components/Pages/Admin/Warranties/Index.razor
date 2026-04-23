@@ -13,91 +13,127 @@
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 
-<MudText Typo="Typo.h4" Class="mb-4">Quản lý Yêu cầu Bảo hành</MudText>
+<div class="pa-4">
+    <PageHeader Title="Quản lý Yêu cầu Bảo hành" ShowAddButton="false" />
 
-<MudTable Items="_warrantyRequests" Dense="true" Hover="true" Loading="_loading"
-          LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
-          Filter="@FilterWarrantyRequests" SortMode="SortMode.Single" AllowUnsorted="false">
-    <ToolBarContent>
-        <MudText Typo="Typo.h6">Danh sách yêu cầu bảo hành</MudText>
-        <MudSpacer />
-        <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm..."
-                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                      IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
-    </ToolBarContent>
-    <HeaderContent>
-        <MudTh width="60px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Id)">ID</MudTableSortLabel></MudTh>
-        <MudTh width="120px">Mã đơn hàng</MudTh>
-        <MudTh width="200px">Sản phẩm</MudTh>
-        <MudTh width="150px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Description)">Mô tả</MudTableSortLabel></MudTh>
-        <MudTh width="120px">Kỹ thuật viên</MudTh>
-        <MudTh width="100px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Status)">Trạng thái</MudTableSortLabel></MudTh>
-        <MudTh width="150px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.CreatedAt)">Ngày tạo</MudTableSortLabel></MudTh>
-        <MudTh width="100px">Thao tác</MudTh>
-    </HeaderContent>
-    <RowTemplate>
-        <MudTd DataLabel="ID">@context.Id</MudTd>
-        <MudTd DataLabel="Mã đơn hàng">@context.OrderNumber</MudTd>
-        <MudTd DataLabel="Sản phẩm">@context.ProductName</MudTd>
-        <MudTd DataLabel="Mô tả">@context.Description</MudTd>
-        <MudTd DataLabel="Kỹ thuật viên">
-            @(context.AssignedTechnicianId.HasValue ? $"KTV #{context.AssignedTechnicianId}" : "Chưa gán")
-        </MudTd>
-        <MudTd DataLabel="Trạng thái">
-            <MudChip T="string" Color="@StatusHelper.GetWarrantyStatusColor(context.Status)" Size="Size.Small">@StatusHelper.GetWarrantyStatusText(context.Status)</MudChip>
-        </MudTd>
-        <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
-        <MudTd>
-            <div class="d-flex gap-1">
-                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
-                             Color="Color.Primary"
-                             Size="Size.Small"
-                             OnClick="() => ViewDetails(context.Id)"
-                             Title="Chi tiết" />
-                @if (context.Status == "Pending")
+    <FilterBar>
+        <MudItem xs="12" sm="6" md="3">
+            <MudSelect T="string" Label="Lọc theo trạng thái" @bind-Value="_selectedStatus" Clearable="true" Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@null">Tất cả</MudSelectItem>
+                @foreach (var status in _statusList)
                 {
-                    <MudIconButton Icon="@Icons.Material.Filled.Check"
-                                 Color="Color.Success"
-                                 Size="Size.Small"
-                                 OnClick="() => Approve(context.Id)"
-                                 Title="Duyệt" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Close"
-                                 Color="Color.Error"
-                                 Size="Size.Small"
-                                 OnClick="() => Reject(context.Id)"
-                                 Title="Từ chối" />
+                    <MudSelectItem Value="@status">@StatusHelper.GetWarrantyStatusText(status)</MudSelectItem>
                 }
-                @if (context.Status == "Approved" && !context.InstallationBookingId.HasValue)
-                {
-                    <MudIconButton Icon="@Icons.Material.Filled.Event"
-                                 Color="Color.Info"
-                                 Size="Size.Small"
-                                 OnClick="() => CreateWarrantyBooking(context.Id, context.OrderId)"
-                                 Title="Tạo lịch bảo hành" />
-                }
-            </div>
-        </MudTd>
-    </RowTemplate>
-    <PagerContent>
-        <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 5, 10, 25, 50 }"
-                       InfoFormat="{first_item}-{last_item} / {all_items}" />
-    </PagerContent>
-</MudTable>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm theo mã đơn, tên khách hàng, sản phẩm..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined" Immediate="true"></MudTextField>
+        </MudItem>
+    </FilterBar>
+
+    <MudTable Items="_warrantyRequests" Dense="true" Hover="true" Loading="_loading"
+              LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+              Filter="@FilterWarrantyRequests" SortMode="SortMode.Single" AllowUnsorted="false">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Danh sách yêu cầu bảo hành</MudText>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh width="60px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Id)">ID</MudTableSortLabel></MudTh>
+            <MudTh width="120px">Mã đơn</MudTh>
+            <MudTh width="150px">Khách hàng</MudTh>
+            <MudTh width="200px">Sản phẩm</MudTh>
+            <MudTh width="150px">Mô tả</MudTh>
+            <MudTh width="100px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.Status)">Trạng thái</MudTableSortLabel></MudTh>
+            <MudTh width="120px"><MudTableSortLabel T="WarrantyRequestResponse" SortBy="@(w => w.CreatedAt)">Ngày tạo</MudTableSortLabel></MudTh>
+            <MudTh width="180px">Thao tác</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="ID">@context.Id</MudTd>
+            <MudTd DataLabel="Mã đơn">
+                <MudText Typo="Typo.body2" Style="font-weight: 500;">@context.OrderNumber</MudText>
+            </MudTd>
+            <MudTd DataLabel="Khách hàng">@context.CustomerName</MudTd>
+            <MudTd DataLabel="Sản phẩm">@context.ProductName</MudTd>
+            <MudTd DataLabel="Mô tả">
+                <MudText Typo="Typo.caption" Style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
+                    @context.Description
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Trạng thái">
+                <MudChip T="string" Color="@StatusHelper.GetWarrantyStatusColor(context.Status)" Size="Size.Small" Variant="Variant.Filled">
+                    @StatusHelper.GetWarrantyStatusText(context.Status)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
+            <MudTd>
+                <div class="d-flex gap-1 flex-wrap">
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                              OnClick="() => ViewDetails(context.Id)">
+                        <MudIcon Icon="@Icons.Material.Filled.Visibility" Class="mr-1" Size="Size.Small" />
+                        Chi tiết
+                    </MudButton>
+                    @if (context.Status == "Pending")
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success"
+                                  OnClick="() => Approve(context.Id)">
+                            <MudIcon Icon="@Icons.Material.Filled.Check" Class="mr-1" Size="Size.Small" />
+                            Duyệt
+                        </MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
+                                  OnClick="() => Reject(context.Id)">
+                            <MudIcon Icon="@Icons.Material.Filled.Close" Class="mr-1" Size="Size.Small" />
+                            Từ chối
+                        </MudButton>
+                    }
+                    @if (context.Status == "Approved" && !context.InstallationBookingId.HasValue)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Info"
+                                  OnClick="() => CreateWarrantyBooking(context.Id, context.OrderId)">
+                            <MudIcon Icon="@Icons.Material.Filled.Event" Class="mr-1" Size="Size.Small" />
+                            Tạo lịch
+                        </MudButton>
+                    }
+                </div>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                           InfoFormat="{first_item}-{last_item} / {all_items}" />
+        </PagerContent>
+    </MudTable>
+</div>
 
 @code {
     private List<WarrantyRequestResponse> _warrantyRequests = new();
+    private List<WarrantyRequestResponse> _allRequests = new();
     private bool _loading = true;
     private string _searchString = "";
+    private string _selectedStatus = "Pending";
+    private int _pendingCount = 0;
+
+    private readonly string[] _statusList = new[]
+    {
+        "Pending", "Approved", "InProgress", "Completed", "Rejected"
+    };
 
     private bool FilterWarrantyRequests(WarrantyRequestResponse warrantyRequest)
     {
-        if (string.IsNullOrWhiteSpace(_searchString))
+        if (string.IsNullOrWhiteSpace(_searchString) && string.IsNullOrWhiteSpace(_selectedStatus))
             return true;
 
-        return warrantyRequest.OrderNumber.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
-               warrantyRequest.Id.ToString().Contains(_searchString) ||
-               warrantyRequest.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
-               warrantyRequest.ProductName.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+        var matchesSearch = string.IsNullOrWhiteSpace(_searchString) ||
+            warrantyRequest.OrderNumber.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            warrantyRequest.Id.ToString().Contains(_searchString) ||
+            warrantyRequest.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            warrantyRequest.ProductName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            warrantyRequest.CustomerName.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+
+        var matchesStatus = string.IsNullOrWhiteSpace(_selectedStatus) ||
+            warrantyRequest.Status == _selectedStatus;
+
+        return matchesSearch && matchesStatus;
     }
 
     protected override async Task OnInitializedAsync()
@@ -111,8 +147,14 @@
         try
         {
             var allRequests = await WarrantyRequestService.GetAllAsync();
-            // Show all warranty request statuses including InProgress and Completed
-            _warrantyRequests = allRequests.ToList();
+            _allRequests = allRequests.ToList();
+            _pendingCount = _allRequests.Count(w => w.Status == "Pending");
+
+            // Default sort: Pending first, then by date descending
+            _warrantyRequests = _allRequests
+                .OrderByDescending(w => w.Status == "Pending")
+                .ThenByDescending(w => w.CreatedAt)
+                .ToList();
         }
         catch (Exception ex)
         {

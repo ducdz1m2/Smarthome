@@ -104,13 +104,15 @@ else
                             }
                             @if (_product.Variants.Any())
                             {
-                                @if (_selectedVariant?.StockQuantity <= 0)
+                                // Calculate total available stock from all variants
+                                var totalAvailableStock = _product.Variants.Where(v => v.IsActive).Sum(v => v.AvailableStock);
+                                @if (totalAvailableStock <= 0)
                                 {
                                     <MudChip T="string" Color="Color.Error" Size="Size.Small">Hết hàng</MudChip>
                                 }
-                                else if (_selectedVariant?.StockQuantity <= 10)
+                                else if (_selectedVariant != null && _selectedVariant.AvailableStock <= 0)
                                 {
-                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Còn @_selectedVariant.StockQuantity sản phẩm</MudChip>
+                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Phân loại này hết hàng</MudChip>
                                 }
                                 else
                                 {

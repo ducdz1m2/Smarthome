@@ -557,6 +557,9 @@ namespace Application.Services
             if (entry.IsCompleted)
                 throw new DomainException("Phiếu nhập kho đã được hoàn thành");
 
+            if (entry.Details == null || !entry.Details.Any())
+                throw new DomainException("Phiếu nhập kho không có chi tiết");
+
             foreach (var detail in entry.Details)
             {
                 Console.WriteLine($"[CompleteStockEntryAsync] Processing detail: ProductId={detail.ProductId}, VariantId={detail.VariantId}, Quantity={detail.Quantity}, UnitCost={detail.UnitCost}");

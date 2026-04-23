@@ -191,6 +191,26 @@ public class WarrantyRequestService : IWarrantyRequestService
         // Get product info
         var product = await _productRepository.GetByIdAsync(warrantyRequest.ProductId);
 
+        // Get order info for customer name
+        string customerName = "";
+        string customerPhone = "";
+        if (warrantyRequest.OrderId > 0)
+        {
+            try
+            {
+                var order = await _orderRepository.GetByIdAsync(warrantyRequest.OrderId);
+                if (order != null)
+                {
+                    customerName = order.ReceiverName;
+                    customerPhone = order.ReceiverPhone?.ToString() ?? "";
+                }
+            }
+            catch
+            {
+                // Ignore errors loading order
+            }
+        }
+
         return new WarrantyRequestResponse
         {
             Id = warrantyRequest.Id,
@@ -203,8 +223,8 @@ public class WarrantyRequestService : IWarrantyRequestService
             AssignedTechnicianId = warrantyRequest.AssignedTechnicianId,
             OrderNumber = warrantyRequest.OrderId > 0 ? $"ORD{warrantyRequest.OrderId:D8}" : $"WRT{warrantyRequest.Id:D8}",
             ProductName = product?.Name ?? "Unknown",
-            CustomerName = "", // Will be loaded from order if needed
-            CustomerPhone = "", // Will be loaded from order if needed
+            CustomerName = customerName,
+            CustomerPhone = customerPhone,
             WarrantyType = warrantyRequest.WarrantyType.ToString(),
             Description = warrantyRequest.Description,
             Status = warrantyRequest.Status.ToString(),

@@ -12,74 +12,112 @@
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 
-<PageHeader Title="Quản lý Đơn hàng" ShowAddButton="false" />
+<div class="pa-4">
+    <PageHeader Title="Quản lý Đơn hàng" ShowAddButton="false" />
 
-<FilterBar>
-    <MudItem xs="12" sm="6" md="3">
-        <MudSelect T="string" Label="Lọc theo trạng thái" @bind-Value="_selectedStatus" Clearable="true" Variant="Variant.Outlined">
-            <MudSelectItem T="string" Value="@null">Tất cả</MudSelectItem>
-            @foreach (var status in _statusList)
-            {
-                <MudSelectItem Value="@status">@StatusHelper.GetOrderStatusText(status)</MudSelectItem>
-            }
-        </MudSelect>
-    </MudItem>
-</FilterBar>
+    <FilterBar>
+        <MudItem xs="12" sm="6" md="3">
+            <MudSelect T="string" Label="Lọc theo trạng thái" @bind-Value="_selectedStatus" Clearable="true" Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@null">Tất cả</MudSelectItem>
+                @foreach (var status in _statusList)
+                {
+                    <MudSelectItem Value="@status">@StatusHelper.GetOrderStatusText(status)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudTextField @bind-Value="_searchString" Placeholder="Tìm kiếm theo mã đơn, tên khách hàng, địa chỉ..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined" Immediate="true"></MudTextField>
+        </MudItem>
+    </FilterBar>
 
-<DataTable Items="_orders" Title="Danh sách đơn hàng" Loading="_loading"
-           FilterFunc="@FilterOrders">
-    <HeaderContent>
-        <MudTh width="80px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.Id)">ID</MudTableSortLabel></MudTh>
-        <MudTh width="100px">Loại</MudTh>
-        <MudTh width="150px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.OrderNumber)">Mã đơn</MudTableSortLabel></MudTh>
-        <MudTh width="150px">Khách hàng</MudTh>
-        <MudTh width="150px">Điện thoại</MudTh>
-        <MudTh width="200px">Địa chỉ</MudTh>
-        <MudTh width="120px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.TotalAmount)">Tổng tiền</MudTableSortLabel></MudTh>
-        <MudTh width="120px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.Status)">Trạng thái</MudTableSortLabel></MudTh>
-        <MudTh width="120px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.CreatedAt)">Ngày tạo</MudTableSortLabel></MudTh>
-        <MudTh width="100px">Thao tác</MudTh>
-    </HeaderContent>
-    <RowTemplate>
-        <MudTd DataLabel="ID">@context.Id</MudTd>
-        <MudTd DataLabel="Loại">
-            @if (context.HasUninstallBooking)
-            {
-                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Tháo dỡ</MudChip>
-            }
-            @if (context.HasWarrantyRequest)
-            {
-                <MudChip T="string" Color="Color.Info" Size="Size.Small">Bảo hành</MudChip>
-            }
-        </MudTd>
-        <MudTd DataLabel="Mã đơn">
-            <MudText Typo="Typo.body2" Style="font-weight: 500;">@context.OrderNumber</MudText>
-        </MudTd>
-        <MudTd DataLabel="Khách hàng">@context.ReceiverName</MudTd>
-        <MudTd DataLabel="Điện thoại">@context.ReceiverPhone</MudTd>
-        <MudTd DataLabel="Địa chỉ">
-            <MudText Typo="Typo.caption" Style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
-                @context.ShippingAddress
-            </MudText>
-        </MudTd>
-        <MudTd DataLabel="Tổng tiền">
-            <MudText Typo="Typo.body2" Color="Color.Primary" Style="font-weight: 500;">
-                @context.TotalAmount.ToString("N0") đ
-            </MudText>
-        </MudTd>
-        <MudTd DataLabel="Trạng thái">
-            <MudChip T="string" Color="@StatusHelper.GetOrderStatusColor(context.Status)" Size="Size.Small" Variant="Variant.Filled">
-                @StatusHelper.GetOrderStatusText(context.Status)
-            </MudChip>
-        </MudTd>
-        <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
-        <MudTd>
-            <ActionButtons ShowEdit="false" ShowAdd="false" ShowDelete="false" ShowView="true" ShowCancel="@CanCancel(context.Status)"
-                          OnView="@(() => OpenOrderDialog(context))"
-                          OnCancel="@(() => CancelOrder(context))" />
-        </MudTd>
-    </RowTemplate>
-</DataTable>
+    <MudTable Items="_orders" Dense="true" Hover="true" Loading="_loading"
+              LoadingProgressColor="Color.Primary" Striped="true" Bordered="true"
+              Filter="@FilterOrders" SortMode="SortMode.Single" AllowUnsorted="false">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Danh sách đơn hàng</MudText>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh width="80px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.Id)">ID</MudTableSortLabel></MudTh>
+            <MudTh width="100px">Loại</MudTh>
+            <MudTh width="150px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.OrderNumber)">Mã đơn</MudTableSortLabel></MudTh>
+            <MudTh width="150px">Khách hàng</MudTh>
+            <MudTh width="150px">Điện thoại</MudTh>
+            <MudTh width="200px">Địa chỉ</MudTh>
+            <MudTh width="120px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.TotalAmount)">Tổng tiền</MudTableSortLabel></MudTh>
+            <MudTh width="120px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.Status)">Trạng thái</MudTableSortLabel></MudTh>
+            <MudTh width="120px"><MudTableSortLabel T="OrderResponse" SortBy="@(o => o.CreatedAt)">Ngày tạo</MudTableSortLabel></MudTh>
+            <MudTh width="180px">Thao tác</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="ID">@context.Id</MudTd>
+            <MudTd DataLabel="Loại">
+                @switch (context.OrderType)
+                {
+                    case "Ship":
+                        <MudChip T="string" Color="Color.Primary" Size="Size.Small">Ship</MudChip>
+                        break;
+                    case "Lắp đặt":
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small">Lắp đặt</MudChip>
+                        break;
+                    case "Đơn ghép":
+                        <MudChip T="string" Color="Color.Secondary" Size="Size.Small">Đơn ghép</MudChip>
+                        break;
+                    default:
+                        <MudChip T="string" Color="Color.Default" Size="Size.Small">@context.OrderType</MudChip>
+                        break;
+                }
+                @if (context.HasUninstallBooking)
+                {
+                    <MudChip T="string" Color="Color.Warning" Size="Size.Small" Class="ml-1">Tháo dỡ</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Mã đơn">
+                <MudText Typo="Typo.body2" Style="font-weight: 500;">@context.OrderNumber</MudText>
+            </MudTd>
+            <MudTd DataLabel="Khách hàng">@context.ReceiverName</MudTd>
+            <MudTd DataLabel="Điện thoại">@context.ReceiverPhone</MudTd>
+            <MudTd DataLabel="Địa chỉ">
+                <MudText Typo="Typo.caption" Style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
+                    @context.ShippingAddress
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Tổng tiền">
+                <MudText Typo="Typo.body2" Color="Color.Primary" Style="font-weight: 500;">
+                    @context.TotalAmount.ToString("N0") đ
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Trạng thái">
+                <MudChip T="string" Color="@StatusHelper.GetOrderStatusColor(context.Status)" Size="Size.Small" Variant="Variant.Filled">
+                    @StatusHelper.GetOrderStatusText(context.Status)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Ngày tạo">@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
+            <MudTd>
+                <div class="d-flex gap-1 flex-wrap">
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                              OnClick="() => OpenOrderDialog(context)">
+                        <MudIcon Icon="@Icons.Material.Filled.Visibility" Class="mr-1" Size="Size.Small" />
+                        Chi tiết
+                    </MudButton>
+                    @if (CanCancel(context.Status))
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
+                                  OnClick="() => CancelOrder(context)">
+                            <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-1" Size="Size.Small" />
+                            Hủy
+                        </MudButton>
+                    }
+                </div>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager RowsPerPageString="Số dòng:" rowsPerPageOptions="new[] { 5, 10, 25, 50 }"
+                           InfoFormat="{first_item}-{last_item} / {all_items}" />
+        </PagerContent>
+    </MudTable>
+</div>
 
 @code {
     private List<OrderResponse> _orders = new();
@@ -87,7 +125,7 @@
     private bool _loading = true;
     private string _searchString = "";
     private string _selectedStatus = "";
-    
+
     private readonly string[] _statusList = new[]
     {
         "Pending", "Confirmed", "AwaitingPickup", "Shipping", "Delivered",
@@ -97,13 +135,19 @@
 
     private bool FilterOrders(OrderResponse order)
     {
-        if (string.IsNullOrWhiteSpace(_searchString))
+        if (string.IsNullOrWhiteSpace(_searchString) && string.IsNullOrWhiteSpace(_selectedStatus))
             return true;
-        
-        return order.OrderNumber.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
-               order.ReceiverName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
-               (order.ReceiverPhone?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
-               (order.ShippingAddress?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+
+        var matchesSearch = string.IsNullOrWhiteSpace(_searchString) ||
+            order.OrderNumber.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            order.ReceiverName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            (order.ReceiverPhone?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (order.ShippingAddress?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+
+        var matchesStatus = string.IsNullOrWhiteSpace(_selectedStatus) ||
+            order.Status.Equals(_selectedStatus, StringComparison.OrdinalIgnoreCase);
+
+        return matchesSearch && matchesStatus;
     }
 
     protected override async Task OnInitializedAsync()
@@ -117,7 +161,11 @@
         try
         {
             _allOrders = await OrderService.GetAllAsync();
-            ApplyStatusFilter();
+            // Default sort: Pending first, then by date descending
+            _orders = _allOrders
+                .OrderByDescending(o => o.Status == "Pending")
+                .ThenByDescending(o => o.CreatedAt)
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -126,18 +174,6 @@
         finally
         {
             _loading = false;
-        }
-    }
-
-    private void ApplyStatusFilter()
-    {
-        if (string.IsNullOrWhiteSpace(_selectedStatus))
-        {
-            _orders = _allOrders;
-        }
-        else
-        {
-            _orders = _allOrders.Where(o => o.Status.Equals(_selectedStatus, StringComparison.OrdinalIgnoreCase)).ToList();
         }
     }
 

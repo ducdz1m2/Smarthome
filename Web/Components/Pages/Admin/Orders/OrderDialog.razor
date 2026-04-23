@@ -473,20 +473,30 @@
         if (_checkboxStates.ContainsKey(orderItemId) && _checkboxStates[orderItemId].ContainsKey(warehouseId))
         {
             var currentState = _checkboxStates[orderItemId][warehouseId];
-            _checkboxStates[orderItemId][warehouseId] = !currentState;
-            
+
             if (!currentState)
             {
+                // If selecting a warehouse, deselect all other warehouses for this item
+                foreach (var whId in _checkboxStates[orderItemId].Keys.ToList())
+                {
+                    if (whId != warehouseId)
+                    {
+                        _checkboxStates[orderItemId][whId] = false;
+                        _warehouseAllocations[orderItemId].RemoveAll(a => a.WarehouseId == whId);
+                    }
+                }
+                _checkboxStates[orderItemId][warehouseId] = true;
+
                 // Create allocation
                 if (!_warehouseAllocations[orderItemId].Any(a => a.WarehouseId == warehouseId))
                 {
-                    var availableStock = _availableStockByWarehouse.ContainsKey(orderItemId) && 
+                    var availableStock = _availableStockByWarehouse.ContainsKey(orderItemId) &&
                                          _availableStockByWarehouse[orderItemId].ContainsKey(warehouseId)
                                          ? _availableStockByWarehouse[orderItemId][warehouseId]
                                          : 0;
-                    _warehouseAllocations[orderItemId].Add(new WarehouseAllocationItem 
-                    { 
-                        WarehouseId = warehouseId, 
+                    _warehouseAllocations[orderItemId].Add(new WarehouseAllocationItem
+                    {
+                        WarehouseId = warehouseId,
                         Quantity = 1,
                         AvailableStock = availableStock
                     });
@@ -494,7 +504,8 @@
             }
             else
             {
-                // Remove allocation
+                // Deselect the warehouse
+                _checkboxStates[orderItemId][warehouseId] = false;
                 _warehouseAllocations[orderItemId].RemoveAll(a => a.WarehouseId == warehouseId);
             }
         }
