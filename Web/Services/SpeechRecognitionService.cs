@@ -115,6 +115,7 @@ public class SpeechRecognitionService : IAsyncDisposable
     [JSInvokable]
     public async Task OnAudioCaptured(byte[] audioData, string mimeType)
     {
+        Console.WriteLine($"[SpeechRecognitionService] OnAudioCaptured: {audioData.Length} bytes, mimeType={mimeType}");
         _isRecording = false;
 
         var callback = _onTranscribed;
@@ -146,6 +147,7 @@ public class SpeechRecognitionService : IAsyncDisposable
         catch (Exception ex)
         {
             Console.WriteLine($"[SpeechRecognitionService] Transcription error: {ex.Message}");
+            Console.WriteLine($"[SpeechRecognitionService] Stack trace: {ex.StackTrace}");
         }
     }
 
@@ -160,7 +162,7 @@ public class SpeechRecognitionService : IAsyncDisposable
 
         try
         {
-            Console.WriteLine($"[SpeechRecognitionService] TTS: '{text[..Math.Min(50, text.Length)]}...'");
+            Console.WriteLine($"[SpeechRecognitionService] SpeakAsync: '{text[..Math.Min(50, text.Length)]}...', speed={speed}, speakerId={speakerId}");
             var wavBytes = await _speechService.SynthesizeAsync(text, speed, speakerId);
 
             if (wavBytes == null || wavBytes.Length == 0)
@@ -169,12 +171,15 @@ public class SpeechRecognitionService : IAsyncDisposable
                 return;
             }
 
+            Console.WriteLine($"[SpeechRecognitionService] TTS audio received: {wavBytes.Length} bytes, sending to JS for playback");
             // Phát audio qua JS
             await _jsRuntime.InvokeVoidAsync("speechRecognition.playAudio", wavBytes);
+            Console.WriteLine("[SpeechRecognitionService] Audio playback initiated via JS");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[SpeechRecognitionService] SpeakAsync error: {ex.Message}");
+            Console.WriteLine($"[SpeechRecognitionService] Stack trace: {ex.StackTrace}");
         }
     }
 

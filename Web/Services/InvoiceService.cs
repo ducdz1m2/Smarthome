@@ -102,11 +102,11 @@ namespace Web.Services
             {
                 table.ColumnsDefinition(columns =>
                 {
-                    columns.ConstantItem(50);
-                    columns.RelativeItem();
-                    columns.ConstantItem(80);
-                    columns.ConstantItem(80);
-                    columns.ConstantItem(100);
+                    columns.ConstantColumn(50);
+                    columns.RelativeColumn();
+                    columns.ConstantColumn(80);
+                    columns.ConstantColumn(80);
+                    columns.ConstantColumn(100);
                 });
 
                 table.Header(header =>
@@ -137,25 +137,25 @@ namespace Web.Services
                 column.Item().Row(row =>
                 {
                     row.RelativeItem().AlignRight().Text("Tạm tính:");
-                    row.ConstantColumn(150).AlignRight().Text($"{_order.SubTotal:N0} đ");
+                    row.ConstantItem(150).AlignRight().Text($"{_order.SubTotal:N0} đ");
                 });
 
                 column.Item().Row(row =>
                 {
                     row.RelativeItem().AlignRight().Text("Phí vận chuyển:");
-                    row.ConstantColumn(150).AlignRight().Text($"{_order.ShippingFee:N0} đ");
+                    row.ConstantItem(150).AlignRight().Text($"{_order.ShippingFee:N0} đ");
                 });
 
                 column.Item().Row(row =>
                 {
                     row.RelativeItem().AlignRight().Text("Giảm giá:");
-                    row.ConstantColumn(150).AlignRight().Text($"- {_order.DiscountAmount:N0} đ");
+                    row.ConstantItem(150).AlignRight().Text($"- {_order.DiscountAmount:N0} đ");
                 });
 
                 column.Item().PaddingTop(10).Row(row =>
                 {
                     row.RelativeItem().AlignRight().Text("Tổng cộng:").Bold().FontSize(12);
-                    row.ConstantColumn(150).AlignRight().Text($"{_order.TotalAmount:N0} đ").Bold().FontSize(12);
+                    row.ConstantItem(150).AlignRight().Text($"{_order.TotalAmount:N0} đ").Bold().FontSize(12);
                 });
             });
         }

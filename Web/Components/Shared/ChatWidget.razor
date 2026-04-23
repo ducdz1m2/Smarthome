@@ -1264,11 +1264,14 @@
         {
             try
             {
-                await SpeechService.SynthesizeAsync(text);
+                Console.WriteLine($"[ChatWidget] PlayTTS: '{text[..Math.Min(50, text.Length)]}...'");
+                await SpeechRecognitionService.SpeakAsync(text);
+                Console.WriteLine("[ChatWidget] TTS playback initiated");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"TTS error: {ex.Message}");
+                Console.WriteLine($"[ChatWidget] TTS error: {ex.Message}");
+                Snackbar.Add($"Lỗi phát giọng nói: {ex.Message}", Severity.Error);
             }
         }
     }

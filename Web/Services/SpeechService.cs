@@ -27,6 +27,7 @@ public class SpeechService
 
         try
         {
+            Console.WriteLine($"[SpeechService] TranscribeAsync: {audioData.Length} bytes, mimeType={mimeType}");
             using var httpClient = _httpClientFactory.CreateClient();
             using var content = new MultipartFormDataContent();
             using var audioContent = new ByteArrayContent(audioData);
@@ -39,6 +40,7 @@ public class SpeechService
                           : "recording.webm";
             content.Add(audioContent, "audio", extension);
 
+            Console.WriteLine($"[SpeechService] Sending to {BaseUrl}/stt");
             var response = await httpClient.PostAsync($"{BaseUrl}/stt", content);
             if (!response.IsSuccessStatusCode)
             {
@@ -48,12 +50,14 @@ public class SpeechService
             }
 
             var json = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[SpeechService] STT response: {json}");
             using var doc = System.Text.Json.JsonDocument.Parse(json);
             return doc.RootElement.GetProperty("text").GetString();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[SpeechService] TranscribeAsync error: {ex.Message}");
+            Console.WriteLine($"[SpeechService] Stack trace: {ex.StackTrace}");
             return null;
         }
     }
@@ -67,6 +71,7 @@ public class SpeechService
 
         try
         {
+            Console.WriteLine($"[SpeechService] SynthesizeAsync: '{text[..Math.Min(50, text.Length)]}...', speed={speed}, speakerId={speakerId}");
             using var httpClient = _httpClientFactory.CreateClient();
             var payload = System.Text.Json.JsonSerializer.Serialize(new
             {
@@ -80,6 +85,7 @@ public class SpeechService
                 System.Text.Encoding.UTF8,
                 "application/json");
 
+            Console.WriteLine($"[SpeechService] Sending to {BaseUrl}/tts");
             var response = await httpClient.PostAsync($"{BaseUrl}/tts", content);
             if (!response.IsSuccessStatusCode)
             {
@@ -88,11 +94,14 @@ public class SpeechService
                 return null;
             }
 
-            return await response.Content.ReadAsByteArrayAsync();
+            var audioBytes = await response.Content.ReadAsByteArrayAsync();
+            Console.WriteLine($"[SpeechService] TTS success: {audioBytes.Length} bytes");
+            return audioBytes;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[SpeechService] SynthesizeAsync error: {ex.Message}");
+            Console.WriteLine($"[SpeechService] Stack trace: {ex.StackTrace}");
             return null;
         }
     }
