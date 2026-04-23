@@ -220,7 +220,9 @@ namespace Application.Services
             int totalAllocated = 0;
             foreach (var allocation in allocations)
             {
-                var productWarehouse = await _productWarehouseRepository.GetByProductVariantAndWarehouseAsync(
+                Console.WriteLine($"[ApplyManualWarehouseAllocationsAsync] Processing allocation: OrderItemId={orderItem.Id}, ProductId={orderItem.ProductId}, VariantId={orderItem.VariantId}, WarehouseId={allocation.WarehouseId}, Quantity={allocation.Quantity}");
+
+                var productWarehouse = await _productWarehouseRepository.GetByProductVariantAndWarehouseForUpdateAsync(
                     orderItem.ProductId,
                     orderItem.VariantId,
                     allocation.WarehouseId
@@ -229,11 +231,14 @@ namespace Application.Services
                 if (productWarehouse == null)
                     throw new DomainException($"Sản phẩm ID {orderItem.ProductId} (Variant ID: {orderItem.VariantId}) không có trong kho ID {allocation.WarehouseId}");
 
+                Console.WriteLine($"[ApplyManualWarehouseAllocationsAsync] Found ProductWarehouse: Quantity={productWarehouse.Quantity}, ReservedQuantity={productWarehouse.ReservedQuantity}, AvailableStock={productWarehouse.GetAvailableStock()}");
+
                 if (productWarehouse.GetAvailableStock() < allocation.Quantity)
                     throw new DomainException($"Kho ID {allocation.WarehouseId} không đủ hàng. Cần {allocation.Quantity}, có sẵn {productWarehouse.GetAvailableStock()}");
 
-                // Reserve stock in warehouse (entity is already tracked, no need to call Update)
-                productWarehouse.Reserve(allocation.Quantity);
+                // Dispatch stock in warehouse (deduct from actual quantity)
+                productWarehouse.Dispatch(allocation.Quantity);
+                Console.WriteLine($"[ApplyManualWarehouseAllocationsAsync] After Dispatch: Quantity={productWarehouse.Quantity}, ReservedQuantity={productWarehouse.ReservedQuantity}, AvailableStock={productWarehouse.GetAvailableStock()}");
 
                 var allocationEntity = Domain.Entities.Sales.OrderWarehouseAllocation.Create(
                     orderItem.Id,
@@ -241,6 +246,7 @@ namespace Application.Services
                     allocation.Quantity
                 );
 
+                Console.WriteLine($"[ApplyManualWarehouseAllocationsAsync] Adding allocation entity to repository: OrderItemId={allocationEntity.OrderItemId}, WarehouseId={allocationEntity.WarehouseId}, Quantity={allocationEntity.AllocatedQuantity}");
                 await _orderWarehouseAllocationRepository.AddAsync(allocationEntity);
                 totalAllocated += allocation.Quantity;
             }
@@ -256,7 +262,7 @@ namespace Application.Services
                 orderItem.ProductId,
                 orderItem.VariantId
             );
-            
+
             if (!availableWarehouses.Any())
                 throw new DomainException($"Không có kho nào có sẵn sản phẩm ID {orderItem.ProductId} (Variant ID: {orderItem.VariantId})");
 
@@ -277,15 +283,25 @@ namespace Application.Services
 
                 if (allocateQuantity > 0)
                 {
-                    // Reserve stock in warehouse (entity is already tracked, no need to call Update)
-                    warehouse.Reserve(allocateQuantity);
+                    // Get tracked entity for update
+                    var productWarehouse = await _productWarehouseRepository.GetByProductVariantAndWarehouseForUpdateAsync(
+                        orderItem.ProductId,
+                        orderItem.VariantId,
+                        warehouse.WarehouseId
+                    );
+
+                    if (productWarehouse != null)
+                    {
+                        // Dispatch stock in warehouse (deduct from actual quantity)
+                        productWarehouse.Dispatch(allocateQuantity);
+                    }
 
                     var allocation = Domain.Entities.Sales.OrderWarehouseAllocation.Create(
                         orderItem.Id,
                         warehouse.WarehouseId,
                         allocateQuantity
                     );
-                    
+
                     await _orderWarehouseAllocationRepository.AddAsync(allocation);
                     remainingQuantity -= allocateQuantity;
                 }
@@ -362,11 +378,27 @@ namespace Application.Services
 
         public async Task<List<WarehouseAllocationResponse>> GetWarehouseAllocationsAsync(int orderId)
         {
+            Console.WriteLine($"[GetWarehouseAllocationsAsync] Loading allocations for OrderId: {orderId}");
             var order = await _orderRepository.GetByIdWithDetailsAsync(orderId);
             if (order == null)
+            {
+                Console.WriteLine($"[GetWarehouseAllocationsAsync] Order not found: {orderId}");
                 return new List<WarehouseAllocationResponse>();
+            }
+
+            Console.WriteLine($"[GetWarehouseAllocationsAsync] Order items in order:");
+            foreach (var item in order.Items)
+            {
+                Console.WriteLine($"[GetWarehouseAllocationsAsync] - OrderItemId: {item.Id}, ProductId: {item.ProductId}, Quantity: {item.Quantity}");
+            }
 
             var allocations = await _orderWarehouseAllocationRepository.GetByOrderIdAsync(orderId);
+            Console.WriteLine($"[GetWarehouseAllocationsAsync] Found {allocations.Count} allocations for OrderId: {orderId}");
+            foreach (var alloc in allocations)
+            {
+                Console.WriteLine($"[GetWarehouseAllocationsAsync] OrderItemId: {alloc.OrderItemId}, WarehouseId: {alloc.WarehouseId}, Quantity: {alloc.AllocatedQuantity}");
+            }
+
             var warehouses = await _warehouseService.GetAllAsync();
 
             return allocations.Select(a => new WarehouseAllocationResponse
@@ -532,6 +564,12 @@ namespace Application.Services
             // Group allocations by order item ID
             var allocationsByItem = allocations.GroupBy(a => a.OrderItemId).ToDictionary(g => g.Key, g => g.ToList());
 
+            Console.WriteLine($"[HandleWarehouseAllocationsForConfirmationAsync] OrderId: {order.Id}, Total allocations: {allocations.Count}");
+            foreach (var kvp in allocationsByItem)
+            {
+                Console.WriteLine($"[HandleWarehouseAllocationsForConfirmationAsync] OrderItemId: {kvp.Key}, Allocation count: {kvp.Value.Count}");
+            }
+
             foreach (var orderItem in orderWithDetails.Items.Where(i => !i.RequiresInstallation))
             {
                 if (allocationsByItem.TryGetValue(orderItem.Id, out var itemAllocations) && itemAllocations.Any())
@@ -544,7 +582,10 @@ namespace Application.Services
                 }
             }
 
+            await _orderWarehouseAllocationRepository.SaveChangesAsync();
+            await _productWarehouseRepository.SaveChangesAsync();
             await _orderRepository.SaveChangesAsync();
+            Console.WriteLine($"[HandleWarehouseAllocationsForConfirmationAsync] Saved changes for order {order.Id}");
         }
 
         private async Task CreateShipmentForOrderAsync(Order order)
@@ -579,27 +620,8 @@ namespace Application.Services
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
-            // Dispatch stock from warehouses for shipping items
-            foreach (var orderItem in order.Items.Where(i => !i.RequiresInstallation))
-            {
-                var allocations = await _orderWarehouseAllocationRepository.GetByOrderItemIdAsync(orderItem.Id);
-                foreach (var allocation in allocations)
-                {
-                    var productWarehouse = await _productWarehouseRepository.GetByProductVariantAndWarehouseAsync(
-                        orderItem.ProductId,
-                        orderItem.VariantId,
-                        allocation.WarehouseId
-                    );
-
-                    if (productWarehouse != null)
-                    {
-                        // Release reserved quantity first, then dispatch actual quantity
-                        productWarehouse.Release(allocation.AllocatedQuantity);
-                        productWarehouse.Dispatch(allocation.AllocatedQuantity);
-                        _productWarehouseRepository.Update(productWarehouse);
-                    }
-                }
-            }
+            // Note: Stock is already dispatched during confirmation (ApplyManualWarehouseAllocationsAsync)
+            // No need to dispatch again here
 
             order.StartShipping();
             await _orderRepository.SaveChangesAsync();
@@ -607,6 +629,7 @@ namespace Application.Services
 
         public async Task MarkDeliveredAsync(int id)
         {
+            Console.WriteLine($"[MarkDeliveredAsync] Marking order {id} as delivered");
             var order = await _orderRepository.GetByIdAsync(id);
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
@@ -614,6 +637,7 @@ namespace Application.Services
             // TODO: Get actual userId from authentication context
             order.MarkDelivered(0);
             await _orderRepository.SaveChangesAsync();
+            Console.WriteLine($"[MarkDeliveredAsync] Order {id} marked as delivered, new status: {order.Status}");
         }
 
         public async Task CancelAsync(int id, string reason)
@@ -623,7 +647,7 @@ namespace Application.Services
             if (order == null)
                 throw new DomainException("Không tìm thấy đơn hàng");
 
-            // Release reserved stock if order hasn't been shipped yet
+            // Return stock to warehouse if order hasn't been shipped yet
             if (order.Status.ToString() != "Shipping" && order.Status.ToString() != "Delivered" && order.Status.ToString() != "Completed")
             {
                 foreach (var orderItem in order.Items.Where(i => !i.RequiresInstallation))
@@ -631,7 +655,7 @@ namespace Application.Services
                     var allocations = await _orderWarehouseAllocationRepository.GetByOrderItemIdAsync(orderItem.Id);
                     foreach (var allocation in allocations)
                     {
-                        var productWarehouse = await _productWarehouseRepository.GetByProductVariantAndWarehouseAsync(
+                        var productWarehouse = await _productWarehouseRepository.GetByProductVariantAndWarehouseForUpdateAsync(
                             orderItem.ProductId,
                             orderItem.VariantId,
                             allocation.WarehouseId
@@ -639,8 +663,8 @@ namespace Application.Services
 
                         if (productWarehouse != null)
                         {
-                            productWarehouse.Release(allocation.AllocatedQuantity);
-                            _productWarehouseRepository.Update(productWarehouse);
+                            // Return stock back to warehouse
+                            productWarehouse.Receive(allocation.AllocatedQuantity);
                         }
                     }
                 }
@@ -648,6 +672,7 @@ namespace Application.Services
 
             var userId = _currentUserService.UserId ?? 0;
             order.Cancel(reason, userId);
+            await _productWarehouseRepository.SaveChangesAsync();
             await _orderRepository.SaveChangesAsync();
         }
 

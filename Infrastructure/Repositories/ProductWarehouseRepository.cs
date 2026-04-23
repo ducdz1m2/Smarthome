@@ -37,6 +37,12 @@ namespace Infrastructure.Repositories
                 .FirstOrDefaultAsync(pw => pw.ProductId == productId && pw.VariantId == variantId && pw.WarehouseId == warehouseId);
         }
 
+        public async Task<ProductWarehouse?> GetByProductVariantAndWarehouseForUpdateAsync(int productId, int? variantId, int warehouseId)
+        {
+            return await _context.ProductWarehouses
+                .FirstOrDefaultAsync(pw => pw.ProductId == productId && pw.VariantId == variantId && pw.WarehouseId == warehouseId);
+        }
+
         public async Task<List<ProductWarehouse>> GetByProductAsync(int productId)
         {
             return await _context.ProductWarehouses

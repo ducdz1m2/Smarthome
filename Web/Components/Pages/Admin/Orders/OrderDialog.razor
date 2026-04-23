@@ -186,35 +186,6 @@
                     </MudCard>
                 </MudItem>
                 
-                @if (_order.Shipments?.Any() == true)
-                {
-                    <MudItem xs="12">
-                        <MudCard Elevation="0" Class="mb-4">
-                            <MudCardHeader>
-                                <CardHeaderContent>
-                                    <MudText Typo="Typo.h6">Thông tin vận chuyển</MudText>
-                                </CardHeaderContent>
-                            </MudCardHeader>
-                            <MudCardContent>
-                                <MudTable Items="_order.Shipments" Dense="true">
-                                    <HeaderContent>
-                                        <MudTh>Mã vận đơn</MudTh>
-                                        <MudTh>Trạng thái</MudTh>
-                                        <MudTh>Đơn vị vận chuyển</MudTh>
-                                        <MudTh>Mã tracking</MudTh>
-                                    </HeaderContent>
-                                    <RowTemplate>
-                                        <MudTd>@context.TrackingNumber</MudTd>
-                                        <MudTd>@context.Status</MudTd>
-                                        <MudTd>@context.Carrier</MudTd>
-                                        <MudTd>@context.TrackingNumber</MudTd>
-                                    </RowTemplate>
-                                </MudTable>
-                            </MudCardContent>
-                        </MudCard>
-                    </MudItem>
-                }
-                
                 <MudItem xs="12">
                     <MudCard Elevation="0">
                         <MudCardContent>
@@ -321,8 +292,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Console.WriteLine($"[OrderDialog OnInitializedAsync] Initializing dialog with OrderId: {OrderId}, IsReadOnly: {IsReadOnly}");
         await LoadWarehouses();
         await LoadOrder();
+        Console.WriteLine($"[OrderDialog OnInitializedAsync] Dialog initialized, _order.Id: {_order?.Id}, _warehouseAllocations count: {_warehouseAllocations.Count}");
+        foreach (var kvp in _warehouseAllocations)
+        {
+            Console.WriteLine($"[OrderDialog OnInitializedAsync] _warehouseAllocations key: {kvp.Key}, value count: {kvp.Value.Count}");
+        }
     }
 
     private async Task LoadWarehouses()
@@ -343,7 +320,17 @@
         try
         {
             _order = await OrderService.GetByIdAsync(OrderId);
-            
+            if (_order == null)
+            {
+                Snackbar.Add("Không tìm thấy đơn hàng", Severity.Error);
+                return;
+            }
+
+            Console.WriteLine($"[LoadOrder] Loading order: OrderId={OrderId}, OrderNumber={_order.OrderNumber}, Status={_order.Status}");
+
+            // Clear allocations to prevent duplicates
+            _warehouseAllocations.Clear();
+
             // Initialize warehouse allocations dictionary and load available warehouses
             if (_order != null)
             {
@@ -361,20 +348,22 @@
 
                 // Load warehouse allocations once if order is not Pending
                 List<WarehouseAllocationResponse> allocations = new();
-                if (_order.Status != "Pending")
+                try
                 {
-                    try
-                    {
-                        allocations = await OrderService.GetWarehouseAllocationsAsync(OrderId);
-                    }
-                    catch (Exception ex)
-                    {
-                        Snackbar.Add($"Lỗi khi tải phân bổ kho: {ex.Message}", Severity.Warning);
-                    }
+                    Console.WriteLine($"[LoadOrder] Loading allocations for OrderId: {OrderId}, Order Status: {_order?.Status}");
+                    allocations = await OrderService.GetWarehouseAllocationsAsync(OrderId);
+                    Console.WriteLine($"[LoadOrder] Loaded {allocations.Count} allocations");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[LoadOrder] Error loading allocations: {ex.Message}");
+                    Snackbar.Add($"Lỗi khi tải phân bổ kho: {ex.Message}", Severity.Warning);
                 }
 
                 foreach (var item in _order.Items)
                 {
+                    Console.WriteLine($"[LoadOrder] Processing order item: Id={item.Id}, ProductId={item.ProductId}, RequiresInstallation={item.RequiresInstallation}");
+                    
                     if (!_warehouseAllocations.ContainsKey(item.Id))
                     {
                         _warehouseAllocations[item.Id] = new List<WarehouseAllocationItem>();
@@ -437,10 +426,11 @@
                         _checkboxStates[item.Id][warehouse.Id] = false;
                     }
 
-                    // If order is not Pending, load existing warehouse allocations for display
-                    if (_order.Status != "Pending" && !item.RequiresInstallation)
+                    // Load existing warehouse allocations for display
+                    if (!item.RequiresInstallation)
                     {
                         var itemAllocations = allocations.Where(a => a.OrderItemId == item.Id).ToList();
+                        Console.WriteLine($"[LoadOrder] OrderItemId: {item.Id}, ProductId: {item.ProductId}, Found allocations: {itemAllocations.Count}");
                         
                         // Remove duplicates by warehouse ID
                         var uniqueAllocations = itemAllocations
@@ -459,6 +449,7 @@
                                                    ? _availableStockByWarehouse[item.Id][alloc.WarehouseId]
                                                    : 0
                             });
+                            Console.WriteLine($"[LoadOrder] Added allocation: OrderItemId={item.Id}, WarehouseId={alloc.WarehouseId}, Quantity={alloc.Quantity}");
                         }
                     }
                 }
@@ -536,7 +527,7 @@
             await OrderService.ConfirmAsync(OrderId, warehouseAllocations);
             Snackbar.Add("Đã xác nhận đơn hàng", Severity.Success);
             await LoadOrder();
-            MudDialog.Close(DialogResult.Ok(true));
+            StateHasChanged();
         }
         catch (Exception ex)
         {
@@ -548,13 +539,16 @@
     {
         try
         {
+            Console.WriteLine($"[StartShipping] Starting shipping for OrderId: {OrderId}");
             await OrderService.StartShippingAsync(OrderId);
             Snackbar.Add("Đơn hàng bắt đầu giao", Severity.Success);
+            Console.WriteLine($"[StartShipping] Calling LoadOrder after StartShippingAsync");
             await LoadOrder();
-            MudDialog.Close(DialogResult.Ok(true));
+            Console.WriteLine($"[StartShipping] LoadOrder completed");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[StartShipping] Error: {ex.Message}");
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }
@@ -563,13 +557,16 @@
     {
         try
         {
+            Console.WriteLine($"[MarkDelivered] Marking order as delivered: OrderId={OrderId}");
             await OrderService.MarkDeliveredAsync(OrderId);
             Snackbar.Add("Đã đánh dấu đơn hàng đã giao", Severity.Success);
+            Console.WriteLine($"[MarkDelivered] Calling LoadOrder after MarkDeliveredAsync");
             await LoadOrder();
-            MudDialog.Close(DialogResult.Ok(true));
+            Console.WriteLine($"[MarkDelivered] LoadOrder completed");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[MarkDelivered] Error: {ex.Message}");
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
         }
     }
