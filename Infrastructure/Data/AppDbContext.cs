@@ -74,6 +74,7 @@ namespace Infrastructure.Data
         public DbSet<Domain.Entities.Communication.ChatRoom> ChatRooms => Set<Domain.Entities.Communication.ChatRoom>();
         public DbSet<Domain.Entities.Communication.ChatMessage> ChatMessages => Set<Domain.Entities.Communication.ChatMessage>();
         public DbSet<Domain.Entities.Communication.ChatParticipant> ChatParticipants => Set<Domain.Entities.Communication.ChatParticipant>();
+        public DbSet<Domain.Entities.Communication.ChatAttachment> ChatAttachments => Set<Domain.Entities.Communication.ChatAttachment>();
         public DbSet<Domain.Entities.Communication.Notification> Notifications => Set<Domain.Entities.Communication.Notification>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -11,15 +11,18 @@ namespace Application.Services;
 public class ChatService : IChatService
 {
     private readonly IChatRoomRepository _chatRoomRepository;
+    private readonly IChatMessageRepository _chatMessageRepository;
     private readonly IDomainEventDispatcher _eventDispatcher;
     private readonly IIdentityService _identityService;
 
     public ChatService(
         IChatRoomRepository chatRoomRepository,
+        IChatMessageRepository chatMessageRepository,
         IDomainEventDispatcher eventDispatcher,
         IIdentityService identityService)
     {
         _chatRoomRepository = chatRoomRepository;
+        _chatMessageRepository = chatMessageRepository;
         _eventDispatcher = eventDispatcher;
         _identityService = identityService;
     }
@@ -145,17 +148,36 @@ public class ChatService : IChatService
 
     public async Task<ChatMessageResponse> SendMessageAsync(int roomId, int senderId, UserType senderType, SendMessageRequest request)
     {
+        Console.WriteLine($"[ChatService] SendMessageAsync called - RoomId: {roomId}, SenderId: {senderId}, HasAttachments: {request.Attachments != null && request.Attachments.Any()}");
+        
         var room = await _chatRoomRepository.GetByIdWithParticipantsAsync(roomId);
         if (room == null)
             throw new InvalidOperationException("Chat room not found");
 
         var message = ChatMessage.Create(roomId, senderId, senderType, request.Content, senderId.ToString());
 
-        // Add message to room before saving
+        // Add message to room and save to get ID
         room.AddMessage(message);
-
         _chatRoomRepository.Update(room);
         await _chatRoomRepository.SaveChangesAsync();
+        Console.WriteLine($"[ChatService] Message saved with ID: {message.Id}");
+
+        // Add attachments using the message ID
+        if (request.Attachments != null && request.Attachments.Any())
+        {
+            Console.WriteLine($"[ChatService] Adding {request.Attachments.Count} attachments to message {message.Id}");
+            foreach (var attachmentRequest in request.Attachments)
+            {
+                Console.WriteLine($"[ChatService] Attachment - FileName: {attachmentRequest.FileName}, FileUrl: {attachmentRequest.FileUrl}, FileType: {attachmentRequest.FileType}");
+                var attachment = ChatAttachment.Create(message.Id, attachmentRequest.FileName, attachmentRequest.FileUrl, attachmentRequest.FileType, attachmentRequest.FileSize, senderId.ToString());
+                message.AddAttachment(attachment);
+            }
+            
+            // Update the message directly to ensure EF Core tracks the new attachments
+            _chatMessageRepository.Update(message);
+            await _chatMessageRepository.SaveChangesAsync();
+            Console.WriteLine($"[ChatService] Attachments saved");
+        }
 
         await _eventDispatcher.DispatchAsync(new ChatMessageSentEvent(
             roomId,
@@ -165,6 +187,15 @@ public class ChatService : IChatService
             request.Content,
             DateTime.UtcNow));
 
+        // Reload the message from database to ensure attachments are properly loaded
+        var reloadedMessage = await _chatMessageRepository.GetByIdAsync(message.Id);
+        if (reloadedMessage != null)
+        {
+            Console.WriteLine($"[ChatService] Reloaded message has {reloadedMessage.Attachments.Count()} attachments");
+            return await MapToMessageResponseAsync(reloadedMessage, senderId, senderType);
+        }
+
+        Console.WriteLine($"[ChatService] Failed to reload message, using original with {message.Attachments.Count()} attachments");
         return await MapToMessageResponseAsync(message, senderId, senderType);
     }
 

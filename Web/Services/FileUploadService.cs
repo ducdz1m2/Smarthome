@@ -5,7 +5,7 @@ namespace Web.Services
 {
     public class FileUploadService : IFileUploadService
     {
-        private const int MaxFileSizeMB = 5;
+        private const int MaxFileSizeMB = 10;
         private const int BytesPerMB = 1024 * 1024;
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<FileUploadService> _logger;
@@ -30,13 +30,13 @@ namespace Web.Services
             if (file == null || file.Length == 0)
                 throw new ArgumentException("File không hợp lệ");
 
-            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".doc", ".docx" };
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            
-            if (!allowedExtensions.Contains(extension))
-                throw new InvalidOperationException("Chỉ chấp nhận file ảnh (jpg, png, gif, webp)");
 
-            if (file.Length > MaxFileSizeMB * BytesPerMB) 
+            if (!allowedExtensions.Contains(extension))
+                throw new InvalidOperationException("Chỉ chấp nhận file ảnh (jpg, png, gif, webp) và tài liệu (pdf, doc, docx)");
+
+            if (file.Length > MaxFileSizeMB * BytesPerMB)
                 throw new InvalidOperationException($"File quá lớn. Tối đa {MaxFileSizeMB}MB");
 
             var tempFolder = Path.Combine(_environment.WebRootPath, "uploads", "temp");
@@ -54,6 +54,37 @@ namespace Web.Services
             _logger.LogInformation("Temp file uploaded: {FileName}", fileName);
             var baseUrl = GetBaseUrl();
             return $"{baseUrl}/uploads/temp/{fileName}";
+        }
+
+        public async Task<string> UploadChatAsync(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                throw new ArgumentException("File không hợp lệ");
+
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".doc", ".docx" };
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+            if (!allowedExtensions.Contains(extension))
+                throw new InvalidOperationException("Chỉ chấp nhận file ảnh (jpg, png, gif, webp) và tài liệu (pdf, doc, docx)");
+
+            if (file.Length > MaxFileSizeMB * BytesPerMB)
+                throw new InvalidOperationException($"File quá lớn. Tối đa {MaxFileSizeMB}MB");
+
+            var chatFolder = Path.Combine(_environment.WebRootPath, "uploads", "chat");
+            if (!Directory.Exists(chatFolder))
+                Directory.CreateDirectory(chatFolder);
+
+            var fileName = $"{Guid.NewGuid():N}{extension}";
+            var filePath = Path.Combine(chatFolder, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            _logger.LogInformation("Chat file uploaded: {FileName}", fileName);
+            var baseUrl = GetBaseUrl();
+            return $"{baseUrl}/uploads/chat/{fileName}";
         }
 
         public async Task<string> MoveToPermanentAsync(string tempPath, string folder)

@@ -58,4 +58,9 @@ public class ChatMessage : Entity
         DeletedAt = DateTime.UtcNow;
         DeletedBy = deletedBy;
     }
+
+    public void AddAttachment(ChatAttachment attachment)
+    {
+        _attachments.Add(attachment);
+    }
 }

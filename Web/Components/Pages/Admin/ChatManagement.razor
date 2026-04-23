@@ -1019,17 +1019,18 @@
             }
             
             var content = new MultipartFormDataContent();
-            var fileContent = new StreamContent(file.OpenReadStream());
+            using var fileStream = file.OpenReadStream();
+            using var fileContent = new StreamContent(fileStream);
             content.Add(fileContent, "file", file.Name);
 
-            var uploadUrl = $"{Navigation.BaseUri}api/chat/upload";
+            var uploadUrl = $"{Navigation.BaseUri}api/upload/chat";
             var response = await httpClient.PostAsync(uploadUrl, content);
             
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadAsStringAsync();
                 using var doc = System.Text.Json.JsonDocument.Parse(responseContent);
-                return doc.RootElement.TryGetProperty("fileUrl", out var fileUrlElem) ? fileUrlElem.GetString() : null;
+                return doc.RootElement.TryGetProperty("url", out var urlElem) ? urlElem.GetString() : null;
             }
             
             return null;

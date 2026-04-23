@@ -155,10 +155,10 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseSession();
 app.UseHttpsRedirection();
 
-// Serve static files from wwwroot/uploads
-app.UseStaticFiles();
+// Map static assets first (build-time assets)
+app.MapStaticAssets();
 
-// Serve chat uploads
+// Serve chat uploads (runtime uploads)
 var chatUploadsPath = Path.Combine(builder.Environment.WebRootPath, "uploads", "chat");
 if (!Directory.Exists(chatUploadsPath))
 {
@@ -170,7 +170,7 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/uploads/chat"
 });
 
-// Serve temp uploads
+// Serve temp uploads (runtime uploads)
 var tempUploadsPath = Path.Combine(builder.Environment.WebRootPath, "uploads", "temp");
 if (!Directory.Exists(tempUploadsPath))
 {
@@ -185,8 +185,6 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
