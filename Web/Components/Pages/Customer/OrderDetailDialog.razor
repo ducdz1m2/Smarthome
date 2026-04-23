@@ -19,6 +19,7 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject SignalRService SignalRService
 @inject NavigationManager NavigationManager
+@inject IInvoiceService InvoiceService
 
 <MudDialog>
     <DialogContent>
@@ -545,6 +546,13 @@
     <DialogActions>
         <MudButton OnClick="Close">Đóng</MudButton>
         
+        @if (_order != null)
+        {
+            <MudButton Color="Color.Primary" OnClick="ExportInvoice" StartIcon="@Icons.Material.Filled.PictureAsPdf">
+                Xuất hóa đơn
+            </MudButton>
+        }
+        
         @* Nút Hủy đơn - chỉ hiển thị khi đơn hàng đang chờ xác nhận *@
         @if (_order != null && _order.Status == "Pending")
         {
@@ -812,6 +820,24 @@
         catch (Exception ex)
         {
             Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ExportInvoice()
+    {
+        if (_order == null) return;
+
+        try
+        {
+            var pdfBytes = InvoiceService.GenerateInvoicePdf(_order);
+            var fileName = $"HoaDon_{_order.OrderNumber}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
+            
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, pdfBytes);
+            Snackbar.Add("Đã xuất hóa đơn thành công", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi xuất hóa đơn: {ex.Message}", Severity.Error);
         }
     }
 

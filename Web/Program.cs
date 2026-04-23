@@ -122,6 +122,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<Web.Services.AuthService>();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<Domain.Interfaces.ICurrentUserService>(provider => provider.GetRequiredService<CurrentUserService>());
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 builder.Services.AddHttpContextAccessor();
 
 // Register SignalR services
