@@ -1,4 +1,4 @@
-# Smarthome - Hệ Thống Quản Lý Bán Hàng & Lắp Đặt Thiết Bị Nhà Thông Minh
+# Xây dựng website kinh doanh thiết bị smart-home
 
 > **Mã nguồn demo luận văn** - Hệ thống thương mại điện tử tích hợp quản lý kho, lắp đặt, bảo hành và chat real-time cho thiết bị nhà thông minh.
 
@@ -495,4 +495,5 @@ Mã nguồn này được cung cấp cho mục đích **demo luận văn**. Khô
 
 **Phiên bản**: 1.0  
 **Ngày cập nhật**: Tháng 4/2026  
-**Tác giả**: Luận văn tốt nghiệp
+**Tác giả**: Lê Ngọc Đức, MSSV: B2205935  
+**Tên đề tài**: Xây dựng website kinh doanh thiết bị smart-home
