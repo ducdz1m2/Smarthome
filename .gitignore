@@ -361,3 +361,19 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Uploaded temp files
+Web/wwwroot/uploads/temp/
+
+# SQL migration scripts (generated/backup)
+*.sql
+temp_*.razor
+
+# Node package files at root
+package.json
+package-lock.json
+
+# Screenshots/error images
+*-screenshot.png
+initial-*.png
+no-*.png
