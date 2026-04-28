@@ -28,6 +28,8 @@ public class ChatHub : Hub
     public async Task SendMessage(int roomId, int senderId, string senderType, string content,
         string? fileUrl = null, string? fileName = null, string? fileType = null, long? fileSize = null)
     {
+        Console.WriteLine($"[ChatHub] SendMessage - RoomId: {roomId}, SenderId: {senderId}, SenderType: {senderType}");
+        
         if (!Enum.TryParse<UserType>(senderType, out var userType))
             userType = UserType.Customer;
 
@@ -48,12 +50,16 @@ public class ChatHub : Hub
 
         try
         {
+            Console.WriteLine($"[ChatHub] Calling ChatService.SendMessageAsync...");
             var message = await _chatService.SendMessageAsync(roomId, senderId, userType, request);
+            Console.WriteLine($"[ChatHub] Message saved to DB, broadcasting to group chat_{roomId}");
             await Clients.Group($"chat_{roomId}").SendAsync("ReceiveMessage", message);
+            Console.WriteLine($"[ChatHub] Message broadcasted successfully");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[ChatHub] Error sending message: {ex.Message}");
+            Console.WriteLine($"[ChatHub] Stack trace: {ex.StackTrace}");
         }
     }
 }

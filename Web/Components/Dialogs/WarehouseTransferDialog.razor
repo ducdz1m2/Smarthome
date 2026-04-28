@@ -30,7 +30,7 @@
             </MudItem>
             <MudItem xs="12" md="6">
                 <MudSelect T="int" Label="Kho đích" @bind-Value="_toWarehouseId" Required="true">
-                    @foreach (var warehouse in (DestinationWarehouses ?? AvailableWarehouses))
+                    @foreach (var warehouse in (DestinationWarehouses ?? AvailableWarehouses ?? _warehouses ?? new List<WarehouseResponse>()))
                     {
                         <MudSelectItem T="int" Value="@warehouse.Id">@warehouse.Name (@warehouse.Code)</MudSelectItem>
                     }
@@ -137,7 +137,7 @@
             
             _products = await InventoryService.GetProductInventoryAsync();
 
-            // Use booking materials if provided, otherwise use all products
+            // Use booking materials if provided
             if (BookingMaterials != null && BookingMaterials.Any())
             {
                 _materials = BookingMaterials;
@@ -145,6 +145,24 @@
                 foreach (var material in _materials)
                 {
                     _selectedMaterials[material.Id] = true;
+                }
+            }
+            else if (SelectedProductId > 0)
+            {
+                // Only show the selected product
+                var selectedProduct = _products.FirstOrDefault(p => p.ProductId == SelectedProductId);
+                if (selectedProduct != null)
+                {
+                    _materials = new List<InstallationMaterialResponse>
+                    {
+                        new InstallationMaterialResponse
+                        {
+                            ProductId = selectedProduct.ProductId,
+                            ProductName = selectedProduct.ProductName,
+                            QuantityTaken = 1
+                        }
+                    };
+                    _selectedMaterials[_materials[0].Id] = true;
                 }
             }
             else

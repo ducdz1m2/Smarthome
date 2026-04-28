@@ -13,11 +13,8 @@
 @inject IInstallationService InstallationService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
-@inject IChatService ChatService
 @inject CurrentUserService CurrentUser
 @inject IJSRuntime JSRuntime
-@inject IHttpClientFactory HttpClientFactory
-@inject SignalRService SignalRService
 @inject NavigationManager NavigationManager
 @inject IInvoiceService InvoiceService
 
@@ -167,6 +164,22 @@
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">Phương thức thanh toán</MudText>
                                         <MudText Typo="Typo.caption">@GetPaymentMethodText(_order.PaymentMethod)</MudText>
                                     </div>
+                                    @if (!string.IsNullOrEmpty(_order.PaymentStatus))
+                                    {
+                                        <div class="d-flex justify-space-between mt-2">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Trạng thái thanh toán</MudText>
+                                            <MudChip T="string" Size="Size.Small" Color="@GetPaymentStatusColor(_order.PaymentStatus)">
+                                                @GetPaymentStatusText(_order.PaymentStatus)
+                                            </MudChip>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(_order.TransactionCode))
+                                    {
+                                        <div class="d-flex justify-space-between mt-2">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Mã giao dịch</MudText>
+                                            <MudText Typo="Typo.caption">@_order.TransactionCode</MudText>
+                                        </div>
+                                    }
                                 </MudCardContent>
                             </MudCard>
                         </MudItem>
@@ -412,6 +425,13 @@
                                                 <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Color="Color.Secondary" />
                                                 <MudText Typo="Typo.body2">KTV: @_installationBooking.TechnicianName</MudText>
                                             </div>
+                                            @if (!string.IsNullOrEmpty(_installationBooking.TechnicianPhone))
+                                            {
+                                                <div class="d-flex align-center gap-2 mb-2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Color="Color.Secondary" />
+                                                    <MudText Typo="Typo.body2">@_installationBooking.TechnicianPhone</MudText>
+                                                </div>
+                                            }
                                             <MudChip T="string" Color="@StatusHelper.GetInstallationStatusColor(_installationBooking.Status)" Size="Size.Small">
                                                 @StatusHelper.GetInstallationStatusText(_installationBooking.Status)
                                             </MudChip>
@@ -426,117 +446,6 @@
                                 </MudItem>
                             }
 
-                            <!-- Chat with Technician -->
-                            @if (_installationBooking != null && _installationBooking.TechnicianId.HasValue)
-                            {
-                                <MudItem xs="12">
-                                    <MudText Typo="Typo.subtitle1" Class="fw-bold mb-2">Liên hệ kỹ thuật viên</MudText>
-                                    <MudCard Elevation="0" Outlined="true">
-                                        <MudCardContent>
-                                            <div class="technician-chat-interface">
-                                                <!-- Chat Header -->
-                                                <div class="chat-header">
-                                                    <div class="d-flex align-items-center gap-3">
-                                                        <MudAvatar Size="Size.Medium" Color="Color.Primary">
-                                                            <MudIcon Icon="@Icons.Material.Filled.Engineering" />
-                                                        </MudAvatar>
-                                                        <div>
-                                                            <MudText Typo="Typo.subtitle2" Class="mb-0">@_installationBooking.TechnicianName</MudText>
-                                                            @if (!string.IsNullOrEmpty(_installationBooking.TechnicianPhone))
-                                                            {
-                                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@_installationBooking.TechnicianPhone</MudText>
-                                                            }
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <!-- Messages -->
-                                                <div class="chat-messages" @ref="_technicianChatMessagesContainer">
-                                                    @if (_loadingTechnicianChat)
-                                                    {
-                                                        <div class="text-center py-4">
-                                                            <MudProgressCircular Color="Color.Primary" Size="Size.Medium" />
-                                                        </div>
-                                                    }
-                                                    else if (_technicianChatMessages.Count == 0)
-                                                    {
-                                                        <div class="text-center py-4">
-                                                            <MudText Typo="Typo.body2" Color="Color.Secondary">Chưa có tin nhắn nào. Hãy bắt đầu cuộc trò chuyện!</MudText>
-                                                        </div>
-                                                    }
-                                                    else
-                                                    {
-                                                        @foreach (var msg in _technicianChatMessages)
-                                                        {
-                                                            <div class="@($"message {(msg.IsFromMe ? "sent" : "received")}")">
-                                                                @if (!msg.IsFromMe)
-                                                                {
-                                                                    <div class="message-avatar">KTV</div>
-                                                                }
-                                                                <div class="message-content">
-                                                                    <div class="message-bubble">
-                                                                        @if (msg.Attachments != null && msg.Attachments.Any())
-                                                                        {
-                                                                            @foreach (var attachment in msg.Attachments)
-                                                                            {
-                                                                                @if (!string.IsNullOrEmpty(attachment.FileType) && attachment.FileType.StartsWith("image/"))
-                                                                                {
-                                                                                    <img src="@attachment.FileUrl" alt="@attachment.FileName" style="max-width: 100%; max-height: 300px; border-radius: 8px;" />
-                                                                                }
-                                                                                else
-                                                                                {
-                                                                                    <div class="file-attachment">
-                                                                                        <span>📎</span>
-                                                                                        <a href="@attachment.FileUrl" target="_blank">@attachment.FileName</a>
-                                                                                    </div>
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                        @if (!string.IsNullOrEmpty(msg.Content))
-                                                                        {
-                                                                            <MudText Typo="Typo.body2">@msg.Content</MudText>
-                                                                        }
-                                                                    </div>
-                                                                    <div class="message-time">@msg.SentAt.ToLocalTime().ToString("HH:mm")</div>
-                                                                </div>
-                                                            </div>
-                                                        }
-                                                    }
-                                                </div>
-
-                                                <!-- Input Area -->
-                                                <div class="chat-input-area">
-                                                    @if (!string.IsNullOrEmpty(_technicianChatFilePreviewUrl))
-                                                    {
-                                                        <div class="file-preview">
-                                                            <img src="@_technicianChatFilePreviewUrl" alt="Preview" style="max-width: 100%; max-height: 100px; border-radius: 8px;" />
-                                                            <button type="button" class="remove-file" @onclick="RemoveTechnicianChatFile">✕</button>
-                                                        </div>
-                                                    }
-                                                    <div class="d-flex gap-2">
-                                                        <InputFile class="d-none technician-chat-file-input" OnChange="OnTechnicianChatFileSelected" accept="image/*,.pdf,.doc,.docx" />
-                                                        <MudIconButton Icon="@Icons.Material.Filled.AttachFile" @onclick="TriggerTechnicianChatFileSelect" Disabled="@(_sendingTechnicianChat)" Title="Đính kèm file" Size="Size.Medium" />
-                                                        <MudTextField T="string" 
-                                                                     @bind-Value="_technicianChatMessage" 
-                                                                     Placeholder="Nhập tin nhắn..." 
-                                                                     Variant="Variant.Outlined" 
-                                                                     OnKeyDown="OnTechnicianChatKeyPress"
-                                                                     Disabled="@(_sendingTechnicianChat)"
-                                                                     Class="chat-input-field" />
-                                                        <MudButton Variant="Variant.Filled" 
-                                                                   Color="Color.Primary" 
-                                                                   OnClick="async () => await SendTechnicianChatMessage()" 
-                                                                   Disabled="@(!CanSendTechnicianChatMessage)"
-                                                                   Class="chat-send-button">
-                                                            <MudIcon Icon="@Icons.Material.Filled.Send" />
-                                                        </MudButton>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </MudCardContent>
-                                    </MudCard>
-                                </MudItem>
-                            }
                         </MudGrid>
                     </MudTabPanel>
                 }
@@ -624,8 +533,8 @@
             }
         }
 
-        @* Nút Đổi lịch - hiển thị khi có lắp đặt và chưa bàn giao KTV và chưa hoàn thành và chưa đổi lịch *@
-        @if (_hasInstallation && _installationBooking != null && _installationBooking.Status == "Pending" && _installationBooking.CustomerRescheduleCount < 1)
+        @* Nút Đổi lịch - hiển thị khi có lắp đặt và status là Pending hoặc Assigned và chưa đổi lịch *@
+        @if (_hasInstallation && _installationBooking != null && (_installationBooking.Status == "Pending" || _installationBooking.Status == "Assigned") && _installationBooking.CustomerRescheduleCount < 1)
         {
             <MudButton Color="Color.Tertiary" OnClick="OpenRescheduleDialog" StartIcon="@Icons.Material.Filled.Event">
                 Đổi lịch lắp đặt
@@ -662,19 +571,6 @@
     private WarrantyRequestResponse? _warrantyRequest;
     private InstallationBookingResponse? _installationBooking;
 
-    // Technician chat fields
-    private List<ChatMessageResponse> _technicianChatMessages = new();
-    private string _technicianChatMessage = string.Empty;
-    private bool _loadingTechnicianChat = false;
-    private bool _sendingTechnicianChat = false;
-    private ElementReference _technicianChatMessagesContainer;
-    private int? _technicianChatRoomId = null;
-    private IBrowserFile? _technicianChatSelectedFile;
-    private string _technicianChatFilePreviewUrl = "";
-    private Action<object>? _onMessageReceivedHandler;
-    private bool _signalRInitialized = false;
-
-    private bool CanSendTechnicianChatMessage => !_sendingTechnicianChat && (!string.IsNullOrWhiteSpace(_technicianChatMessage) || _technicianChatSelectedFile != null);
 
     protected override async Task OnInitializedAsync()
     {
@@ -683,56 +579,13 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Console.WriteLine($"[OrderDetailDialog] OnAfterRenderAsync: firstRender={firstRender}, _signalRInitialized={_signalRInitialized}");
-        if (firstRender && !_signalRInitialized)
-        {
-            try
-            {
-                Console.WriteLine("[OrderDetailDialog] Initializing SignalR...");
-                await SignalRService.InitializeAsync();
-                _onMessageReceivedHandler = (msg) => _ = OnTechnicianChatMessageReceived(msg);
-                SignalRService.OnChatMessageReceived += _onMessageReceivedHandler;
-                _signalRInitialized = true;
-                Console.WriteLine("[OrderDetailDialog] SignalR initialized successfully");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[OrderDetailDialog] Failed to initialize SignalR: {ex.Message}");
-            }
-        }
+        // No SignalR initialization needed for order detail dialog
+        await Task.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_onMessageReceivedHandler != null)
-        {
-            SignalRService.OnChatMessageReceived -= _onMessageReceivedHandler;
-        }
         await Task.CompletedTask;
-    }
-
-    private async Task OnTechnicianChatMessageReceived(object messageObj)
-    {
-        try
-        {
-            var messageJson = System.Text.Json.JsonSerializer.Serialize(messageObj);
-            using var doc = System.Text.Json.JsonDocument.Parse(messageJson);
-            if (doc.RootElement.TryGetProperty("chatRoomId", out var chatRoomIdElement))
-            {
-                var messageRoomId = chatRoomIdElement.GetInt32();
-                var currentUserId = CurrentUser.UserId ?? 0;
-
-                // Only reload if this is the current chat room
-                if (_technicianChatRoomId.HasValue && messageRoomId == _technicianChatRoomId.Value)
-                {
-                    await LoadTechnicianChatMessages();
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error processing chat message: {ex.Message}");
-        }
     }
 
     private async Task LoadOrderAsync()
@@ -768,11 +621,10 @@
                     try
                     {
                         _installationBooking = await InstallationService.GetByOrderIdAsync(OrderId);
-
-                        // Load technician chat messages if technician is assigned
-                        if (_installationBooking != null && _installationBooking.TechnicianId.HasValue)
+                        Console.WriteLine($"[OrderDetailDialog] Installation booking loaded: {_installationBooking != null}");
+                        if (_installationBooking != null)
                         {
-                            await LoadTechnicianChatMessages();
+                            Console.WriteLine($"[OrderDetailDialog] Booking Status: {_installationBooking.Status}, CustomerRescheduleCount: {_installationBooking.CustomerRescheduleCount}");
                         }
                     }
                     catch (Exception ex)
@@ -829,14 +681,22 @@
 
         try
         {
-            var pdfBytes = InvoiceService.GenerateInvoicePdf(_order);
-            var fileName = $"HoaDon_{_order.OrderNumber}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
+            Console.WriteLine($"[OrderDetailDialog] Starting invoice export for order {_order.OrderNumber}");
             
-            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, pdfBytes);
-            Snackbar.Add("Đã xuất hóa đơn thành công", Severity.Success);
+            // Open the API endpoint in a new tab to download PDF
+            var url = $"{NavigationManager.BaseUri}api/invoice/download/{_order.Id}";
+            Console.WriteLine($"[OrderDetailDialog] Opening URL: {url}");
+            
+            await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+            
+            Snackbar.Add("Đang tải hóa đơn...", Severity.Info);
+            
+            Console.WriteLine($"[OrderDetailDialog] Invoice download initiated for order {_order.OrderNumber}");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[OrderDetailDialog] Error exporting invoice for order {_order?.OrderNumber}: {ex.Message}");
+            Console.WriteLine($"[OrderDetailDialog] Stack trace: {ex.StackTrace}");
             Snackbar.Add($"Lỗi xuất hóa đơn: {ex.Message}", Severity.Error);
         }
     }
@@ -1028,192 +888,6 @@
         NavigationManager.NavigateTo($"/products/{productId}");
     }
 
-    private async Task LoadTechnicianChatMessages()
-    {
-        if (_installationBooking == null) return;
-
-        try
-        {
-            _loadingTechnicianChat = true;
-
-            // Create chat room first if it doesn't exist
-            if (_technicianChatRoomId == null && _installationBooking.TechnicianId.HasValue)
-            {
-                try
-                {
-                    var customerId = CurrentUser.UserId ?? 0;
-                    _technicianChatRoomId = await ChatService.CreateInstallationChatAsync(customerId, _installationBooking.TechnicianId.Value, _installationBooking.Id);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Failed to create chat room: {ex.Message}");
-                    // If chat room creation fails, just show empty state
-                    _technicianChatMessages = new List<ChatMessageResponse>();
-                    return;
-                }
-            }
-
-            // Join SignalR room if chat room exists
-            if (_technicianChatRoomId.HasValue)
-            {
-                await SignalRService.JoinChatRoom(_technicianChatRoomId.Value);
-
-                var userId = CurrentUser.UserId ?? 0;
-                _technicianChatMessages = await ChatService.GetChatMessagesAsync(_technicianChatRoomId.Value, userId, UserType.Customer);
-                _technicianChatMessages = _technicianChatMessages.OrderBy(m => m.SentAt).ToList();
-                await ScrollTechnicianChatToBottom();
-            }
-            else
-            {
-                _technicianChatMessages = new List<ChatMessageResponse>();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading chat messages: {ex.Message}");
-            Snackbar.Add($"Lỗi tải tin nhắn: {ex.Message}", Severity.Error);
-            _technicianChatMessages = new List<ChatMessageResponse>();
-        }
-        finally
-        {
-            _loadingTechnicianChat = false;
-        }
-    }
-
-    private async Task SendTechnicianChatMessage()
-    {
-        if (_installationBooking == null || _sendingTechnicianChat) return;
-
-        if (string.IsNullOrWhiteSpace(_technicianChatMessage) && _technicianChatSelectedFile == null) return;
-
-        try
-        {
-            _sendingTechnicianChat = true;
-            await InvokeAsync(StateHasChanged);
-
-            // Ensure chat room exists
-            if (_technicianChatRoomId == null)
-            {
-                var customerId = CurrentUser.UserId ?? 0;
-                _technicianChatRoomId = await ChatService.CreateInstallationChatAsync(customerId, _installationBooking.TechnicianId.Value, _installationBooking.Id);
-            }
-
-            // Upload file if selected
-            List<ChatAttachmentRequest>? attachments = null;
-
-            if (_technicianChatSelectedFile != null)
-            {
-                var fileUrl = await UploadTechnicianChatFileAsync(_technicianChatSelectedFile);
-                if (fileUrl != null)
-                {
-                    attachments = new List<ChatAttachmentRequest>
-                    {
-                        new ChatAttachmentRequest
-                        {
-                            FileName = _technicianChatSelectedFile.Name,
-                            FileUrl = fileUrl,
-                            FileType = _technicianChatSelectedFile.ContentType,
-                            FileSize = _technicianChatSelectedFile.Size
-                        }
-                    };
-                }
-            }
-
-            var request = new SendMessageRequest
-            {
-                Content = _technicianChatMessage,
-                Attachments = attachments
-            };
-
-            var userId = CurrentUser.UserId ?? 0;
-            await ChatService.SendMessageAsync(_technicianChatRoomId.Value, userId, UserType.Customer, request);
-
-            // Clear input
-            _technicianChatMessage = string.Empty;
-            _technicianChatSelectedFile = null;
-            _technicianChatFilePreviewUrl = "";
-
-            // Reload messages
-            await LoadTechnicianChatMessages();
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Lỗi gửi tin nhắn: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _sendingTechnicianChat = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task<string?> UploadTechnicianChatFileAsync(IBrowserFile file)
-    {
-        try
-        {
-            var content = new MultipartFormDataContent();
-            content.Add(new StreamContent(file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024)), "file", file.Name);
-
-            var client = HttpClientFactory.CreateClient();
-            var response = await client.PostAsync($"https://localhost:7298/api/upload/chat", content);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var result = await response.Content.ReadAsStringAsync();
-                return result; // Return the URL string directly
-            }
-
-            return null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private void OnTechnicianChatKeyPress(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-        {
-            _ = SendTechnicianChatMessage();
-        }
-    }
-
-    private async void TriggerTechnicianChatFileSelect()
-    {
-        await JSRuntime.InvokeVoidAsync("document.querySelector('.technician-chat-file-input').click()");
-    }
-
-    private async void OnTechnicianChatFileSelected(InputFileChangeEventArgs e)
-    {
-        if (e.File != null)
-        {
-            _technicianChatSelectedFile = e.File;
-
-            if (e.File.ContentType.StartsWith("image/"))
-            {
-                var reader = new StreamReader(e.File.OpenReadStream());
-                var base64 = await reader.ReadToEndAsync();
-                _technicianChatFilePreviewUrl = $"data:{e.File.ContentType};base64,{base64}";
-            }
-        }
-    }
-
-    private void RemoveTechnicianChatFile()
-    {
-        _technicianChatSelectedFile = null;
-        _technicianChatFilePreviewUrl = "";
-    }
-
-    private async Task ScrollTechnicianChatToBottom()
-    {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('.chat-messages').scrollTop = document.querySelector('.chat-messages').scrollHeight");
-        }
-        catch { }
-    }
 
     private async Task OpenRescheduleDialog()
     {
@@ -1248,6 +922,28 @@
             "CreditCard" => "Thẻ tín dụng",
             "EWallet" => "Ví điện tử",
             _ => paymentMethod
+        };
+    }
+
+    private static string GetPaymentStatusText(string paymentStatus)
+    {
+        return paymentStatus switch
+        {
+            "Pending" => "Chờ thanh toán",
+            "Success" => "Đã thanh toán",
+            "Failed" => "Thanh toán thất bại",
+            _ => paymentStatus
+        };
+    }
+
+    private static Color GetPaymentStatusColor(string paymentStatus)
+    {
+        return paymentStatus switch
+        {
+            "Pending" => Color.Warning,
+            "Success" => Color.Success,
+            "Failed" => Color.Error,
+            _ => Color.Default
         };
     }
 

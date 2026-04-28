@@ -10,16 +10,18 @@
             <MudText Typo="Typo.h6">@Title</MudText>
         }
         <MudSpacer />
-        @if (ShowSearch)
-        {
-            <MudTextField @bind-Value="@_searchString" Placeholder="Tìm kiếm..." 
-                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                          IconSize="Size.Medium" Class="mt-0" Immediate="true"></MudTextField>
-        }
-        @if (FilterContent != null)
-        {
-            @FilterContent
-        }
+        <div class="d-flex align-center gap-2">
+            @if (ShowSearch)
+            {
+                <MudTextField @bind-Value="@_searchString" Placeholder="Tìm kiếm..." 
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              IconSize="Size.Medium" Class="mt-0" Immediate="true" Style="width: 200px;"></MudTextField>
+            }
+            @if (FilterContent != null)
+            {
+                @FilterContent
+            }
+        </div>
     </ToolBarContent>
     <HeaderContent>
         @HeaderContent

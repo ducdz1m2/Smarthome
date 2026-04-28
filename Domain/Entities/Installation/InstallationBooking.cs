@@ -111,7 +111,7 @@ public class InstallationBooking : AggregateRoot
                 // Validate that it's the scheduled date or close to it (allow starting travel on the day before)
                 var daysUntilScheduled = (ScheduledDate.Date - DateTime.UtcNow.Date).Days;
                 if (daysUntilScheduled > 1)
-                    throw new BusinessRuleViolationException("BookingDate", $"Chỉ có thể bắt đầu di chuyển trong vòng 1 ngày trước ngày hẹn. Ngày hẹn: {ScheduledDate:dd/MM/yyyy}");
+                    throw new BusinessRuleViolationException("BookingDate", $"Chưa đến lịch bắt đầu lắp đặt. Ngày hẹn: {ScheduledDate:dd/MM/yyyy}. Bạn chỉ có thể bắt đầu di chuyển trong vòng 1 ngày trước ngày hẹn.");
             }
 
             Status = InstallationStatus.OnTheWay;
@@ -127,10 +127,10 @@ public class InstallationBooking : AggregateRoot
             if (Status != InstallationStatus.OnTheWay)
                 throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể lắp sau khi đã đến nơi");
 
-            // Validate that it's the scheduled date or close to it (allow starting on the scheduled day)
+            // Validate that it's the scheduled date or close to it (allow starting 1 day before due to timezone differences)
             var daysUntilScheduled = (ScheduledDate.Date - DateTime.UtcNow.Date).Days;
-            if (daysUntilScheduled > 0)
-                throw new BusinessRuleViolationException("BookingDate", $"Chỉ có thể bắt đầu lắp đặt vào ngày hẹn hoặc sau đó. Ngày hẹn: {ScheduledDate:dd/MM/yyyy}");
+            if (daysUntilScheduled > 1)
+                throw new BusinessRuleViolationException("BookingDate", $"Chỉ có thể bắt đầu lắp đặt trong vòng 1 ngày trước ngày hẹn hoặc vào ngày hẹn. Ngày hẹn: {ScheduledDate:dd/MM/yyyy}");
 
             Status = InstallationStatus.Installing;
             StartedAt = DateTime.UtcNow;
@@ -256,8 +256,9 @@ public class InstallationBooking : AggregateRoot
 
         public void PrepareMaterials()
         {
-            if (Status != InstallationStatus.Confirmed)
-                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể chuẩn bị vật tư ở trạng thái đã xác nhận");
+            // Allow preparing materials from Confirmed or Preparing status (idempotent)
+            if (Status != InstallationStatus.Confirmed && Status != InstallationStatus.Preparing)
+                throw new BusinessRuleViolationException("BookingStatus", "Chỉ có thể chuẩn bị vật tư ở trạng thái đã xác nhận hoặc đang chuẩn bị");
 
             Status = InstallationStatus.Preparing;
             MaterialsPrepared = true;

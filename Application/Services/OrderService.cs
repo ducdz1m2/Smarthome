@@ -35,6 +35,8 @@ namespace Application.Services
         private readonly IEmailService _emailService;
         private readonly Domain.Repositories.IUserRepository _userRepository;
         private readonly IDomainEventDispatcher _eventDispatcher;
+        private readonly ICouponService _couponService;
+        private readonly IPromotionService _promotionService;
 
         public OrderService(
             IOrderRepository orderRepository,
@@ -55,7 +57,9 @@ namespace Application.Services
             INotificationService notificationService,
             IEmailService emailService,
             Domain.Repositories.IUserRepository userRepository,
-            IDomainEventDispatcher eventDispatcher)
+            IDomainEventDispatcher eventDispatcher,
+            ICouponService couponService,
+            IPromotionService promotionService)
         {
             _orderRepository = orderRepository;
             _productRepository = productRepository;
@@ -76,6 +80,8 @@ namespace Application.Services
             _emailService = emailService;
             _userRepository = userRepository;
             _eventDispatcher = eventDispatcher;
+            _couponService = couponService;
+            _promotionService = promotionService;
         }
 
         public async Task<List<OrderResponse>> GetAllAsync()
@@ -129,6 +135,7 @@ namespace Application.Services
         {
             Console.WriteLine($"[OrderService] CreateAsync called for UserId: {request.UserId}");
             Console.WriteLine($"[OrderService] TechnicianId: {request.TechnicianId}, InstallationSlotId: {request.InstallationSlotId}");
+            Console.WriteLine($"[OrderService] CouponCode: {request.CouponCode}");
 
             var order = Order.Create(
                 request.UserId,
@@ -148,6 +155,8 @@ namespace Application.Services
             Console.WriteLine($"[OrderService] Order created with OrderNumber: {order.OrderNumber}, DomainEvents count: {order.DomainEvents.Count()}");
 
             decimal regularItemsTotal = 0;
+            decimal productDiscountTotal = 0;
+
             foreach (var item in request.Items)
             {
                 var product = await _productRepository.GetByIdAsync(item.ProductId);
@@ -172,14 +181,38 @@ namespace Application.Services
                     price = variants.Min(v => v.Price)!;
                 }
 
-                order.AddItem(item.ProductId, item.VariantId, item.Quantity, price!, item.RequiresInstallation);
+                // Apply product-level promotions (automatic discounts)
+                Money finalPrice = price;
+                try
+                {
+                    var activePromotions = await _promotionService.GetActiveForProductAsync(item.ProductId);
+                    if (activePromotions.Any())
+                    {
+                        Console.WriteLine($"[OrderService] Found {activePromotions.Count} active promotions for ProductId: {item.ProductId}");
+                        // Apply the highest discount promotion
+                        var bestPromotion = activePromotions.OrderByDescending(p => p.DiscountPercent).First();
+                        var promotionDiscount = await _promotionService.CalculateDiscountAsync(bestPromotion.Id, price.Amount, item.ProductId);
+                        finalPrice = Money.Vnd(price.Amount - promotionDiscount);
+                        productDiscountTotal += promotionDiscount * item.Quantity;
+                        Console.WriteLine($"[OrderService] Applied promotion discount: {promotionDiscount} for ProductId: {item.ProductId}, Final price: {finalPrice.Amount}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[OrderService] Error applying product promotion: {ex.Message}");
+                    // Continue with original price if promotion fails
+                }
+
+                order.AddItem(item.ProductId, item.VariantId, item.Quantity, finalPrice, item.RequiresInstallation);
 
                 // Calculate total for regular items (non-installation)
                 if (!item.RequiresInstallation)
                 {
-                    regularItemsTotal += price.Amount * item.Quantity;
+                    regularItemsTotal += finalPrice.Amount * item.Quantity;
                 }
             }
+
+            Console.WriteLine($"[OrderService] Product discount total: {productDiscountTotal}");
 
             // Calculate shipping fee based on regular items only
             var hasRegularItems = request.Items.Any(i => !i.RequiresInstallation);
@@ -195,6 +228,31 @@ namespace Application.Services
                 order.ApplyShippingFee(calculatedFee);
             }
             // If only installation items, shipping fee is 0 (free shipping)
+
+            // Apply coupon discount if provided
+            if (!string.IsNullOrWhiteSpace(request.CouponCode))
+            {
+                Console.WriteLine($"[OrderService] Applying coupon: {request.CouponCode}");
+                try
+                {
+                    var couponResult = await _couponService.ValidateAndApplyCouponAsync(request.CouponCode, order.TotalAmount.Amount);
+                    if (couponResult.IsValid)
+                    {
+                        Console.WriteLine($"[OrderService] Coupon applied successfully. Discount: {couponResult.DiscountAmount}");
+                        order.ApplyDiscount(Money.Vnd(couponResult.DiscountAmount));
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[OrderService] Coupon validation failed: {couponResult.ErrorMessage}");
+                        // Continue without coupon discount if validation fails
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[OrderService] Error applying coupon: {ex.Message}");
+                    // Continue without coupon discount if error occurs
+                }
+            }
 
             await _orderRepository.AddAsync(order);
             Console.WriteLine($"[OrderService] About to call SaveChangesAsync");
@@ -516,12 +574,10 @@ namespace Application.Services
                 order = await _orderRepository.GetByIdAsync(id);
                 Console.WriteLine($"[ConfirmAsync] After SaveChangesAsync, Status: {order?.Status}");
 
-                // Send notification to customer
+                // Notification is sent via OrderConfirmedEvent handler, no need to call NotifyOrderStatusChangedAsync here
+                // Send email
                 if (order != null)
                 {
-                    await _notificationService.NotifyOrderStatusChangedAsync(id, orderWithDetails.UserId, oldStatus, order.Status);
-
-                    // Send email
                     var user = await _userRepository.GetByIdAsync(orderWithDetails.UserId);
                     if (user != null && !string.IsNullOrEmpty(user.Email))
                     {
@@ -757,9 +813,7 @@ namespace Application.Services
             order.StartShipping();
             await _orderRepository.SaveChangesAsync();
 
-            // Send notification to customer
-            await _notificationService.NotifyOrderStatusChangedAsync(id, order.UserId, oldStatus, order.Status);
-
+            // Notification is sent via OrderShippingStartedEvent handler, no need to call NotifyOrderStatusChangedAsync here
             // Send email
             var user = await _userRepository.GetByIdAsync(order.UserId);
             if (user != null && !string.IsNullOrEmpty(user.Email))
@@ -782,9 +836,7 @@ namespace Application.Services
             await _orderRepository.SaveChangesAsync();
             Console.WriteLine($"[MarkDeliveredAsync] Order {id} marked as delivered, new status: {order.Status}");
 
-            // Send notification to customer
-            await _notificationService.NotifyOrderStatusChangedAsync(id, order.UserId, oldStatus, order.Status);
-
+            // Notification is sent via OrderDeliveredEvent handler, no need to call NotifyOrderStatusChangedAsync here
             // Send email
             var user = await _userRepository.GetByIdAsync(order.UserId);
             if (user != null && !string.IsNullOrEmpty(user.Email))
@@ -830,9 +882,7 @@ namespace Application.Services
             await _productWarehouseRepository.SaveChangesAsync();
             await _orderRepository.SaveChangesAsync();
 
-            // Send notification to customer
-            await _notificationService.NotifyOrderStatusChangedAsync(id, order.UserId, oldStatus, order.Status);
-
+            // Notification is sent via OrderCancelledEvent handler, no need to call NotifyOrderStatusChangedAsync here
             // Send email
             var user = await _userRepository.GetByIdAsync(order.UserId);
             if (user != null && !string.IsNullOrEmpty(user.Email))
@@ -895,16 +945,25 @@ namespace Application.Services
 
         public async Task UpdatePaymentStatusAsync(int orderId, string paymentMethod, string transactionCode)
         {
+            Console.WriteLine($"[OrderService] UpdatePaymentStatusAsync: OrderId={orderId}, PaymentMethod={paymentMethod}, TransactionCode={transactionCode}");
+            
             var order = await _orderRepository.GetByIdAsync(orderId);
             if (order == null)
+            {
+                Console.WriteLine($"[OrderService] Order not found: {orderId}");
                 throw new DomainException("Không tìm thấy đơn hàng");
+            }
+
+            Console.WriteLine($"[OrderService] Order found: {orderId}, Current PaymentTransaction={order.PaymentTransaction != null}");
 
             if (order.PaymentTransaction != null)
             {
+                Console.WriteLine($"[OrderService] Updating existing payment transaction");
                 order.PaymentTransaction.MarkSuccess(transactionCode);
             }
             else
             {
+                Console.WriteLine($"[OrderService] Creating new payment transaction");
                 var paymentTransaction = Domain.Entities.Sales.PaymentTransaction.Create(
                     orderId,
                     order.TotalAmount,
@@ -915,6 +974,7 @@ namespace Application.Services
             }
 
             await _orderRepository.SaveChangesAsync();
+            Console.WriteLine($"[OrderService] Payment status updated successfully for order {orderId}");
         }
 
         private async Task<OrderResponse> MapToResponseAsync(Order order)
@@ -980,6 +1040,15 @@ namespace Application.Services
                             : hasShippingItems ? "Ship"
                             : "Khác";
 
+            // Map payment status from PaymentTransaction
+            string? paymentStatus = null;
+            string? transactionCode = null;
+            if (order.PaymentTransaction != null)
+            {
+                paymentStatus = order.PaymentTransaction.Status.ToString();
+                transactionCode = order.PaymentTransaction.TransactionCode;
+            }
+
             return new OrderResponse
             {
                 Id = order.Id,
@@ -996,6 +1065,8 @@ namespace Application.Services
                 ShippingFee = order.ShippingFee.Amount,
                 Status = order.Status.ToString(),
                 PaymentMethod = order.PaymentMethod.ToString(),
+                PaymentStatus = paymentStatus,
+                TransactionCode = transactionCode,
                 ShippingMethod = order.ShippingMethod.ToString(),
                 CancelReason = order.CancelReason,
                 CreatedAt = order.CreatedAt,

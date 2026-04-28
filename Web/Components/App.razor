@@ -16,14 +16,18 @@
 </head>
 
 <body>
-   
-    
+
+
     <Routes @rendermode="InteractiveServer" />
-  
+
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
     <script src="/js/speechRecognition.js"></script>
     <script src="/js/push-notification.js"></script>
+    <script>
+        console.log('[App.razor] Scripts loaded');
+        console.log('[App.razor] speechRecognition available:', typeof window.speechRecognition !== 'undefined');
+    </script>
 
 </body>
 

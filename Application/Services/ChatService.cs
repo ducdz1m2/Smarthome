@@ -111,6 +111,8 @@ public class ChatService : IChatService
 
     public async Task<int> CreateSupportChatAsync(CreateSupportChatRequest request, int adminId)
     {
+        Console.WriteLine($"[ChatService] CreateSupportChatAsync - CustomerId: {request.CustomerId}, AdminId: {adminId}");
+        
         var room = ChatRoom.Create(
             title: "Hỗ trợ khách hàng",
             type: ChatRoomType.Support,
@@ -121,6 +123,17 @@ public class ChatService : IChatService
 
         await _chatRoomRepository.AddAsync(room);
         await _chatRoomRepository.SaveChangesAsync();
+        Console.WriteLine($"[ChatService] Room created with ID: {room.Id}");
+
+        // Add participants after save so room.Id is populated
+        var customerParticipant = ChatParticipant.Create(room.Id, request.CustomerId, UserType.Customer, request.CustomerId.ToString());
+        var adminParticipant = ChatParticipant.Create(room.Id, adminId, UserType.Admin, adminId.ToString());
+        Console.WriteLine($"[ChatService] Created participants - Customer: {request.CustomerId}, Admin: {adminId}");
+
+        // Participants are added via the repository/EF context
+        _chatRoomRepository.Update(room);
+        await _chatRoomRepository.SaveChangesAsync();
+        Console.WriteLine($"[ChatService] Participants saved to room {room.Id}");
 
         await _eventDispatcher.DispatchAsync(new ChatRoomCreatedEvent(
             room.Id,

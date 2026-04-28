@@ -98,8 +98,17 @@ public class SignalRService : IAsyncDisposable
     public async Task SendMessage(int roomId, int senderId, string senderType, string content,
         string? fileUrl = null, string? fileName = null, string? fileType = null, long? fileSize = null)
     {
+        Console.WriteLine($"[SignalRService] SendMessage called - RoomId: {roomId}, SenderId: {senderId}, SenderType: {senderType}, ChatHubState: {_chatHub?.State}");
         if (_chatHub?.State == HubConnectionState.Connected)
+        {
+            Console.WriteLine($"[SignalRService] Invoking SendMessage on hub...");
             await _chatHub.InvokeAsync("SendMessage", roomId, senderId, senderType, content, fileUrl, fileName, fileType, fileSize);
+            Console.WriteLine($"[SignalRService] SendMessage invoked successfully");
+        }
+        else
+        {
+            Console.WriteLine($"[SignalRService] Chat hub not connected, cannot send message");
+        }
     }
 
     public async ValueTask DisposeAsync()

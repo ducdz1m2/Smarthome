@@ -17,6 +17,7 @@ public class ReturnOrderService : IReturnOrderService
     private readonly IInstallationSlotService _slotService;
     private readonly IProductWarehouseRepository _productWarehouseRepository;
     private readonly IWarehouseRepository _warehouseRepository;
+    private readonly IProductRepository _productRepository;
 
     public ReturnOrderService(
         IReturnOrderRepository returnOrderRepository,
@@ -24,7 +25,8 @@ public class ReturnOrderService : IReturnOrderService
         IInstallationService installationService,
         IInstallationSlotService slotService,
         IProductWarehouseRepository productWarehouseRepository,
-        IWarehouseRepository warehouseRepository)
+        IWarehouseRepository warehouseRepository,
+        IProductRepository productRepository)
     {
         _returnOrderRepository = returnOrderRepository;
         _orderRepository = orderRepository;
@@ -32,25 +34,41 @@ public class ReturnOrderService : IReturnOrderService
         _slotService = slotService;
         _productWarehouseRepository = productWarehouseRepository;
         _warehouseRepository = warehouseRepository;
+        _productRepository = productRepository;
     }
 
     public async Task<List<ReturnOrderResponse>> GetAllAsync()
     {
         var returnOrders = await _returnOrderRepository.GetAllAsync();
-        return returnOrders.Select(MapToResponse).ToList();
+        var result = new List<ReturnOrderResponse>();
+        foreach (var returnOrder in returnOrders)
+        {
+            // Reload with items for each return order to calculate refund
+            var returnOrderWithItems = await _returnOrderRepository.GetByIdWithItemsAsync(returnOrder.Id);
+            if (returnOrderWithItems != null)
+            {
+                result.Add(await MapToResponseAsync(returnOrderWithItems));
+            }
+        }
+        return result;
     }
 
     public async Task<ReturnOrderResponse?> GetByIdAsync(int id)
     {
         var returnOrder = await _returnOrderRepository.GetByIdWithItemsAsync(id);
         if (returnOrder == null) return null;
-        return MapToResponse(returnOrder);
+        return await MapToResponseAsync(returnOrder);
     }
 
     public async Task<List<ReturnOrderResponse>> GetByOrderIdAsync(int orderId)
     {
         var returnOrders = await _returnOrderRepository.GetByOrderIdAsync(orderId);
-        return returnOrders.Select(MapToResponse).ToList();
+        var result = new List<ReturnOrderResponse>();
+        foreach (var returnOrder in returnOrders)
+        {
+            result.Add(await MapToResponseAsync(returnOrder));
+        }
+        return result;
     }
 
     public async Task<List<ReturnOrderResponse>> GetByStatusAsync(string status)
@@ -59,7 +77,17 @@ public class ReturnOrderService : IReturnOrderService
             throw new DomainException("Trạng thái không hợp lệ");
 
         var returnOrders = await _returnOrderRepository.GetByStatusAsync(returnStatus);
-        return returnOrders.Select(MapToResponse).ToList();
+        var result = new List<ReturnOrderResponse>();
+        foreach (var returnOrder in returnOrders)
+        {
+            // Reload with items for each return order to calculate refund
+            var returnOrderWithItems = await _returnOrderRepository.GetByIdWithItemsAsync(returnOrder.Id);
+            if (returnOrderWithItems != null)
+            {
+                result.Add(await MapToResponseAsync(returnOrderWithItems));
+            }
+        }
+        return result;
     }
 
     public async Task<int> CreateAsync(CreateReturnOrderRequest request)
@@ -138,11 +166,31 @@ public class ReturnOrderService : IReturnOrderService
     {
         Console.WriteLine($"[ReturnOrderService.ApproveAsync] ========== STARTED for ReturnOrderId: {id} ==========");
 
-        var returnOrder = await _returnOrderRepository.GetByIdAsync(id);
+        var returnOrder = await _returnOrderRepository.GetByIdWithItemsAsync(id);
         if (returnOrder == null)
             throw new DomainException("Không tìm thấy yêu cầu trả hàng");
 
         Console.WriteLine($"[ReturnOrderService.ApproveAsync] ReturnOrder found: ID={returnOrder.Id}, ReturnMethod={returnOrder.ReturnMethod}, Status={returnOrder.Status}");
+
+        // Calculate refund amount if not provided
+        if (!refundAmount.HasValue)
+        {
+            var order = await _orderRepository.GetByIdAsync(returnOrder.OriginalOrderId);
+            if (order != null)
+            {
+                decimal calculatedRefund = 0;
+                foreach (var item in returnOrder.Items)
+                {
+                    var orderItem = order.Items.FirstOrDefault(oi => oi.Id == item.OrderItemId);
+                    if (orderItem != null)
+                    {
+                        calculatedRefund += orderItem.UnitPrice.Amount * item.Quantity;
+                    }
+                }
+                refundAmount = calculatedRefund;
+                Console.WriteLine($"[ReturnOrderService.ApproveAsync] Calculated refund amount: {refundAmount.Value}");
+            }
+        }
 
         if (refundAmount.HasValue)
         {
@@ -371,36 +419,172 @@ public class ReturnOrderService : IReturnOrderService
         await _returnOrderRepository.SaveChangesAsync();
     }
 
-    private static ReturnOrderResponse MapToResponse(ReturnOrder returnOrder)
+    public async Task<int> CreateUninstallBookingAsync(int returnOrderId, int slotId)
     {
+        var returnOrder = await _returnOrderRepository.GetByIdWithItemsAsync(returnOrderId);
+        if (returnOrder == null)
+            throw new DomainException("Không tìm thấy yêu cầu trả hàng");
+
+        if (returnOrder.ReturnMethod != ReturnMethod.Technician)
+            throw new DomainException("Chỉ có thể tạo lịch tháo gỡ cho đơn hoàn hàng qua kỹ thuật viên");
+
+        var order = await _orderRepository.GetByIdAsync(returnOrder.OriginalOrderId);
+        if (order == null)
+            throw new DomainException("Không tìm thấy đơn hàng gốc");
+
+        // Get the original installation booking to find the technician
+        var existingBooking = await _installationService.GetByOrderIdAsync(order.Id);
+        if (existingBooking == null || !existingBooking.TechnicianId.HasValue)
+            throw new DomainException("Không tìm thấy kỹ thuật viên đã lắp đặt đơn hàng này");
+
+        var technicianId = existingBooking.TechnicianId.Value;
+
+        // Get the slot
+        var slot = await _slotService.GetByIdAsync(slotId);
+        if (slot == null)
+            throw new DomainException("Không tìm thấy slot lịch hẹn");
+
+        // Check if slot belongs to the technician
+        if (slot.TechnicianId != technicianId)
+            throw new DomainException("Slot không thuộc về kỹ thuật viên đã lắp đặt");
+
+        // Check if uninstall booking already exists
+        var uninstallBookings = await _installationService.GetListByOrderIdAsync(order.Id);
+        if (uninstallBookings.Any(b => b.IsUninstall))
+            throw new DomainException("Đã có lịch tháo gỡ cho đơn hàng này");
+
+        // Create uninstall booking
+        var scheduledDate = slot.Date.Add(slot.StartTime);
+        var uninstallBookingId = await _installationService.CreateAsync(new CreateInstallationBookingRequest
+        {
+            OrderId = order.Id,
+            TechnicianId = technicianId,
+            SlotId = slotId,
+            ScheduledDate = scheduledDate,
+            IsUninstall = true
+        });
+
+        Console.WriteLine($"[CreateUninstallBookingAsync] Created uninstall booking {uninstallBookingId} for return order {returnOrderId}");
+
+        return uninstallBookingId;
+    }
+
+    private async Task<ReturnOrderResponse> MapToResponseAsync(ReturnOrder returnOrder)
+    {
+        // Load order with items to get OrderNumber and calculate refund
+        var order = await _orderRepository.GetByIdWithDetailsAsync(returnOrder.OriginalOrderId);
+        string orderNumber = order?.OrderNumber ?? $"Order #{returnOrder.OriginalOrderId}";
+
+        Console.WriteLine($"[MapToResponseAsync] ReturnOrder {returnOrder.Id}, OriginalOrderId: {returnOrder.OriginalOrderId}");
+        Console.WriteLine($"[MapToResponseAsync] Order found: {order != null}, OrderNumber: {orderNumber}");
+        Console.WriteLine($"[MapToResponseAsync] ReturnOrder.Items count: {returnOrder.Items.Count}");
+
+        // Always calculate refund amount from order items (mua bao nhiêu thì hoàn bấy nhiêu)
+        decimal refundAmount = 0;
+        if (order != null && returnOrder.Items.Any())
+        {
+            Console.WriteLine($"[MapToResponseAsync] Order.Items count: {order.Items.Count}");
+            foreach (var item in returnOrder.Items)
+            {
+                Console.WriteLine($"[MapToResponseAsync] Processing return item: OrderItemId={item.OrderItemId}, ProductId={item.ProductId}, Quantity={item.Quantity}");
+                var orderItem = order.Items.FirstOrDefault(oi => oi.Id == item.OrderItemId);
+                if (orderItem != null)
+                {
+                    var itemTotal = orderItem.UnitPrice.Amount * item.Quantity;
+                    refundAmount += itemTotal;
+                    Console.WriteLine($"[MapToResponseAsync] Found order item: UnitPrice={orderItem.UnitPrice.Amount}, itemTotal={itemTotal}");
+                }
+                else
+                {
+                    Console.WriteLine($"[MapToResponseAsync] WARNING: OrderItem not found for OrderItemId={item.OrderItemId}");
+                }
+            }
+            Console.WriteLine($"[MapToResponseAsync] Calculated refund amount for ReturnOrder {returnOrder.Id}: {refundAmount}");
+        }
+        else
+        {
+            Console.WriteLine($"[MapToResponseAsync] Cannot calculate refund: order is null or no items");
+        }
+
+        // Load uninstall booking if ReturnMethod is Technician
+        InstallationBookingResponse? uninstallBooking = null;
+        if (returnOrder.ReturnMethod == ReturnMethod.Technician && order != null)
+        {
+            var uninstallBookings = await _installationService.GetListByOrderIdAsync(order.Id);
+            uninstallBooking = uninstallBookings.FirstOrDefault(b => b.IsUninstall);
+            Console.WriteLine($"[MapToResponseAsync] Uninstall booking found: {uninstallBooking != null}, Status: {uninstallBooking?.Status}");
+        }
+
+        // Load items with product and warehouse details
+        var items = new List<ReturnOrderItemDto>();
+        foreach (var item in returnOrder.Items)
+        {
+            // Load product details
+            var product = await _productRepository.GetByIdWithDetailsAsync(item.ProductId);
+            string productName = product?.Name ?? $"Sản phẩm #{item.ProductId}";
+            string variantName = string.Empty;
+
+            if (item.VariantId.HasValue && product?.Variants != null)
+            {
+                var variant = product.Variants.FirstOrDefault(v => v.Id == item.VariantId.Value);
+                if (variant != null)
+                {
+                    try
+                    {
+                        var attributes = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(variant.AttributesJson);
+                        if (attributes != null && attributes.Count > 0)
+                        {
+                            variantName = string.Join(", ", attributes.Values.Take(2));
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            // Load warehouse name
+            string warehouseName = string.Empty;
+            if (item.WarehouseId.HasValue)
+            {
+                var warehouse = await _warehouseRepository.GetByIdAsync(item.WarehouseId.Value);
+                warehouseName = warehouse?.Name ?? string.Empty;
+            }
+
+            items.Add(new ReturnOrderItemDto
+            {
+                Id = item.Id,
+                OrderItemId = item.OrderItemId,
+                ProductId = item.ProductId,
+                VariantId = item.VariantId,
+                ProductName = productName,
+                VariantName = variantName,
+                Quantity = item.Quantity,
+                Reason = item.Reason,
+                IsDamaged = item.IsDamaged,
+                ReturnedToInventory = item.ReturnedToInventory,
+                WarehouseId = item.WarehouseId,
+                WarehouseName = warehouseName,
+                DamagedStatus = item.DamagedStatus,
+                RepairCost = item.RepairCost,
+                RepairNotes = item.RepairNotes
+            });
+        }
+
         return new ReturnOrderResponse
         {
             Id = returnOrder.Id,
             OrderId = returnOrder.OriginalOrderId,
+            OrderNumber = orderNumber,
             ReturnType = returnOrder.ReturnType.ToString(),
             ReturnMethod = returnOrder.ReturnMethod.ToString(),
             Reason = returnOrder.Reason,
             Status = returnOrder.Status.ToString(),
-            RefundAmount = returnOrder.RefundAmount?.Amount ?? 0,
+            RefundAmount = refundAmount,
             ApprovedAt = returnOrder.ApprovedAt,
             ReceivedAt = returnOrder.ReceivedAt,
             CompletedAt = returnOrder.CompletedAt,
             CreatedAt = returnOrder.CreatedAt,
-            Items = returnOrder.Items.Select(i => new ReturnOrderItemDto
-            {
-                Id = i.Id,
-                OrderItemId = i.OrderItemId,
-                ProductId = i.ProductId,
-                VariantId = i.VariantId,
-                Quantity = i.Quantity,
-                Reason = i.Reason,
-                IsDamaged = i.IsDamaged,
-                ReturnedToInventory = i.ReturnedToInventory,
-                WarehouseId = i.WarehouseId,
-                DamagedStatus = i.DamagedStatus,
-                RepairCost = i.RepairCost,
-                RepairNotes = i.RepairNotes
-            }).ToList()
+            Items = items,
+            UninstallBooking = uninstallBooking
         };
     }
 

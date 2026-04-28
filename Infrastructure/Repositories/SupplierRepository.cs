@@ -30,6 +30,7 @@ namespace Infrastructure.Repositories
         public async Task<List<Supplier>> GetAllAsync()
         {
             return await _context.Suppliers
+                .Include(s => s.StockEntries)
                 .AsNoTracking()
                 .OrderBy(s => s.Name)
                 .ToListAsync();

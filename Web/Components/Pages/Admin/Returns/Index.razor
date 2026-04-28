@@ -84,14 +84,7 @@
                         </MudText>
                     </MudTd>
                     <MudTd>
-                        @if (context.RefundAmount > 0)
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Success">@context.RefundAmount.ToString("N0") đ</MudText>
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
-                        }
+                        <MudText Typo="Typo.body2" Color="Color.Success">@context.RefundAmount.ToString("N0") đ</MudText>
                     </MudTd>
                     <MudTd>
                         @if (context.Status == "Pending")

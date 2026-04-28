@@ -27,16 +27,19 @@ public class SpeechService
 
         try
         {
-            Console.WriteLine($"[SpeechService] TranscribeAsync: {audioData.Length} bytes, mimeType={mimeType}");
+            // Parse mime type để loại bỏ parameters (ví dụ: "audio/webm;codecs=opus" -> "audio/webm")
+            var cleanMimeType = mimeType.Split(';')[0].Trim();
+            Console.WriteLine($"[SpeechService] TranscribeAsync: {audioData.Length} bytes, mimeType={mimeType}, cleanMimeType={cleanMimeType}");
+            
             using var httpClient = _httpClientFactory.CreateClient();
             using var content = new MultipartFormDataContent();
             using var audioContent = new ByteArrayContent(audioData);
             audioContent.Headers.ContentType =
-                new System.Net.Http.Headers.MediaTypeHeaderValue(mimeType);
+                new System.Net.Http.Headers.MediaTypeHeaderValue(cleanMimeType);
 
             // Field name phải là "audio" theo speech-service/main.py
-            var extension = mimeType.Contains("wav") ? "recording.wav"
-                          : mimeType.Contains("ogg") ? "recording.ogg"
+            var extension = cleanMimeType.Contains("wav") ? "recording.wav"
+                          : cleanMimeType.Contains("ogg") ? "recording.ogg"
                           : "recording.webm";
             content.Add(audioContent, "audio", extension);
 

@@ -65,6 +65,24 @@ else
                 @_order.ShippingAddress
             </MudText>
 
+            <!-- Payment Status -->
+            <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Thanh toán</MudText>
+            <div class="d-flex align-center gap-2">
+                <MudText Typo="Typo.body2">Phương thức: @_order.PaymentMethod</MudText>
+                @if (!string.IsNullOrEmpty(_order.PaymentStatus))
+                {
+                    <MudChip T="string" Size="Size.Small" Color="@GetPaymentStatusColor(_order.PaymentStatus)">
+                        @GetPaymentStatusText(_order.PaymentStatus)
+                    </MudChip>
+                }
+                @if (!string.IsNullOrEmpty(_order.TransactionCode))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        (Mã GD: @_order.TransactionCode)
+                    </MudText>
+                }
+            </div>
+
             <!-- Order Items -->
             <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Sản phẩm</MudText>
             @foreach (var item in _order.Items)
@@ -169,5 +187,29 @@ else
                 Snackbar.Add($"Lỗi hủy đơn hàng: {ex.Message}", Severity.Error);
             }
         }
+    }
+
+    private static string GetPaymentStatusText(string paymentStatus)
+    {
+        return paymentStatus switch
+        {
+            "Pending" => "Chờ thanh toán",
+            "Success" => "Đã thanh toán",
+            "Failed" => "Thanh toán thất bại",
+            "Refunded" => "Đã hoàn tiền",
+            _ => paymentStatus
+        };
+    }
+
+    private static Color GetPaymentStatusColor(string paymentStatus)
+    {
+        return paymentStatus switch
+        {
+            "Pending" => Color.Warning,
+            "Success" => Color.Success,
+            "Failed" => Color.Error,
+            "Refunded" => Color.Info,
+            _ => Color.Default
+        };
     }
 }

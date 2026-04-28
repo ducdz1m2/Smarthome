@@ -913,9 +913,10 @@ namespace Application.Services
             if (booking == null)
                 throw new DomainException("Không tìm thấy lịch lắp đặt");
 
-            // For warranty bookings or bookings in Assigned status (after material transfer), allow preparing materials
-            if (booking.Status != InstallationStatus.Confirmed && !booking.IsWarranty && booking.Status != InstallationStatus.Assigned)
-                throw new DomainException("Chỉ có thể chuẩn bị vật tư khi đang ở trạng thái Đã xác nhận hoặc Đã phân công");
+            // For warranty bookings or bookings in Assigned/Preparing status (after material transfer), allow preparing materials
+            // Preparing status is allowed to support picking up materials from multiple warehouses incrementally
+            if (booking.Status != InstallationStatus.Confirmed && booking.Status != InstallationStatus.Preparing && !booking.IsWarranty && booking.Status != InstallationStatus.Assigned)
+                throw new DomainException("Chỉ có thể chuẩn bị vật tư khi đang ở trạng thái Đã xác nhận, Đang chuẩn bị hoặc Đã phân công");
 
             // Verify warehouse exists
             var warehouse = await _warehouseRepository.GetByIdAsync(request.WarehouseId);
@@ -1450,31 +1451,7 @@ namespace Application.Services
                 CustomerRatingContent = null,
 
                 // Materials
-                Materials = booking.Materials?.Select(m => new InstallationMaterialResponse
-                {
-                    Id = m.Id,
-                    ProductId = m.ProductId,
-                    VariantId = m.VariantId,
-                    ProductName = $"Vật tư #{m.ProductId}", // Would need Product lookup
-                    QuantityTaken = m.QuantityTaken,
-                    QuantityUsed = m.QuantityUsed,
-                    QuantityReturned = m.QuantityReturned,
-                    WarehouseId = m.WarehouseId,
-                    WarehouseName = m.Warehouse?.Name,
-                    PickedUpAt = m.PickedUpAt
-                }).GroupBy(m => new { m.ProductId, m.VariantId }).Select(g => new InstallationMaterialResponse
-                {
-                    Id = g.First().Id,
-                    ProductId = g.Key.ProductId,
-                    VariantId = g.Key.VariantId,
-                    ProductName = g.First().ProductName,
-                    QuantityTaken = g.Sum(x => x.QuantityTaken),
-                    QuantityUsed = g.Sum(x => x.QuantityUsed ?? 0),
-                    QuantityReturned = g.Sum(x => x.QuantityReturned ?? 0),
-                    WarehouseId = g.First().WarehouseId,
-                    WarehouseName = g.First().WarehouseName,
-                    PickedUpAt = g.First().PickedUpAt
-                }).ToList() ?? new List<InstallationMaterialResponse>()
+                Materials = await LoadMaterialDetailsAsync(booking.Materials)
             };
 
             // Load technician rating content
@@ -1550,6 +1527,70 @@ namespace Application.Services
             }
             
             return result;
+        }
+
+        private async Task<List<InstallationMaterialResponse>> LoadMaterialDetailsAsync(ICollection<InstallationMaterial> materials)
+        {
+            if (materials == null || !materials.Any())
+                return new List<InstallationMaterialResponse>();
+
+            var result = new List<InstallationMaterialResponse>();
+
+            foreach (var material in materials)
+            {
+                var product = await _productRepository.GetByIdWithDetailsAsync(material.ProductId);
+                string productName = product?.Name ?? $"Sản phẩm #{material.ProductId}";
+                string variantName = string.Empty;
+
+                if (material.VariantId.HasValue && product?.Variants != null)
+                {
+                    var variant = product.Variants.FirstOrDefault(v => v.Id == material.VariantId.Value);
+                    if (variant != null)
+                    {
+                        try
+                        {
+                            var attributes = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(variant.AttributesJson);
+                            if (attributes != null && attributes.Count > 0)
+                            {
+                                variantName = string.Join(", ", attributes.Values.Take(2));
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                result.Add(new InstallationMaterialResponse
+                {
+                    Id = material.Id,
+                    ProductId = material.ProductId,
+                    VariantId = material.VariantId,
+                    ProductName = string.IsNullOrEmpty(variantName) ? productName : $"{productName} ({variantName})",
+                    QuantityTaken = material.QuantityTaken,
+                    QuantityUsed = material.QuantityUsed,
+                    QuantityReturned = material.QuantityReturned,
+                    WarehouseId = material.WarehouseId,
+                    WarehouseName = material.Warehouse?.Name,
+                    PickedUpAt = material.PickedUpAt
+                });
+            }
+
+            // Group by product/variant and sum quantities
+            return result
+                .GroupBy(m => new { m.ProductId, m.VariantId })
+                .Select(g => new InstallationMaterialResponse
+                {
+                    Id = g.First().Id,
+                    ProductId = g.Key.ProductId,
+                    VariantId = g.Key.VariantId,
+                    ProductName = g.First().ProductName,
+                    QuantityTaken = g.Sum(x => x.QuantityTaken),
+                    QuantityUsed = g.Sum(x => x.QuantityUsed ?? 0),
+                    QuantityReturned = g.Sum(x => x.QuantityReturned ?? 0),
+                    WarehouseId = g.First().WarehouseId,
+                    WarehouseName = g.First().WarehouseName,
+                    PickedUpAt = g.First().PickedUpAt
+                })
+                .ToList();
         }
 
         private InstallationBookingListResponse MapToListResponse(InstallationBooking booking)

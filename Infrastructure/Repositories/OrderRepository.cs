@@ -30,6 +30,7 @@ namespace Infrastructure.Repositories
                 .AsNoTracking()
                 .Include(o => o.Items)
                 .Include(o => o.Shipments)
+                .Include(o => o.PaymentTransaction)
                 .FirstOrDefaultAsync(o => o.Id == id);
         }
 
@@ -39,6 +40,7 @@ namespace Infrastructure.Repositories
             return await _context.Orders
                 .Include(o => o.Items)
                 .Include(o => o.Shipments)
+                .Include(o => o.PaymentTransaction)
                 .FirstOrDefaultAsync(o => o.Id == id);
         }
 
@@ -61,6 +63,7 @@ namespace Infrastructure.Repositories
             return await _context.Orders
                 .AsNoTracking()
                 .Include(o => o.Items)
+                .Include(o => o.PaymentTransaction)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
         }
@@ -71,6 +74,7 @@ namespace Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(o => o.Status == status)
                 .Include(o => o.Items)
+                .Include(o => o.PaymentTransaction)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
         }
@@ -81,6 +85,7 @@ namespace Infrastructure.Repositories
                 .AsNoTracking()
                 .Where(o => o.UserId == userId)
                 .Include(o => o.Items)
+                .Include(o => o.PaymentTransaction)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
         }

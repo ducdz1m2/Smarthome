@@ -119,7 +119,11 @@
                                         }
                                     </MudTd>
                                     <MudTd>
-                                        @if (_order.Status == "Pending" && !context.RequiresInstallation)
+                                        @if (IsCombinedOrder())
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Info">Kỹ thuật viên sẽ tự lấy hàng</MudText>
+                                        }
+                                        else if (_order.Status == "Pending" && !context.RequiresInstallation)
                                         {
                                             <div style="max-width: 400px;">
                                                 @if (_availableStockByWarehouse.ContainsKey(context.Id) && _availableStockByWarehouse[context.Id].Any())
@@ -128,7 +132,7 @@
                                                     {
                                                         var availableStock = _availableStockByWarehouse[context.Id][warehouse.Id];
                                                         <div class="d-flex align-center mb-2 flex-wrap">
-                                                            <MudCheckBox Value="@_checkboxStates[context.Id][warehouse.Id]" 
+                                                            <MudCheckBox Value="@_checkboxStates[context.Id][warehouse.Id]"
                                                                          Color="Color.Primary" Class="mr-2"
                                                                          @onclick="() => ToggleWarehouse(context.Id, warehouse.Id)" />
                                                             <div style="min-width: 150px;">
@@ -140,7 +144,7 @@
                                                                 var allocation = _warehouseAllocations[context.Id].FirstOrDefault(a => a.WarehouseId == warehouse.Id);
                                                                 if (allocation != null)
                                                                 {
-                                                                    <MudNumericField T="int" Variant="Variant.Outlined" Dense="true" 
+                                                                    <MudNumericField T="int" Variant="Variant.Outlined" Dense="true"
                                                                                    @bind-Value="@allocation.Quantity"
                                                                                    Min="1" Max="@Math.Min(context.Quantity, availableStock)" Label="Số lượng" Class="ml-2" Style="min-width: 120px;" />
                                                                 }
@@ -162,7 +166,7 @@
                                                     @foreach (var allocation in _warehouseAllocations[context.Id])
                                                     {
                                                         var warehouse = _warehouses.FirstOrDefault(w => w.Id == allocation.WarehouseId);
-                                                        var currentStock = _availableStockByWarehouse.ContainsKey(context.Id) && 
+                                                        var currentStock = _availableStockByWarehouse.ContainsKey(context.Id) &&
                                                                            _availableStockByWarehouse[context.Id].ContainsKey(allocation.WarehouseId)
                                                                            ? _availableStockByWarehouse[context.Id][allocation.WarehouseId]
                                                                            : 0;
@@ -281,15 +285,6 @@
         {
             @if (_order.Status == "Pending")
             {
-                @if (IsCombinedOrder())
-                {
-                    <MudAlert Severity="Severity.Info" Class="mb-2">
-                        <MudText Typo="Typo.body2">
-                            <strong>Đơn ghép:</strong> Đơn hàng này có cả sản phẩm cần lắp đặt và cần giao hàng.
-                            Khi xác nhận, hệ thống sẽ tự động tạo lịch lắp đặt và đơn giao hàng.
-                        </MudText>
-                    </MudAlert>
-                }
                 <MudButton Color="Color.Primary" OnClick="ConfirmOrder" StartIcon="@Icons.Material.Filled.CheckCircle">
                     Xác nhận
                 </MudButton>
@@ -579,20 +574,24 @@
     {
         try
         {
-            // Build warehouse allocation request
-            var warehouseAllocations = new List<WarehouseAllocationRequest>();
-            foreach (var item in _order.Items)
+            // For combined orders, technician will handle warehouse selection
+            List<WarehouseAllocationRequest> warehouseAllocations = new();
+            if (!IsCombinedOrder())
             {
-                if (!item.RequiresInstallation && _warehouseAllocations.TryGetValue(item.Id, out var allocations))
+                // Build warehouse allocation request for non-combined orders
+                foreach (var item in _order.Items)
                 {
-                    foreach (var allocation in allocations)
+                    if (!item.RequiresInstallation && _warehouseAllocations.TryGetValue(item.Id, out var allocations))
                     {
-                        warehouseAllocations.Add(new WarehouseAllocationRequest
+                        foreach (var allocation in allocations)
                         {
-                            OrderItemId = item.Id,
-                            WarehouseId = allocation.WarehouseId,
-                            Quantity = allocation.Quantity
-                        });
+                            warehouseAllocations.Add(new WarehouseAllocationRequest
+                            {
+                                OrderItemId = item.Id,
+                                WarehouseId = allocation.WarehouseId,
+                                Quantity = allocation.Quantity
+                            });
+                        }
                     }
                 }
             }

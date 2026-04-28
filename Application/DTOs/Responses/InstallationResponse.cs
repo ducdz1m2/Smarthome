@@ -71,6 +71,7 @@ namespace Application.DTOs.Responses
         public int ProductId { get; set; }
         public int? VariantId { get; set; }
         public string ProductName { get; set; } = string.Empty;
+        public string? VariantName { get; set; }
         public int QuantityTaken { get; set; }
         public int? QuantityUsed { get; set; }
         public int? QuantityReturned { get; set; }

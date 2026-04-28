@@ -17,6 +17,7 @@ using Domain.Enums;
         public DateTime? CompletedAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public List<ReturnOrderItemDto> Items { get; set; } = new();
+        public InstallationBookingResponse? UninstallBooking { get; set; }
     }
 
     public class ReturnOrderItemDto

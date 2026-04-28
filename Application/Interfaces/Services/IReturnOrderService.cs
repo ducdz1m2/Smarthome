@@ -11,7 +11,7 @@ public interface IReturnOrderService
     Task<ReturnOrderResponse?> GetByIdAsync(int id);
     Task<List<ReturnOrderResponse>> GetByOrderIdAsync(int orderId);
     Task<List<ReturnOrderResponse>> GetByStatusAsync(string status);
-    
+
     // Command methods
     Task<int> CreateAsync(CreateReturnOrderRequest request);
     Task ApproveAsync(int id, decimal? refundAmount = null);
@@ -20,4 +20,5 @@ public interface IReturnOrderService
     Task CompleteAsync(int id);
     Task CancelAsync(int id, string? reason = null);
     Task DeleteAsync(int id);
+    Task<int> CreateUninstallBookingAsync(int returnOrderId, int slotId);
 }

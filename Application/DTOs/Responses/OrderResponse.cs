@@ -17,6 +17,8 @@ namespace Application.DTOs.Responses
         public string Status { get; set; } = string.Empty;
         public bool HasWarrantyRequest { get; set; }
         public string PaymentMethod { get; set; } = string.Empty;
+        public string? PaymentStatus { get; set; } // Payment status: Pending, Success, Failed
+        public string? TransactionCode { get; set; } // Transaction code from payment gateway
         public string ShippingMethod { get; set; } = string.Empty;
         public string? CancelReason { get; set; }
         public DateTime CreatedAt { get; set; }

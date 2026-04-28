@@ -227,7 +227,7 @@ public class Order : AggregateRoot
 
             Status = OrderStatus.Shipping;
             AddStatusHistory(Status, "Đơn hàng bắt đầu được giao");
-            AddDomainEvent(new OrderShippingStartedEvent(Id, string.Empty));
+            AddDomainEvent(new OrderShippedEvent(Id, UserId, string.Empty));
         }
 
         public void MarkDelivered(int userId)

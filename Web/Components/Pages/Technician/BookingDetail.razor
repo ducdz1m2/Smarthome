@@ -30,7 +30,7 @@ else
             <MudPaper Class="pa-4 mb-4" Elevation="2">
                 <div class="d-flex justify-space-between align-center">
                     <div>
-                        <MudText Typo="Typo.h5">@(_booking.IsWarranty ? "Lịch bảo hành" : _booking.IsUninstall ? "Lịch tháo lắp" : "Lịch lắp đặt") #@_booking.Id</MudText>
+                        <MudText Typo="Typo.h5">@(_booking.IsWarranty ? "Lịch bảo hành" : _booking.IsUninstall ? "Lịch tháo gỡ" : "Lịch lắp đặt") #@_booking.Id</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">@_booking.OrderNumber</MudText>
                     </div>
                     <MudChip T="string" Color="StatusHelper.GetInstallationStatusColor(_booking.Status)" Size="Size.Large">@StatusHelper.GetInstallationStatusText(_booking.Status)</MudChip>
@@ -268,18 +268,29 @@ else
                     }
                     else
                     {
-                        <MudAlert Severity="Severity.Success" Class="mb-3">
-                            Đã xác nhận lịch. Vui lòng chuẩn bị vật tư từ kho trước khi di chuyển.
-                        </MudAlert>
-                        @if (_booking.MaterialsPrepared)
+                        @if (_booking.IsUninstall)
                         {
+                            <MudAlert Severity="Severity.Success" Class="mb-3">
+                                Đã xác nhận lịch tháo gỡ. Sẵn sàng di chuyển!
+                            </MudAlert>
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
                                        OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
                         }
                         else
                         {
-                            <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
-                                       OnClick="OpenPrepareMaterialsDialog">Chuẩn bị vật tư từ kho</MudButton>
+                            <MudAlert Severity="Severity.Success" Class="mb-3">
+                                Đã xác nhận lịch. Vui lòng chuẩn bị vật tư từ kho trước khi di chuyển.
+                            </MudAlert>
+                            @if (_booking.MaterialsPrepared)
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
+                                           OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
+                                           OnClick="OpenPrepareMaterialsDialog">Chuẩn bị vật tư từ kho</MudButton>
+                            }
                         }
                     }
                 }
@@ -293,7 +304,7 @@ else
                                 Đã chuẩn bị sản phẩm thay thế xong. Sẵn sàng di chuyển!
                             </MudAlert>
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
-                                       OnClick="StartTravel" Class="mr-2">Bắt đầu di chuyển</MudButton>
+                                       OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
                         }
                         else
                         {
@@ -301,10 +312,16 @@ else
                                 Vui lòng chuẩn bị sản phẩm thay thế trước khi di chuyển.
                             </MudAlert>
                             <MudButton Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.Warehouse"
-                                       OnClick="OpenPrepareReplacementDialog" Class="mr-2">Chuẩn bị sản phẩm thay thế</MudButton>
+                                       OnClick="OpenPrepareReplacementDialog">Chuẩn bị sản phẩm thay thế</MudButton>
                         }
-                        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel"
-                                   OnClick="OpenFailDialog">Đánh dấu thất bại</MudButton>
+                    }
+                    else if (_booking.IsUninstall)
+                    {
+                        <MudAlert Severity="Severity.Success" Class="mb-3">
+                            Sẵn sàng di chuyển!
+                        </MudAlert>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.DirectionsCar"
+                                   OnClick="StartTravel">Bắt đầu di chuyển</MudButton>
                     }
                     else
                     {
@@ -332,22 +349,26 @@ else
                                     <MudText Typo="Typo.subtitle1">Vật tư đã lấy từ kho</MudText>
                                 </MudCardHeader>
                                 <MudCardContent>
-                                    <MudList T="InstallationMaterialResponse">
-                                        @foreach (var material in _booking.Materials)
-                                        {
-                                            <MudListItem T="InstallationMaterialResponse">
-                                                <div class="d-flex justify-space-between align-center">
-                                                    <div>
-                                                        <MudText>@material.ProductName</MudText>
-                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                            SL: @material.QuantityTaken | Kho: @(material.WarehouseName ?? "N/A")
-                                                        </MudText>
-                                                    </div>
-                                                    <MudChip Size="Size.Small" Color="Color.Info">Đã lấy</MudChip>
-                                                </div>
-                                            </MudListItem>
-                                        }
-                                    </MudList>
+                                    <MudTable Items="_booking.Materials" Dense="true" Hover="true">
+                                        <HeaderContent>
+                                            <MudTh>Sản phẩm</MudTh>
+                                            <MudTh>Đã lấy</MudTh>
+                                            <MudTh>Đã dùng</MudTh>
+                                            <MudTh>Đã trả</MudTh>
+                                        </HeaderContent>
+                                        <RowTemplate>
+                                            <MudTd>
+                                                <MudText Typo="Typo.body2">@context.ProductName</MudText>
+                                                @if (!string.IsNullOrEmpty(context.VariantName))
+                                                {
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.VariantName</MudText>
+                                                }
+                                            </MudTd>
+                                            <MudTd>@context.QuantityTaken</MudTd>
+                                            <MudTd>@(context.QuantityUsed ?? 0)</MudTd>
+                                            <MudTd>@(context.QuantityReturned ?? 0)</MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
                                 </MudCardContent>
                             </MudCard>
                         }
@@ -365,7 +386,7 @@ else
                     else
                     {
                         <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Build"
-                                   OnClick="StartInstallation">Bắt đầu lắp đặt</MudButton>
+                                   OnClick="StartInstallation">@(_booking.IsUninstall ? "Bắt đầu tháo gỡ" : "Bắt đầu lắp đặt")</MudButton>
                     }
                 }
                 else if (_booking.Status == "Installing")
@@ -488,6 +509,7 @@ else
             {
                 @if (_replacementProductsPrepared && _selectedReplacementProducts.Any(rp => rp.Selected))
                 {
+                    @* Temporary disabled damage management feature
                     <MudText Typo="Typo.subtitle2" Class="mb-2 mt-3">Sản phẩm hỏng</MudText>
                     <MudCard Elevation="0" Outlined="true" Class="mb-3">
                         <MudCardContent>
@@ -507,6 +529,7 @@ else
                             }
                         </MudCardContent>
                     </MudCard>
+                    *@
                 }
                 else
                 {
@@ -973,7 +996,7 @@ else
         try
         {
             await InstallationApiService.StartInstallationAsync(Id);
-            Snackbar.Add("Đã bắt đầu lắp đặt", Severity.Success);
+            Snackbar.Add(_booking?.IsUninstall == true ? "Đã bắt đầu tháo gỡ" : "Đã bắt đầu lắp đặt", Severity.Success);
             await LoadBooking();
         }
         catch (Exception ex)

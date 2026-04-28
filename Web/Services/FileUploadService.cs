@@ -58,11 +58,14 @@ namespace Web.Services
 
         public async Task<string> UploadChatAsync(IFormFile file)
         {
+            Console.WriteLine($"[FileUploadService] UploadChatAsync called - File: {file?.FileName}, Size: {file?.Length}");
+            
             if (file == null || file.Length == 0)
                 throw new ArgumentException("File không hợp lệ");
 
             var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".doc", ".docx" };
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            Console.WriteLine($"[FileUploadService] File extension: {extension}");
 
             if (!allowedExtensions.Contains(extension))
                 throw new InvalidOperationException("Chỉ chấp nhận file ảnh (jpg, png, gif, webp) và tài liệu (pdf, doc, docx)");
@@ -71,20 +74,38 @@ namespace Web.Services
                 throw new InvalidOperationException($"File quá lớn. Tối đa {MaxFileSizeMB}MB");
 
             var chatFolder = Path.Combine(_environment.WebRootPath, "uploads", "chat");
+            Console.WriteLine($"[FileUploadService] Chat folder: {chatFolder}");
             if (!Directory.Exists(chatFolder))
+            {
+                Console.WriteLine($"[FileUploadService] Creating chat folder");
                 Directory.CreateDirectory(chatFolder);
+            }
 
             var fileName = $"{Guid.NewGuid():N}{extension}";
             var filePath = Path.Combine(chatFolder, fileName);
+            Console.WriteLine($"[FileUploadService] Saving file to: {filePath}");
 
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            try
             {
-                await file.CopyToAsync(stream);
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+                Console.WriteLine($"[FileUploadService] File saved successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[FileUploadService] Error saving file: {ex.Message}");
+                Console.WriteLine($"[FileUploadService] Stack trace: {ex.StackTrace}");
+                throw;
             }
 
             _logger.LogInformation("Chat file uploaded: {FileName}", fileName);
             var baseUrl = GetBaseUrl();
-            return $"{baseUrl}/uploads/chat/{fileName}";
+            Console.WriteLine($"[FileUploadService] Base URL: {baseUrl}");
+            var result = $"{baseUrl}/uploads/chat/{fileName}";
+            Console.WriteLine($"[FileUploadService] Returning URL: {result}");
+            return result;
         }
 
         public async Task<string> MoveToPermanentAsync(string tempPath, string folder)

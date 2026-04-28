@@ -27,7 +27,18 @@ namespace Application.Services
         public async Task<List<ProductListResponse>> GetAllAsync()
         {
             var products = await _productRepository.GetAllAsync();
-            return products.Select(p => MapToListResponse(p, 0, 0)).ToList();
+            
+            // Load warehouse stocks for all products
+            var productIds = products.Select(p => p.Id).ToList();
+            var warehouseStocks = await _productWarehouseRepository.GetByProductsAsync(productIds);
+            
+            return products.Select(p => 
+            {
+                var productStocks = warehouseStocks.Where(ws => ws.ProductId == p.Id).ToList();
+                var totalQty = productStocks.Sum(ws => ws.Quantity);
+                var totalReserved = productStocks.Sum(ws => ws.ReservedQuantity);
+                return MapToListResponse(p, totalQty, totalReserved);
+            }).ToList();
         }
 
         public async Task<ProductResponse?> GetByIdAsync(int id)

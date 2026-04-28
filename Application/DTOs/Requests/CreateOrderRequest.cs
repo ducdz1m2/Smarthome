@@ -14,6 +14,7 @@
         public DateTime? InstallationDate { get; set; }
         public int? InstallationSlotId { get; set; }
         public int? TechnicianId { get; set; }
+        public string? CouponCode { get; set; }
         public List<CreateOrderItemRequest> Items { get; set; } = new();
     }
 

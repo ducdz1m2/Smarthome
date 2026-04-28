@@ -1,5 +1,6 @@
 using Application.DTOs.Requests;
 using Application.DTOs.Responses;
+using Application.DTOs.Results;
 
 namespace Application.Interfaces.Services
 {
@@ -13,5 +14,6 @@ namespace Application.Interfaces.Services
         Task DeleteAsync(int id);
         Task<bool> ActivateAsync(int id);
         Task<bool> DeactivateAsync(int id);
+        Task<ApplyCouponResult> ValidateAndApplyCouponAsync(string couponCode, decimal orderAmount);
     }
 }

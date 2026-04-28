@@ -11,6 +11,7 @@
 @inject IInstallationSlotService InstallationSlotService
 @inject ITechnicianProfileService TechnicianProfileService
 @inject Domain.Services.IShippingService ShippingService
+@inject Application.Interfaces.Services.ICouponService CouponService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
@@ -310,6 +311,48 @@
                                 }
                             </MudText>
                         </div>
+
+                        <!-- Coupon Input -->
+                        <div class="mb-3">
+                            <MudTextField @bind-Value="_couponCode"
+                                         Label="Mã khuyến mãi"
+                                         Variant="Variant.Outlined"
+                                         Adornment="Adornment.End"
+                                         AdornmentIcon="@Icons.Material.Filled.LocalOffer"
+                                         OnAdornmentClick="ApplyCoupon"
+                                         AdornmentColor="Color.Primary"
+                                         Class="mb-2" />
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="ApplyCoupon"
+                                       Disabled="@_isApplyingCoupon">
+                                @if (_isApplyingCoupon)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Class="mr-2" />
+                                    <span>Đang áp dụng...</span>
+                                }
+                                else
+                                {
+                                    <span>Áp dụng mã</span>
+                                }
+                            </MudButton>
+                            @if (!string.IsNullOrEmpty(_couponMessage))
+                            {
+                                <MudText Typo="Typo.caption" Color="@(_couponApplied ? Color.Success : Color.Error)" Class="mt-1">
+                                    @_couponMessage
+                                </MudText>
+                            }
+                        </div>
+
+                        @if (_discountAmount > 0)
+                        {
+                            <div class="d-flex justify-space-between mb-2">
+                                <MudText Typo="Typo.body2" Color="Color.Success">Giảm giá</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Success">-@FormatPrice(_discountAmount)</MudText>
+                            </div>
+                        }
+
                         <MudDivider Class="my-4" />
                         <div class="d-flex justify-space-between">
                             <MudText Typo="Typo.h6" Class="fw-bold">Tổng cộng</MudText>
@@ -376,6 +419,13 @@
     private int _currentUserId = 0;
     private int? _selectedTechnicianId = null;
 
+    // Coupon-related fields
+    private string _couponCode = "";
+    private bool _isApplyingCoupon = false;
+    private decimal _discountAmount = 0;
+    private bool _couponApplied = false;
+    private string _couponMessage = "";
+
     private CreateOrderRequest _request = new()
     {
         ReceiverName = "",
@@ -407,7 +457,7 @@
     private decimal _subTotal => _cartItems.Sum(i => i.TotalPrice);
     private bool _requiresInstallation => _cartItems.Any(i => i.RequiresInstallation);
     private decimal _shippingFee;
-    private decimal _total => _subTotal + _shippingFee;
+    private decimal _total => _subTotal + _shippingFee - _discountAmount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -659,6 +709,56 @@
         }
     }
 
+    private async Task ApplyCoupon()
+    {
+        if (string.IsNullOrWhiteSpace(_couponCode))
+        {
+            _couponMessage = "Vui lòng nhập mã khuyến mãi";
+            _couponApplied = false;
+            StateHasChanged();
+            return;
+        }
+
+        _isApplyingCoupon = true;
+        _couponMessage = "";
+        StateHasChanged();
+
+        try
+        {
+            Console.WriteLine($"[Checkout] Applying coupon: {_couponCode}, OrderAmount: {_subTotal}");
+            var result = await CouponService.ValidateAndApplyCouponAsync(_couponCode, _subTotal);
+            Console.WriteLine($"[Checkout] Coupon result: IsValid={result.IsValid}, Discount={result.DiscountAmount}");
+
+            if (result.IsValid)
+            {
+                _discountAmount = result.DiscountAmount;
+                _couponApplied = true;
+                _couponMessage = $"Đã áp dụng mã! Giảm {FormatPrice(_discountAmount)}";
+                Snackbar.Add($"Áp dụng mã khuyến mãi thành công! Giảm {FormatPrice(_discountAmount)}", Severity.Success);
+            }
+            else
+            {
+                _discountAmount = 0;
+                _couponApplied = false;
+                _couponMessage = result.ErrorMessage ?? "Mã khuyến mãi không hợp lệ";
+                Snackbar.Add(_couponMessage, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Checkout] Error applying coupon: {ex.Message}");
+            _discountAmount = 0;
+            _couponApplied = false;
+            _couponMessage = $"Lỗi: {ex.Message}";
+            Snackbar.Add($"Lỗi khi áp dụng mã: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isApplyingCoupon = false;
+            StateHasChanged();
+        }
+    }
+
     private async Task PlaceOrder()
     {
         if (!_isValid || !_cartItems.Any()) return;
@@ -669,6 +769,8 @@
         _isPlacingOrder = true;
         try
         {
+            Console.WriteLine($"[Checkout] PlaceOrder: PaymentMethod={_paymentMethod}, Total={_total}");
+            
             // Build request
             _request.Items = _cartItems.Select(i => new CreateOrderItemRequest
             {
@@ -701,8 +803,18 @@
                 _request.InstallationDate = _request.InstallationDate;
             }
 
+            // Set coupon code if applied
+            if (_couponApplied && !string.IsNullOrWhiteSpace(_couponCode))
+            {
+                _request.CouponCode = _couponCode;
+                Console.WriteLine($"[Checkout] Applying coupon code: {_couponCode}");
+            }
+
+            Console.WriteLine($"[Checkout] Creating order with PaymentMethod={_request.PaymentMethod}");
+            
             // Create order
             var orderId = await OrderService.CreateAsync(_request);
+            Console.WriteLine($"[Checkout] Order created: {orderId}");
 
             // Clear cart
             await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "cart");
@@ -710,28 +822,34 @@
             // Handle VNPay payment
             if (_paymentMethod == "VNPAY")
             {
+                Console.WriteLine($"[Checkout] Initiating VNPay payment for order {orderId}");
                 var orderInfo = $"Thanh toán đơn hàng {orderId}";
                 var vnPayResponse = await VNPayService.CreatePaymentUrlAsync(orderId, _total, orderInfo);
 
                 if (vnPayResponse.Success)
                 {
+                    Console.WriteLine($"[Checkout] VNPay URL created, redirecting to: {vnPayResponse.PaymentUrl}");
                     // Redirect to VNPay payment page
                     NavigationManager.NavigateTo(vnPayResponse.PaymentUrl, forceLoad: true);
                 }
                 else
                 {
+                    Console.WriteLine($"[Checkout] VNPay URL creation failed: {vnPayResponse.Message}");
                     Snackbar.Add($"Lỗi khi tạo URL thanh toán VNPAY: {vnPayResponse.Message}", Severity.Error);
                     NavigationManager.NavigateTo($"/orders/{orderId}");
                 }
             }
             else
             {
+                Console.WriteLine($"[Checkout] COD order placed successfully");
                 Snackbar.Add("Đặt hàng thành công!", Severity.Success);
                 NavigationManager.NavigateTo("/orders");
             }
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[Checkout] PlaceOrder error: {ex.Message}");
+            Console.WriteLine($"[Checkout] Stack trace: {ex.StackTrace}");
             Snackbar.Add($"Lỗi khi đặt hàng: {ex.Message}", Severity.Error);
         }
         finally

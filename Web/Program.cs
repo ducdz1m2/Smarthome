@@ -19,6 +19,10 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
 using FluentEmail.Core;
+using QuestPDF.Infrastructure;
+
+// Configure QuestPDF license
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -228,6 +232,34 @@ app.MapGet("/api/warehouses", async (Application.Interfaces.Repositories.IWareho
     }).ToList();
     return Results.Ok(response);
 }).RequireAuthorization();
+
+// Map invoice download endpoint
+app.MapGet("/api/invoice/download/{orderId}", async (int orderId, IOrderService orderService, IInvoiceService invoiceService) =>
+{
+    try
+    {
+        Console.WriteLine($"[InvoiceEndpoint] Downloading invoice for order {orderId}");
+        
+        var order = await orderService.GetByIdAsync(orderId);
+        if (order == null)
+        {
+            Console.WriteLine($"[InvoiceEndpoint] Order {orderId} not found");
+            return Results.NotFound("Đơn hàng không tồn tại");
+        }
+
+        var pdfBytes = invoiceService.GenerateInvoicePdf(order);
+        var fileName = $"HoaDon_{order.OrderNumber}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
+        
+        Console.WriteLine($"[InvoiceEndpoint] Generated PDF for order {orderId}, size: {pdfBytes.Length} bytes");
+        
+        return Results.File(pdfBytes, "application/pdf", fileName);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[InvoiceEndpoint] Error downloading invoice for order {orderId}: {ex.Message}");
+        return Results.Problem($"Lỗi xuất hóa đơn: {ex.Message}");
+    }
+});
 
 // Map SignalR hubs
 app.MapHub<NotificationHub>("/hubs/notification");

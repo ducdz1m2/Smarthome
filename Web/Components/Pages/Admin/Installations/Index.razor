@@ -17,6 +17,42 @@
 
 <PageHeader Title="Quản lý Lịch Lắp đặt" AddButtonText="Thêm lịch lắp đặt" OnAddClick="@(() => OpenDialog(null))" />
 
+<!-- Summary Cards -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Class="elevation-2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Tổng lịch lắp đặt</MudText>
+                <MudText Typo="Typo.h5" Class="mt-1">@_installBookings.Count</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Class="elevation-2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Lịch bảo hành</MudText>
+                <MudText Typo="Typo.h5" Class="mt-1">@_warrantyBookings.Count</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Class="elevation-2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Lịch tháo dỡ</MudText>
+                <MudText Typo="Typo.h5" Class="mt-1">@_uninstallBookings.Count</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Class="@(_awaitingMaterialCount > 0 ? "elevation-2 warning-card" : "elevation-2")">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Chờ vật tư</MudText>
+                <MudText Typo="Typo.h5" Class="@(_awaitingMaterialCount > 0 ? "mt-1 warning-text" : "mt-1")">@_awaitingMaterialCount</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
 @if (_awaitingMaterialCount > 0)
 {
     <MudAlert Severity="Severity.Warning" Class="mb-4">
@@ -29,28 +65,30 @@
 
 <MudTabs Elevation="2" Rounded="true" ApplyEffects="true">
     <MudTabPanel Text="Lắp đặt">
-        <FilterBar>
-            <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="string" @bind-Value="_statusFilter" Label="Trạng thái"
-                           Clearable="true" Dense="true" Variant="Variant.Outlined"
-                           AnchorOrigin="Origin.BottomCenter">
-                    <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Installing")">Đang lắp</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadData">
-                    Lọc
-                </MudButton>
-            </MudItem>
-        </FilterBar>
-
         <DataTable Items="_installBookings" Title="Danh sách lịch lắp đặt" Loading="_loading"
                    FilterFunc="@FilterItems">
+            <FilterContent>
+                <MudGrid Class="align-center">
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudSelect T="string" @bind-Value="_installStatusFilter" Label="Trạng thái"
+                                   Clearable="true" Dense="true" Variant="Variant.Outlined"
+                                   AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Installing")">Đang lắp</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudDatePicker @bind-Date="_installStartDate" Label="Từ ngày" Dense="true" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudDatePicker @bind-Date="_installEndDate" Label="Đến ngày" Dense="true" Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+            </FilterContent>
             <HeaderContent>
                 <MudTh>ID</MudTh>
                 <MudTh>Đơn hàng</MudTh>
@@ -90,29 +128,31 @@
     </MudTabPanel>
 
     <MudTabPanel Text="Bảo hành">
-        <FilterBar>
-            <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="string" @bind-Value="_statusFilter" Label="Trạng thái"
-                           Clearable="true" Dense="true" Variant="Variant.Outlined"
-                           AnchorOrigin="Origin.BottomCenter">
-                    <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Installing")">Đang bảo hành</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("AwaitingMaterial")">Chờ vật tư</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadData">
-                    Lọc
-                </MudButton>
-            </MudItem>
-        </FilterBar>
-
         <DataTable Items="_warrantyBookings" Title="Danh sách lịch bảo hành" Loading="_loading"
                    FilterFunc="@FilterItems">
+            <FilterContent>
+                <MudGrid Class="align-center">
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudSelect T="string" @bind-Value="_warrantyStatusFilter" Label="Trạng thái"
+                                   Clearable="true" Dense="true" Variant="Variant.Outlined"
+                                   AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Installing")">Đang bảo hành</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("AwaitingMaterial")">Chờ vật tư</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudDatePicker @bind-Date="_warrantyStartDate" Label="Từ ngày" Dense="true" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudDatePicker @bind-Date="_warrantyEndDate" Label="Đến ngày" Dense="true" Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+            </FilterContent>
             <HeaderContent>
                 <MudTh>ID</MudTh>
                 <MudTh>Đơn hàng</MudTh>
@@ -164,28 +204,30 @@
     </MudTabPanel>
 
     <MudTabPanel Text="Tháo dỡ">
-        <FilterBar>
-            <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="string" @bind-Value="_statusFilter" Label="Trạng thái"
-                           Clearable="true" Dense="true" Variant="Variant.Outlined"
-                           AnchorOrigin="Origin.BottomCenter">
-                    <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Installing")">Đang tháo dỡ</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadData">
-                    Lọc
-                </MudButton>
-            </MudItem>
-        </FilterBar>
-
         <DataTable Items="_uninstallBookings" Title="Danh sách lịch tháo dỡ" Loading="_loading"
                    FilterFunc="@FilterItems">
+            <FilterContent>
+                <MudGrid Class="align-center">
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudSelect T="string" @bind-Value="_uninstallStatusFilter" Label="Trạng thái"
+                                   Clearable="true" Dense="true" Variant="Variant.Outlined"
+                                   AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem T="string" Value="@("Assigned")">Chờ KT xác nhận</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Preparing")">KT chuẩn bị</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("OnTheWay")">Đang di chuyển</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Installing")">Đang tháo dỡ</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Completed")">Hoàn thành</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Cancelled")">Đã hủy</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudDatePicker @bind-Date="_uninstallStartDate" Label="Từ ngày" Dense="true" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudDatePicker @bind-Date="_uninstallEndDate" Label="Đến ngày" Dense="true" Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+            </FilterContent>
             <HeaderContent>
                 <MudTh>ID</MudTh>
                 <MudTh>Đơn hàng</MudTh>
@@ -225,6 +267,16 @@
     </MudTabPanel>
 </MudTabs>
 
+<style>
+    .warning-card {
+        border-left: 4px solid #ff9800;
+    }
+    .warning-text {
+        color: #ff9800;
+        font-weight: 600;
+    }
+</style>
+
 @code {
     private List<InstallationBookingListResponse> _bookings = new();
     private List<InstallationBookingListResponse> _installBookings = new();
@@ -233,7 +285,15 @@
     private List<TechnicianResponse> _technicians = new();
     private bool _loading = true;
     private string _searchString = "";
-    private string? _statusFilter;
+    private string? _installStatusFilter;
+    private string? _warrantyStatusFilter;
+    private string? _uninstallStatusFilter;
+    private DateTime? _installStartDate;
+    private DateTime? _installEndDate;
+    private DateTime? _warrantyStartDate;
+    private DateTime? _warrantyEndDate;
+    private DateTime? _uninstallStartDate;
+    private DateTime? _uninstallEndDate;
     private int _awaitingMaterialCount = 0;
 
     protected override async Task OnInitializedAsync()
@@ -281,15 +341,45 @@
 
     private bool FilterItems(InstallationBookingListResponse booking)
     {
+        var currentTab = booking.IsWarranty ? "warranty" : (booking.IsUninstall ? "uninstall" : "install");
+        var statusFilter = currentTab == "install" ? _installStatusFilter :
+                          currentTab == "warranty" ? _warrantyStatusFilter : _uninstallStatusFilter;
+        var startDate = currentTab == "install" ? _installStartDate :
+                       currentTab == "warranty" ? _warrantyStartDate : _uninstallStartDate;
+        var endDate = currentTab == "install" ? _installEndDate :
+                     currentTab == "warranty" ? _warrantyEndDate : _uninstallEndDate;
+
         if (!string.IsNullOrWhiteSpace(_searchString))
         {
-            return booking.OrderId.ToString().Contains(_searchString) ||
-                   (booking.TechnicianName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false);
+            if (!booking.OrderId.ToString().Contains(_searchString) &&
+                !(booking.TechnicianName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false))
+            {
+                return false;
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(_statusFilter))
+        if (!string.IsNullOrWhiteSpace(statusFilter))
         {
-            return booking.Status == _statusFilter;
+            if (booking.Status != statusFilter)
+            {
+                return false;
+            }
+        }
+
+        if (startDate.HasValue)
+        {
+            if (booking.ScheduledDate.Date < startDate.Value.Date)
+            {
+                return false;
+            }
+        }
+
+        if (endDate.HasValue)
+        {
+            if (booking.ScheduledDate.Date > endDate.Value.Date)
+            {
+                return false;
+            }
         }
 
         return true;

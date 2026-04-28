@@ -2,6 +2,7 @@ using Application.DTOs.Responses;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Microsoft.Extensions.Logging;
 
 namespace Web.Services
 {
@@ -12,10 +13,41 @@ namespace Web.Services
 
     public class InvoiceService : IInvoiceService
     {
+        private readonly ILogger<InvoiceService> _logger;
+
+        public InvoiceService(ILogger<InvoiceService> logger)
+        {
+            _logger = logger;
+        }
+
         public byte[] GenerateInvoicePdf(OrderResponse order)
         {
-            var document = new InvoiceDocument(order);
-            return document.GeneratePdf();
+            try
+            {
+                _logger.LogInformation("Starting PDF generation for order {OrderNumber}", order?.OrderNumber);
+                
+                if (order == null)
+                {
+                    _logger.LogError("Order is null");
+                    throw new ArgumentNullException(nameof(order));
+                }
+
+                if (order.Items == null || !order.Items.Any())
+                {
+                    _logger.LogWarning("Order {OrderNumber} has no items", order.OrderNumber);
+                }
+
+                var document = new InvoiceDocument(order);
+                var pdfBytes = document.GeneratePdf();
+                
+                _logger.LogInformation("Successfully generated PDF for order {OrderNumber}, size: {Size} bytes", order.OrderNumber, pdfBytes.Length);
+                return pdfBytes;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating PDF for order {OrderNumber}", order?.OrderNumber ?? "unknown");
+                throw;
+            }
         }
     }
 
@@ -37,15 +69,20 @@ namespace Web.Services
             container
                 .Page(page =>
                 {
+                    // 1. Xác định khổ giấy rõ ràng (A4)
+                    page.Size(PageSizes.A4);
                     page.Margin(50);
-                    page.DefaultTextStyle(x => x.FontSize(10));
+                    page.DefaultTextStyle(x => x.FontSize(9).LineHeight(1.3f).FontFamily(Fonts.Verdana)); // Đảm bảo font hỗ trợ Unicode nếu cần
 
                     page.Header().Element(ComposeHeader);
                     page.Content().Element(ComposeContent);
+                    
                     page.Footer().AlignCenter().Text(x =>
                     {
-                        x.Span("Page ");
+                        x.Span("Trang ");
                         x.CurrentPageNumber();
+                        x.Span(" / ");
+                        x.TotalPages();
                     });
                 });
         }
@@ -56,17 +93,15 @@ namespace Web.Services
             {
                 row.RelativeItem().Column(column =>
                 {
-                    column.Item().Text("HÓA ĐƠN").Bold().FontSize(20);
-                    column.Item().Text($"Mã đơn hàng: #{_order.OrderNumber}").FontSize(12);
-                    column.Item().Text($"Ngày tạo: {_order.CreatedAt:dd/MM/yyyy HH:mm}").FontSize(10);
+                    column.Item().Text("HÓA ĐƠN").Bold().FontSize(20).FontColor(Colors.Blue.Medium);
+                    column.Item().Text($"Mã đơn hàng: #{_order.OrderNumber}");
+                    column.Item().Text($"Ngày tạo: {_order.CreatedAt:dd/MM/yyyy HH:mm}");
                 });
 
-                row.RelativeItem().Column(column =>
+                row.RelativeItem().AlignRight().Column(column =>
                 {
-                    column.Item().AlignRight().Text("SmartHome").Bold().FontSize(16);
-                    column.Item().AlignRight().Text("Địa chỉ: 123 Đường ABC, TP.HCM").FontSize(10);
-                    column.Item().AlignRight().Text("Điện thoại: 0901234567").FontSize(10);
-                    column.Item().AlignRight().Text("Email: contact@smarthome.vn").FontSize(10);
+                    column.Item().Text("Đại học CT").Bold().FontSize(14);
+                    column.Item().Text("SĐT: 0397765046");
                 });
             });
         }
@@ -87,12 +122,12 @@ namespace Web.Services
         {
             container.Border(1).Padding(10).Column(column =>
             {
-                column.Item().Text("Thông tin khách hàng").Bold().FontSize(12);
-                column.Item().PaddingTop(5).Text($"Tên: {_order.ReceiverName}").FontSize(10);
-                column.Item().Text($"SĐT: {_order.ReceiverPhone}").FontSize(10);
-                column.Item().Text($"Địa chỉ: {_order.ShippingAddress}").FontSize(10);
-                column.Item().Text($"Phương thức thanh toán: {_order.PaymentMethod}").FontSize(10);
-                column.Item().Text($"Trạng thái: {_order.Status}").FontSize(10);
+                column.Item().Text("Thông tin khách hàng").Bold().FontSize(11);
+                column.Item().PaddingTop(8).Text($"Tên: {_order.ReceiverName}").FontSize(9);
+                column.Item().PaddingTop(4).Text($"SĐT: {_order.ReceiverPhone}").FontSize(9);
+                column.Item().PaddingTop(4).Text($"Địa chỉ: {_order.ShippingAddress}").FontSize(9);
+                column.Item().PaddingTop(4).Text($"Phương thức thanh toán: {_order.PaymentMethod}").FontSize(9);
+                column.Item().PaddingTop(4).Text($"Trạng thái: {_order.Status}").FontSize(9);
             });
         }
 
@@ -100,22 +135,23 @@ namespace Web.Services
         {
             container.Table(table =>
             {
+                // 2. Điều chỉnh lại tỷ lệ cột để phần tên sản phẩm (Relative) chiếm không gian chính giữa
                 table.ColumnsDefinition(columns =>
                 {
-                    columns.ConstantColumn(50);
-                    columns.RelativeColumn();
-                    columns.ConstantColumn(80);
-                    columns.ConstantColumn(80);
-                    columns.ConstantColumn(100);
+                    columns.ConstantColumn(30);  // STT
+                    columns.RelativeColumn();    // Sản phẩm (tự động giãn)
+                    columns.ConstantColumn(80);  // Đơn giá
+                    columns.ConstantColumn(40);  // SL
+                    columns.ConstantColumn(100); // Thành tiền
                 });
 
                 table.Header(header =>
                 {
-                    header.Cell().Element(CellStyle).Text("STT").Bold();
-                    header.Cell().Element(CellStyle).Text("Sản phẩm").Bold();
-                    header.Cell().Element(CellStyle).AlignRight().Text("Đơn giá").Bold();
-                    header.Cell().Element(CellStyle).AlignRight().Text("SL").Bold();
-                    header.Cell().Element(CellStyle).AlignRight().Text("Thành tiền").Bold();
+                    header.Cell().Element(HeaderStyle).Text("STT");
+                    header.Cell().Element(HeaderStyle).Text("Sản phẩm");
+                    header.Cell().Element(HeaderStyle).AlignRight().Text("Đơn giá");
+                    header.Cell().Element(HeaderStyle).AlignRight().Text("SL");
+                    header.Cell().Element(HeaderStyle).AlignRight().Text("Thành tiền");
                 });
 
                 int index = 1;
@@ -123,51 +159,60 @@ namespace Web.Services
                 {
                     table.Cell().Element(CellStyle).Text($"{index++}");
                     table.Cell().Element(CellStyle).Text(item.ProductName);
-                    table.Cell().Element(CellStyle).AlignRight().Text($"{item.UnitPrice:N0} đ");
+                    table.Cell().Element(CellStyle).AlignRight().Text($"{item.UnitPrice:N0}");
                     table.Cell().Element(CellStyle).AlignRight().Text(item.Quantity.ToString());
-                    table.Cell().Element(CellStyle).AlignRight().Text($"{item.TotalPrice:N0} đ");
+                    table.Cell().Element(CellStyle).AlignRight().Text($"{item.TotalPrice:N0}");
                 }
             });
         }
 
         void ComposeTotals(IContainer container)
         {
-            container.AlignRight().Column(column =>
+            // 3. Sử dụng Row với RelativeItem trống bên trái để đẩy nội dung sang phải một cách cân đối
+            container.PaddingTop(10).Row(row => 
             {
-                column.Item().Row(row =>
+                row.RelativeItem(); // Chiếm hết phần trống bên trái
+                
+                row.ConstantItem(250).Column(column => // Giới hạn độ rộng vùng tổng tiền
                 {
-                    row.RelativeItem().AlignRight().Text("Tạm tính:");
-                    row.ConstantItem(150).AlignRight().Text($"{_order.SubTotal:N0} đ");
-                });
-
-                column.Item().Row(row =>
-                {
-                    row.RelativeItem().AlignRight().Text("Phí vận chuyển:");
-                    row.ConstantItem(150).AlignRight().Text($"{_order.ShippingFee:N0} đ");
-                });
-
-                column.Item().Row(row =>
-                {
-                    row.RelativeItem().AlignRight().Text("Giảm giá:");
-                    row.ConstantItem(150).AlignRight().Text($"- {_order.DiscountAmount:N0} đ");
-                });
-
-                column.Item().PaddingTop(10).Row(row =>
-                {
-                    row.RelativeItem().AlignRight().Text("Tổng cộng:").Bold().FontSize(12);
-                    row.ConstantItem(150).AlignRight().Text($"{_order.TotalAmount:N0} đ").Bold().FontSize(12);
+                    column.Item().Row(r => {
+                        r.RelativeItem().Text("Tạm tính:");
+                        r.ConstantItem(100).AlignRight().Text($"{_order.SubTotal:N0} đ");
+                    });
+                    column.Item().Row(r => {
+                        r.RelativeItem().Text("Phí vận chuyển:");
+                        r.ConstantItem(100).AlignRight().Text($"{_order.ShippingFee:N0} đ");
+                    });
+                    column.Item().Row(r => {
+                        r.RelativeItem().Text("Giảm giá:");
+                        r.ConstantItem(100).AlignRight().Text($"- {_order.DiscountAmount:N0} đ");
+                    });
+                    column.Item().PaddingTop(5).BorderTop(1).Row(r => {
+                        r.RelativeItem().Text("Tổng cộng:").Bold().FontSize(12);
+                        r.ConstantItem(100).AlignRight().Text($"{_order.TotalAmount:N0} đ").Bold().FontSize(12);
+                    });
                 });
             });
+        }
+
+        // 4. Sửa lại Style để có đầy đủ viền, tránh cảm giác lệch lạc
+        static IContainer HeaderStyle(IContainer container)
+        {
+            return container
+                .BorderBottom(1)
+                .BorderColor(Colors.Black)
+                .PaddingVertical(5)
+                .PaddingHorizontal(5)
+                .DefaultTextStyle(x => x.Bold());
         }
 
         static IContainer CellStyle(IContainer container)
         {
             return container
                 .BorderBottom(1)
-                .BorderLeft(1)
-                .BorderRight(1)
+                .BorderColor(Colors.Grey.Lighten2)
                 .PaddingVertical(5)
-                .PaddingHorizontal(10);
+                .PaddingHorizontal(5);
         }
     }
 }

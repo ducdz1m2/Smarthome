@@ -4,6 +4,8 @@
 @using Domain.Enums
 @inject IReturnOrderService ReturnOrderService
 @inject IWarehouseService WarehouseService
+@inject IInstallationSlotService SlotService
+@inject IInstallationService InstallationService
 @inject ISnackbar Snackbar
 
 <MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
@@ -59,6 +61,39 @@
 
             <MudDivider Class="my-4" />
 
+            @if (_returnOrder.ReturnMethod == "Technician")
+            {
+                <MudText Typo="Typo.subtitle1" Class="fw-bold mb-3">Lịch tháo gỡ thiết bị</MudText>
+                @if (_returnOrder.UninstallBooking != null)
+                {
+                    <MudCard Class="mb-4" Elevation="0" Outlined="true">
+                        <MudCardContent>
+                            <div class="d-flex justify-space-between align-center">
+                                <div>
+                                    <MudText Typo="Typo.body2" Class="fw-bold">Lịch tháo gỡ #@_returnOrder.UninstallBooking.Id</MudText>
+                                    <MudText Typo="Typo.caption">Kỹ thuật viên: @_returnOrder.UninstallBooking.TechnicianName</MudText>
+                                    <MudText Typo="Typo.caption">Ngày hẹn: @_returnOrder.UninstallBooking.ScheduledDate.ToString("dd/MM/yyyy HH:mm")</MudText>
+                                </div>
+                                <MudChip T="string" Color="@GetBookingStatusColor(_returnOrder.UninstallBooking.Status)" Size="Size.Small">
+                                    @GetBookingStatusText(_returnOrder.UninstallBooking.Status)
+                                </MudChip>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mb-4">
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.body2">Chưa có lịch tháo gỡ thiết bị. Vui lòng tạo lịch tháo gỡ trước khi hoàn thành yêu cầu hoàn hàng.</MudText>
+                            <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="OpenSlotDialog">
+                                Tạo lịch tháo gỡ
+                            </MudButton>
+                        </div>
+                    </MudAlert>
+                }
+            }
+
             <MudText Typo="Typo.subtitle1" Class="fw-bold mb-3">Sản phẩm hoàn trả</MudText>
 
             @if (_returnOrder.Items.Any())
@@ -67,34 +102,17 @@
                     <HeaderContent>
                         <MudTh>Sản phẩm</MudTh>
                         <MudTh>SL</MudTh>
-                        <MudTh>Trạng thái</MudTh>
                         <MudTh>Kho nhận</MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd>
-                            <div class="d-flex flex-column">
-                                <MudText Typo="Typo.body2" Class="fw-bold">@context.ProductName</MudText>
-                                @if (!string.IsNullOrEmpty(context.VariantName))
-                                {
-                                    <MudText Typo="Typo.caption">@context.VariantName</MudText>
-                                }
-                            </div>
+                            <MudText Typo="Typo.body2">@context.ProductName</MudText>
+                            @if (!string.IsNullOrEmpty(context.VariantName))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.VariantName</MudText>
+                            }
                         </MudTd>
                         <MudTd>@context.Quantity</MudTd>
-                        <MudTd>
-                            @if (context.IsDamaged)
-                            {
-                                <MudChip T="string" Color="Color.Error" Size="Size.Small">Hư hỏng</MudChip>
-                            }
-                            else if (context.ReturnedToInventory)
-                            {
-                                <MudChip T="string" Color="Color.Success" Size="Size.Small">Đã nhập kho</MudChip>
-                            }
-                            else
-                            {
-                                <MudChip T="string" Color="Color.Default" Size="Size.Small">Chờ nhập kho</MudChip>
-                            }
-                        </MudTd>
                         <MudTd>
                             @if (context.WarehouseId.HasValue)
                             {
@@ -155,6 +173,45 @@
     </DialogActions>
 </MudDialog>
 
+@if (_showSlotDialog)
+{
+    <MudDialog Class="pa-0">
+        <DialogContent>
+            <MudText Typo="Typo.h6" Class="mb-4">Chọn lịch tháo gỡ</MudText>
+            @if (_loadingSlots)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (_availableSlots.Any())
+            {
+                <MudRadioGroup T="int?" @bind-Value="_selectedSlotId">
+                    @foreach (var slot in _availableSlots)
+                    {
+                        <MudRadio Value="@((int?)slot.Id)" Class="my-2">
+                            <MudCard Elevation="0" Outlined="true" Class="w-100">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.body2" Class="fw-bold">@slot.Date.ToString("dd/MM/yyyy")</MudText>
+                                    <MudText Typo="Typo.caption">@slot.StartTime - @slot.EndTime</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudRadio>
+                    }
+                </MudRadioGroup>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning">Không có slot trống trong 7 ngày tới</MudAlert>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CloseSlotDialog">Hủy</MudButton>
+            <MudButton Color="Color.Primary" OnClick="ConfirmCreateUninstallBooking" Disabled="!_selectedSlotId.HasValue">
+                Tạo lịch
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
 <style>
     .fw-bold {
         font-weight: 600;
@@ -172,6 +229,13 @@
     private List<WarehouseResponse> _warehouses = new();
     private Dictionary<int, int> _itemWarehouseSelections = new();
     private bool _loading = true;
+
+    // Slot dialog fields
+    private bool _showSlotDialog = false;
+    private bool _loadingSlots = false;
+    private List<InstallationSlotResponse> _availableSlots = new();
+    private int? _selectedSlotId;
+    private int? _technicianId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -217,13 +281,26 @@
     private bool CanComplete()
     {
         if (_returnOrder == null) return false;
-        
+
+        // For Technician returns, check if uninstall booking is completed
+        if (_returnOrder.ReturnMethod == "Technician")
+        {
+            if (_returnOrder.UninstallBooking == null)
+            {
+                return false; // No uninstall booking created
+            }
+            if (_returnOrder.UninstallBooking.Status != "Completed")
+            {
+                return false; // Uninstall not completed yet
+            }
+        }
+
         // Kiểm tra các sản phẩm cần kho đã có kho chưa
         var itemsNeedingWarehouse = _returnOrder.Items.Where(i => !i.IsDamaged).ToList();
-        
+
         // Nếu có items chưa có warehouse và chưa chọn trong dialog
         var itemsWithoutWarehouse = itemsNeedingWarehouse.Where(i => !i.WarehouseId.HasValue).ToList();
-        
+
         foreach (var item in itemsWithoutWarehouse)
         {
             if (!_itemWarehouseSelections.ContainsKey(item.Id))
@@ -231,7 +308,7 @@
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -256,9 +333,10 @@
             // Cập nhật warehouse cho các items chưa có
             // Note: Đây là UI demo, thực tế cần API riêng để cập nhật warehouse
             // Hiện tại CompleteAsync sẽ xử lý nhập kho dựa trên WarehouseId đã có
-            
+
             await ReturnOrderService.CompleteAsync(ReturnOrderId);
             Snackbar.Add("Đã hoàn thành hoàn hàng và nhập kho", Severity.Success);
+            await LoadData();
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)
@@ -293,5 +371,108 @@
             "Rejected" => "Đã từ chối",
             _ => status
         };
+    }
+
+    private static Color GetBookingStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => Color.Warning,
+            "Assigned" => Color.Info,
+            "Confirmed" => Color.Primary,
+            "Preparing" => Color.Secondary,
+            "OnTheWay" => Color.Tertiary,
+            "Installing" => Color.Primary,
+            "Completed" => Color.Success,
+            "Cancelled" => Color.Error,
+            "Failed" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetBookingStatusText(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ phân công",
+            "Assigned" => "Đã phân công",
+            "Confirmed" => "Đã xác nhận",
+            "Preparing" => "Đang chuẩn bị",
+            "OnTheWay" => "Đang di chuyển",
+            "Installing" => "Đang tháo gỡ",
+            "Completed" => "Đã hoàn thành",
+            "Cancelled" => "Đã hủy",
+            "Failed" => "Thất bại",
+            _ => status
+        };
+    }
+
+    private async Task OpenSlotDialog()
+    {
+        if (_returnOrder == null) return;
+
+        // Get the original installation booking to find the technician
+        var originalBooking = await InstallationService.GetByOrderIdAsync(_returnOrder.OrderId);
+        if (originalBooking == null || !originalBooking.TechnicianId.HasValue)
+        {
+            Snackbar.Add("Không tìm thấy kỹ thuật viên đã lắp đặt", Severity.Error);
+            return;
+        }
+
+        _technicianId = originalBooking.TechnicianId.Value;
+        _showSlotDialog = true;
+        _selectedSlotId = null;
+        _availableSlots = new();
+
+        // Load available slots for the next 7 days
+        _loadingSlots = true;
+        StateHasChanged();
+
+        try
+        {
+            var searchDate = DateTime.UtcNow.AddDays(1);
+            for (int day = 0; day < 7; day++)
+            {
+                var currentDate = searchDate.AddDays(day);
+                var slots = await SlotService.GetAvailableSlotsAsync(_technicianId.Value, currentDate);
+                if (slots != null && slots.Any())
+                {
+                    _availableSlots.AddRange(slots);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi tải slot: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingSlots = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CloseSlotDialog()
+    {
+        _showSlotDialog = false;
+        _selectedSlotId = null;
+        _availableSlots = new();
+    }
+
+    private async Task ConfirmCreateUninstallBooking()
+    {
+        if (!_selectedSlotId.HasValue || _returnOrder == null) return;
+
+        try
+        {
+            await ReturnOrderService.CreateUninstallBookingAsync(_returnOrder.Id, _selectedSlotId.Value);
+            Snackbar.Add("Đã tạo lịch tháo gỡ thành công", Severity.Success);
+            CloseSlotDialog();
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Lỗi: {ex.Message}", Severity.Error);
+        }
     }
 }

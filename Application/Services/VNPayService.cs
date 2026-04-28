@@ -25,14 +25,19 @@ namespace Application.Services
         {
             try
             {
+                Console.WriteLine($"[VNPayService] CreatePaymentUrlAsync: OrderId={orderId}, Amount={amount}, OrderInfo={orderInfo}");
+                
                 var vnpayConfig = _configuration.GetSection("VNPay");
                 var tmnCode = vnpayConfig["TmnCode"];
                 var hashSecret = vnpayConfig["HashSecret"];
                 var baseUrl = vnpayConfig["BaseUrl"];
                 var returnUrl = vnpayConfig["ReturnUrl"];
 
+                Console.WriteLine($"[VNPayService] Config: TmnCode={tmnCode}, BaseUrl={baseUrl}, ReturnUrl={returnUrl}");
+
                 if (string.IsNullOrEmpty(tmnCode) || string.IsNullOrEmpty(hashSecret) || string.IsNullOrEmpty(returnUrl))
                 {
+                    Console.WriteLine("[VNPayService] Missing required configuration");
                     return new VNPayResponse
                     {
                         Success = false,
@@ -42,6 +47,7 @@ namespace Application.Services
 
                 if (tmnCode == "YOUR_TMN_CODE" || hashSecret == "YOUR_HASH_SECRET")
                 {
+                    Console.WriteLine("[VNPayService] Demo configuration detected");
                     return new VNPayResponse
                     {
                         Success = false,
@@ -52,6 +58,7 @@ namespace Application.Services
                 var order = await _orderRepository.GetByIdAsync(orderId);
                 if (order == null)
                 {
+                    Console.WriteLine($"[VNPayService] Order not found: {orderId}");
                     return new VNPayResponse
                     {
                         Success = false,
@@ -59,7 +66,12 @@ namespace Application.Services
                     };
                 }
 
+                Console.WriteLine($"[VNPayService] Order found: {orderId}, TotalAmount={order.TotalAmount}");
+
                 // Use actual order ID instead of ticks for better tracking
+                // vnp_OrderInfo must be Vietnamese without accents and no special characters
+                var cleanOrderInfo = System.Text.RegularExpressions.Regex.Replace(orderInfo, "[^a-zA-Z0-9 ]", "").Replace(" ", "");
+                
                 var vnpayData = new Dictionary<string, string>
                 {
                     { "vnp_Version", "2.1.0" },
@@ -68,7 +80,7 @@ namespace Application.Services
                     { "vnp_Amount", ((long)(amount * 100)).ToString() },
                     { "vnp_CurrCode", "VND" },
                     { "vnp_TxnRef", orderId.ToString() },
-                    { "vnp_OrderInfo", orderInfo },
+                    { "vnp_OrderInfo", cleanOrderInfo },
                     { "vnp_OrderType", "billpayment" },
                     { "vnp_Locale", "vn" },
                     { "vnp_ReturnUrl", returnUrl },
@@ -76,14 +88,18 @@ namespace Application.Services
                     { "vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss") }
                 };
 
-                // VNPay requires sorted keys, raw values (no URL encoding) for hash computation
+                // VNPay requires URL encoding for hash data (like Python's urllib.parse.urlencode)
                 var sortedData = vnpayData.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
-                var hashData = string.Join("&", sortedData.Select(x => $"{x.Key}={x.Value}"));
+                var hashData = string.Join("&", sortedData.Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value)}"));
                 var secureHash = HmacSHA512(hashSecret, hashData);
+
+                Console.WriteLine($"[VNPayService] Hash computed: {secureHash}");
 
                 // Build the actual payment URL with URL-encoded values
                 var queryString = string.Join("&", sortedData.Select(x => $"{x.Key}={Uri.EscapeDataString(x.Value)}"));
                 var paymentUrl = $"{baseUrl}?{queryString}&vnp_SecureHash={secureHash}";
+
+                Console.WriteLine($"[VNPayService] Payment URL created: {paymentUrl}");
 
                 return new VNPayResponse
                 {
@@ -94,6 +110,8 @@ namespace Application.Services
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[VNPayService] Error: {ex.Message}");
+                Console.WriteLine($"[VNPayService] Stack trace: {ex.StackTrace}");
                 return new VNPayResponse
                 {
                     Success = false,
@@ -106,20 +124,26 @@ namespace Application.Services
         {
             try
             {
+                Console.WriteLine($"[VNPayService] ProcessIpnAsync: {string.Join(", ", vnpayData.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
+                
                 var vnpayConfig = _configuration.GetSection("VNPay");
                 var hashSecret = vnpayConfig["HashSecret"];
 
                 if (string.IsNullOrEmpty(hashSecret))
                 {
+                    Console.WriteLine("[VNPayService] ProcessIpnAsync: Missing hash secret");
                     return false;
                 }
 
                 if (!vnpayData.ContainsKey("vnp_SecureHash"))
                 {
+                    Console.WriteLine("[VNPayService] ProcessIpnAsync: Missing vnp_SecureHash");
                     return false;
                 }
 
                 var receivedHash = vnpayData["vnp_SecureHash"];
+                Console.WriteLine($"[VNPayService] ProcessIpnAsync: Received hash: {receivedHash}");
+                
                 // Exclude both vnp_SecureHash and vnp_SecureHashType from hash computation
                 var vnpayDataWithoutHash = vnpayData
                     .Where(x => x.Key != "vnp_SecureHash" && x.Key != "vnp_SecureHashType")
@@ -130,23 +154,32 @@ namespace Application.Services
                 var hashData = string.Join("&", sortedData.Select(x => $"{x.Key}={x.Value}"));
                 var calculatedHash = HmacSHA512(hashSecret, hashData);
 
+                Console.WriteLine($"[VNPayService] ProcessIpnAsync: Calculated hash: {calculatedHash}");
+
                 if (receivedHash != calculatedHash)
                 {
+                    Console.WriteLine("[VNPayService] ProcessIpnAsync: Hash mismatch - signature invalid");
                     return false;
                 }
 
                 var responseCode = vnpayData.GetValueOrDefault("vnp_ResponseCode");
                 var transactionStatus = vnpayData.GetValueOrDefault("vnp_TransactionStatus");
 
+                Console.WriteLine($"[VNPayService] ProcessIpnAsync: ResponseCode={responseCode}, TransactionStatus={transactionStatus}");
+
                 if (responseCode == "00" && transactionStatus == "00")
                 {
+                    Console.WriteLine("[VNPayService] ProcessIpnAsync: Payment successful");
                     return true;
                 }
 
+                Console.WriteLine("[VNPayService] ProcessIpnAsync: Payment failed or pending");
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[VNPayService] ProcessIpnAsync Error: {ex.Message}");
+                Console.WriteLine($"[VNPayService] ProcessIpnAsync Stack trace: {ex.StackTrace}");
                 return false;
             }
         }
@@ -162,7 +195,7 @@ namespace Application.Services
                 var hashValue = hmac.ComputeHash(inputBytes);
                 foreach (var theByte in hashValue)
                 {
-                    hash.Append(theByte.ToString("x2"));
+                    hash.Append(theByte.ToString("x2")); // Lowercase hex
                 }
             }
 

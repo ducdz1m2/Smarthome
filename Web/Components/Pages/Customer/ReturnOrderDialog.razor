@@ -60,6 +60,7 @@
                             
                             @if (_returnQuantities[item.Id] > 0)
                             {
+                                @* Temporary disabled damage management feature
                                 <MudDivider Class="my-2" />
                                 <div class="d-flex align-center gap-4 mt-2">
                                     <MudCheckBox T="bool" 
@@ -76,6 +77,7 @@
                                         <MudText Typo="Typo.caption">Sản phẩm hư hỏng sẽ không được cộng vào kho bán</MudText>
                                     </MudAlert>
                                 }
+                                *@
                             }
                         </MudCardContent>
                     </MudCard>

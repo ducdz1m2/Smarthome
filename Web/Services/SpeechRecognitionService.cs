@@ -109,13 +109,12 @@ public class SpeechRecognitionService : IAsyncDisposable
     }
 
     /// <summary>
-    /// Được gọi từ JavaScript khi audio capture hoàn tất.
-    /// Gửi audio lên /stt và invoke callback với text kết quả.
+    /// Được gọi từ JavaScript khi transcription hoàn tất (sau khi gửi audio qua HTTP).
     /// </summary>
     [JSInvokable]
-    public async Task OnAudioCaptured(byte[] audioData, string mimeType)
+    public async Task OnTranscriptionResult(string text)
     {
-        Console.WriteLine($"[SpeechRecognitionService] OnAudioCaptured: {audioData.Length} bytes, mimeType={mimeType}");
+        Console.WriteLine($"[SpeechRecognitionService] OnTranscriptionResult: '{text}'");
         _isRecording = false;
 
         var callback = _onTranscribed;
@@ -123,31 +122,27 @@ public class SpeechRecognitionService : IAsyncDisposable
         _dotNetRef?.Dispose();
         _dotNetRef = null;
 
-        if (callback == null || audioData.Length == 0)
+        if (callback == null)
         {
-            Console.WriteLine("[SpeechRecognitionService] OnAudioCaptured: no callback or empty audio");
+            Console.WriteLine("[SpeechRecognitionService] OnTranscriptionResult: no callback");
             return;
         }
 
         try
         {
-            Console.WriteLine($"[SpeechRecognitionService] Sending {audioData.Length} bytes ({mimeType}) to STT...");
-            var text = await _speechService.TranscribeAsync(audioData, mimeType);
-
             if (!string.IsNullOrWhiteSpace(text))
             {
-                Console.WriteLine($"[SpeechRecognitionService] STT result: {text}");
+                Console.WriteLine($"[SpeechRecognitionService] Invoking callback with text: {text}");
                 await callback(text);
             }
             else
             {
-                Console.WriteLine("[SpeechRecognitionService] STT returned empty text");
+                Console.WriteLine("[SpeechRecognitionService] Transcription result is empty");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SpeechRecognitionService] Transcription error: {ex.Message}");
-            Console.WriteLine($"[SpeechRecognitionService] Stack trace: {ex.StackTrace}");
+            Console.WriteLine($"[SpeechRecognitionService] Callback error: {ex.Message}");
         }
     }
 
